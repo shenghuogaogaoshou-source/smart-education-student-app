@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f6f2" />
+  <title>数智学习世界</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <div id="debug-log"
+    style="position:fixed;bottom:0;left:0;right:0;background:#ffffd0;color:#333;padding:5px;z-index:9999;font-size:11px;max-height:150px;overflow:auto;font-family:monospace;">
+  </div>
+  <script>
+    // Shims for browser environment
+    window.process = window.process || { env: { NODE_ENV: 'production' } };
+    window.global = window;
+    window.Buffer = window.Buffer || { isBuffer: function () { return false; } };
+    window.setImmediate = window.setImmediate || function (fn) { return setTimeout(fn, 0); };
+    // Debug log
+    window.__dbg = function (msg) {
+      var div = document.getElementById('debug-log');
+      if (div) { var line = new Date().toLocaleTimeString() + ' ' + msg; div.textContent = line + '\n' + div.textContent; }
+      try { console.log(msg); } catch (e) { }
+    };
+    window.addEventListener('error', function (e) {
+      window.__dbg('ERROR: ' + e.message + ' @ ' + (e.filename || '') + ':' + (e.lineno || ''));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      window.__dbg('REJECTION: ' + (e.reason && e.reason.message || e.reason));
+    });
+    window.__dbg('page loaded');
+  </script>
+  <script type="module" src="/dev-entry.js"></script>
+</body>
+
+</html>

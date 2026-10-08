@@ -1,0 +1,935 @@
+/* ===== 闯关界面 · 立体3D关卡地图 ===== */
+
+/* 小学端主题变量 */
+:root[data-stage="elementary"] {
+  --map-bg-1: #FFF8E8;
+  --map-bg-2: #FFEED8;
+  --map-bg-3: #FFD8C0;
+  --map-bg-4: #FFC0A8;
+  --path-c1: #E8B878;
+  --path-c2: #E89878;
+  --coin-gold-a: #FFE68A;
+  --coin-gold-b: #F5C030;
+  --coin-gold-c: #C88A00;
+  --coin-gold-shadow: rgba(200, 138, 0, 0.45);
+  --coin-gold-inner: rgba(255, 255, 255, 0.65);
+  --coin-gold-edge: rgba(160, 100, 0, 0.55);
+  --coin-completed-face: #FFC840;
+  --coin-completed-light: #FFE880;
+  --coin-completed-dark: #C88800;
+  --coin-completed-side: #B07800;
+  /* 侧面厚度带 */
+  --coin-completed-bottom: #9A6800;
+  /* 底面 */
+  --coin-current-face: #6BCF7F;
+  --coin-current-light: #A8E8B5;
+  --coin-current-dark: #3E9E4E;
+  --coin-current-side: #2E7E3E;
+  --coin-current-bottom: #1F6830;
+  --coin-locked-face: #D8CCBF;
+  --coin-locked-light: #F0E8DF;
+  --coin-locked-dark: #9A8E80;
+  --coin-locked-side: #7A7065;
+  --coin-locked-bottom: #605850;
+  --coin-completed-icon: #6B4400;
+  --coin-current-icon: #FFFFFF;
+  --coin-locked-icon: #FFFFFF;
+  --chest-body: #C89050;
+  --chest-lid: #E8A860;
+  --chest-band: #F5C542;
+  --trophy-gold: #F5C542;
+  --trophy-gold-light: #FFE080;
+  --trophy-gold-dark: #C88800;
+  --label-color: #6B4A3A;
+  --label-muted: #9C8A7E;
+  --chip-bg: rgba(255, 255, 255, 0.72);
+  --chip-border: rgba(255, 200, 160, 0.5);
+  --glow-1: rgba(255, 216, 160, 0.4);
+  --glow-2: rgba(255, 180, 200, 0.35);
+  --unit-title: #E87045;
+  --unit-num: #B07840;
+}
+
+/* 中学端主题变量 */
+:root[data-stage="secondary"] {
+  --map-bg-1: #F4F0FB;
+  --map-bg-2: #E4DBF2;
+  --map-bg-3: #D0C0E8;
+  --map-bg-4: #B8A4DC;
+  --path-c1: #B094D0;
+  --path-c2: #8FA8D8;
+  --coin-gold-a: #D8C4F0;
+  --coin-gold-b: #A88AD0;
+  --coin-gold-c: #6E4FA8;
+  --coin-gold-shadow: rgba(110, 79, 168, 0.4);
+  --coin-gold-inner: rgba(255, 255, 255, 0.55);
+  --coin-gold-edge: rgba(70, 49, 120, 0.55);
+  --coin-completed-face: #A88AD0;
+  --coin-completed-light: #D8C4F0;
+  --coin-completed-dark: #6E4FA8;
+  --coin-completed-side: #5A3E88;
+  --coin-completed-bottom: #4A3272;
+  --coin-current-face: #5B8FD8;
+  --coin-current-light: #94BBE8;
+  --coin-current-dark: #3E6BB5;
+  --coin-current-side: #2E5595;
+  --coin-current-bottom: #244580;
+  --coin-locked-face: #C4BED4;
+  --coin-locked-light: #E8E4F0;
+  --coin-locked-dark: #8A849A;
+  --coin-locked-side: #6E687E;
+  --coin-locked-bottom: #554F66;
+  --coin-completed-icon: #2D1E4A;
+  --coin-current-icon: #FFFFFF;
+  --coin-locked-icon: #FFFFFF;
+  --chest-body: #6E5CA0;
+  --chest-lid: #8F7DBF;
+  --chest-band: #D8B842;
+  --trophy-gold: #C0A0F0;
+  --trophy-gold-light: #E8D8FF;
+  --trophy-gold-dark: #7A5CC0;
+  --label-color: #3D3A4A;
+  --label-muted: #8A8699;
+  --chip-bg: rgba(255, 255, 255, 0.65);
+  --chip-border: rgba(176, 148, 208, 0.45);
+  --glow-1: rgba(200, 180, 240, 0.4);
+  --glow-2: rgba(170, 200, 240, 0.3);
+  --unit-title: #6E4FA8;
+  --unit-num: #8F74BE;
+}
+
+/* ===== 页面主体 ===== */
+.test-page {
+  position: relative;
+  min-height: 100vh;
+  padding: max(18px, env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, var(--map-bg-1) 0%, var(--map-bg-2) 25%, var(--map-bg-3) 60%, var(--map-bg-4) 100%);
+  overflow: hidden;
+}
+
+/* ===== 顶部区 ===== */
+.test-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.test-unit {
+  min-width: 0;
+}
+
+.unit-num {
+  display: block;
+  color: var(--unit-num);
+  font-size: calc(0.72rem * var(--font-scale));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.test-unit h2 {
+  margin: 0;
+  color: var(--unit-title);
+  font-size: calc(1.2rem * var(--font-scale));
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.resource-row {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.chip-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+}
+
+.chip-flame {
+  color: #F28B2C;
+}
+
+.chip-gem {
+  color: #3B82F6;
+}
+
+.chip-bolt {
+  color: #E85FBF;
+}
+
+.chip-val {
+  font-size: calc(0.84rem * var(--font-scale));
+  font-weight: 800;
+  color: var(--label-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 关卡地图区 ===== */
+.level-map {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 200px);
+  min-height: 500px;
+  z-index: 1;
+}
+
+/* 背景光晕装饰 */
+.map-bg-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(30px);
+}
+
+.map-glow-1 {
+  top: 8%;
+  left: -20%;
+  width: 60%;
+  aspect-ratio: 1;
+  background: var(--glow-1);
+}
+
+.map-glow-2 {
+  bottom: 15%;
+  right: -15%;
+  width: 55%;
+  aspect-ratio: 1;
+  background: var(--glow-2);
+}
+
+/* SVG 路径连线 */
+.map-path-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.map-path-line {
+  animation: dashFlow 30s linear infinite;
+}
+
+@keyframes dashFlow {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/* ===== 关卡节点容器 ===== */
+.level-node {
+  position: absolute;
+  transform: translate(-50%, 50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 关卡名称 */
+.level-label {
+  font-size: calc(0.72rem * var(--font-scale));
+  font-weight: 750;
+  color: var(--label-color);
+  text-align: center;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+/* ===== 3D 圆柱币（SVG 绘制卡通风格） ===== */
+.circle-node {}
+
+/* 按钮容器 —— 薄版 SVG 外框（更宽更扁，符合薄币比例） */
+.level-coin {
+  position: relative;
+  width: 82px;
+  height: 50px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 3;
+  transition: transform 0.12s ease;
+  transform-origin: center bottom;
+}
+
+.level-coin:active {
+  transform: scale(0.95);
+}
+
+/* SVG 容器 —— 填满按钮 */
+.level-coin-svg .coin-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* === 三种状态的 fill 变量映射 === */
+
+/* ---- 已完成（金色/紫色币） ---- */
+.level-completed .c-ground {
+  fill: rgba(0, 0, 0, 0.22);
+}
+
+.level-completed .c-bottom {
+  fill: var(--coin-completed-bottom);
+}
+
+.level-completed .c-side-l,
+.level-completed .c-side-r,
+.level-completed .c-side-mid {
+  fill: var(--coin-completed-side);
+}
+
+.level-completed .c-side-bottom-stripe {
+  fill: rgba(0, 0, 0, 0.15);
+}
+
+.level-completed .c-face {
+  fill: var(--coin-completed-face);
+}
+
+.level-completed .c-shine {
+  fill: var(--coin-completed-light);
+  opacity: 0.55;
+}
+
+.level-completed .c-icon-check {
+  fill: none;
+  stroke: var(--coin-completed-icon);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- 当前关卡（绿/蓝币）+ 跳动动画 ---- */
+.level-current .c-ground {
+  fill: rgba(0, 0, 0, 0.25);
+}
+
+.level-current .c-bottom {
+  fill: var(--coin-current-bottom);
+}
+
+.level-current .c-side-l,
+.level-current .c-side-r,
+.level-current .c-side-mid {
+  fill: var(--coin-current-side);
+}
+
+.level-current .c-side-bottom-stripe {
+  fill: rgba(0, 0, 0, 0.18);
+}
+
+.level-current .c-face {
+  fill: var(--coin-current-face);
+}
+
+.level-current .c-shine {
+  fill: var(--coin-current-light);
+  opacity: 0.6;
+}
+
+.level-current .c-icon-book {
+  stroke: var(--coin-current-icon);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.level-current {
+  animation: coinBounce 2.2s ease-in-out infinite;
+}
+
+@keyframes coinBounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* ---- 锁定关卡（灰色币） ---- */
+.level-locked .c-ground {
+  fill: rgba(0, 0, 0, 0.18);
+}
+
+.level-locked .c-bottom {
+  fill: var(--coin-locked-bottom);
+}
+
+.level-locked .c-side-l,
+.level-locked .c-side-r,
+.level-locked .c-side-mid {
+  fill: var(--coin-locked-side);
+}
+
+.level-locked .c-side-bottom-stripe {
+  fill: rgba(0, 0, 0, 0.12);
+}
+
+.level-locked .c-face {
+  fill: var(--coin-locked-face);
+}
+
+.level-locked .c-shine {
+  fill: var(--coin-locked-light);
+  opacity: 0.5;
+}
+
+.level-locked .c-icon-lock {
+  stroke: var(--coin-locked-icon);
+  stroke-width: 2.2;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.level-locked .coin-svg {
+  filter: grayscale(0.2);
+  opacity: 0.9;
+}
+
+.level-locked {
+  cursor: default;
+}
+
+.level-locked:active {
+  transform: none;
+}
+
+/* === 当前关卡的旋转光环 + 脉冲光晕（纯装饰） === */
+.current-ring {
+  position: absolute;
+  inset: -10px -12px -14px;
+  border-radius: 50%;
+  border: 2.5px dashed var(--coin-current-face);
+  border-top-color: var(--coin-current-light);
+  opacity: 0.7;
+  animation: ringSpin 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes ringSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.current-glow {
+  position: absolute;
+  inset: -18px -20px -24px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--coin-current-face) 0%, transparent 70%);
+  opacity: 0.2;
+  animation: glowPulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.38;
+  }
+}
+
+/* === 地面阴影（关卡节点下方的柔和阴影） === */
+.level-shadow-circle {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 12px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.18) 0%, transparent 75%);
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ===== 宝箱节点 ===== */
+.level-chest {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
+  animation: chestBounce 3s ease-in-out infinite;
+}
+
+@keyframes chestBounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.level-chest svg {
+  width: 100%;
+  height: 100%;
+}
+
+.chest-body {
+  fill: var(--chest-body);
+}
+
+.chest-lid {
+  fill: var(--chest-lid);
+}
+
+.chest-lock {
+  fill: #FFE680;
+}
+
+.chest-lock-hole {
+  fill: var(--chest-body);
+}
+
+.chest-band {
+  fill: var(--chest-band);
+}
+
+.level-shadow-chest {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 12px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.2) 0%, transparent 75%);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* ===== 奖杯节点 ===== */
+.level-trophy {
+  width: 80px;
+  height: 86px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.25));
+  animation: trophySpin 6s linear infinite;
+  transform-origin: 50% 90%;
+}
+
+@keyframes trophySpin {
+
+  0%,
+  40%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  45% {
+    transform: rotate(-6deg);
+  }
+
+  55% {
+    transform: rotate(6deg);
+  }
+
+  60%,
+  95% {
+    transform: rotate(0deg);
+  }
+}
+
+.level-trophy svg {
+  width: 100%;
+  height: 100%;
+}
+
+.trophy-cup {
+  fill: var(--trophy-gold);
+}
+
+.trophy-handle {
+  fill: var(--trophy-gold-dark);
+  opacity: 0.6;
+}
+
+.trophy-base {
+  fill: var(--trophy-gold-dark);
+}
+
+.trophy-foot {
+  fill: var(--trophy-gold);
+}
+
+.trophy-shine {
+  fill: var(--trophy-gold-light);
+  opacity: 0.7;
+}
+
+.level-shadow-trophy {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 14px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.22) 0%, transparent 75%);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* ===== 云朵小羊吉祥物 × 2 — 对角放置，远离所有关卡 ===== */
+.mascot-container {
+  position: absolute;
+  transform: translate(-50%, 50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 左下角 —— 挥手打招呼（wave） */
+.mascot-bottom-left {
+  /* 左下安全区：所有关卡最左是 x=22%（l4），我们放在 x=10% 绝对不会碰 */
+  left: 10%;
+  bottom: 6%;
+}
+
+/* 右上角 —— 欢呼打气（cheer） */
+.mascot-top-right {
+  /* 右上安全区：所有关卡最右是 x=78%（l5），最高是 y=5%（l1），我们放在 x=90% bottom=96% 绝对不会碰 */
+  left: 90%;
+  bottom: 96%;
+}
+
+/* 吉祥物整体大幅缩小 */
+.mascot-wrap {
+  position: relative;
+  transform: scale(0.5);
+  transform-origin: center bottom;
+}
+
+/* 右上的那个：水平翻转镜像，让它朝左看地图更自然 */
+.mascot-top-right .mascot-wrap {
+  transform: scale(0.5) scaleX(-1);
+}
+
+/* ---- 默认动作：挥手（wave）—— 只动一只胳膊 ---- */
+.mascot-svg.mascot-action-wave .arm-l {
+  animation: waveArm 2.8s ease-in-out infinite;
+}
+
+.mascot-svg.mascot-action-wave .arm-r {
+  transform: rotate(-25deg);
+}
+
+@keyframes waveArm {
+
+  0%,
+  12%,
+  100% {
+    transform: rotate(25deg);
+  }
+
+  6% {
+    transform: rotate(55deg);
+  }
+}
+
+/* ---- cheer 动作：双臂举起 + 上下跳动 ---- */
+.mascot-svg.mascot-action-cheer .arm-l {
+  animation: cheerArmL 1.6s ease-in-out infinite;
+}
+
+.mascot-svg.mascot-action-cheer .arm-r {
+  animation: cheerArmR 1.6s ease-in-out infinite;
+}
+
+.mascot-top-right .mascot-wrap {
+  animation: cheerBounce 2.8s ease-in-out infinite;
+}
+
+@keyframes cheerArmL {
+
+  0%,
+  100% {
+    transform: rotate(30deg);
+  }
+
+  50% {
+    transform: rotate(-15deg);
+  }
+}
+
+@keyframes cheerArmR {
+
+  0%,
+  100% {
+    transform: rotate(-30deg);
+  }
+
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes cheerBounce {
+
+  0%,
+  100% {
+    transform: scale(0.5) scaleX(-1) translateY(0);
+  }
+
+  50% {
+    transform: scale(0.5) scaleX(-1) translateY(-6px);
+  }
+}
+
+/* 呼吸 + 呆毛摇摆 + 腿踏步 —— 两种动作都保留 */
+
+/* 吉祥物身体组整体呼吸 */
+.mascot-svg .body-group {
+  animation: bodyBreath 3.5s ease-in-out infinite;
+  transform-origin: 50% 70%;
+}
+
+@keyframes bodyBreath {
+
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(1.04);
+  }
+}
+
+/* 头顶呆毛（轻微摇摆） */
+.mascot-svg .tuft {
+  transform-origin: 50% 100%;
+  animation: tuftSway 2.8s ease-in-out infinite;
+}
+
+@keyframes tuftSway {
+
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+/* ===== 默认手臂动画：只用于没有指定 action 的吉祥物 ===== */
+/* wave 动作：左胳膊挥 / cheer：双臂举高 —— 已经各自在上面定义好了 */
+/* 这里是 fallback：wave 未覆盖的右胳膊，和 cheer 未覆盖的基础 */
+
+/* 眨眼（两种动作都要） */
+.mascot-svg .eye-l {
+  transform-origin: 50% 50%;
+  animation: blink 4.5s ease-in-out infinite;
+}
+
+.mascot-svg .eye-r {
+  transform-origin: 50% 50%;
+  animation: blink 4.5s ease-in-out infinite;
+  animation-delay: 0.05s;
+}
+
+@keyframes blink {
+
+  0%,
+  42%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  45% {
+    transform: scaleY(0.12);
+  }
+}
+
+/* wave 动作的右胳膊：固定姿态，不挥手 */
+.mascot-svg.mascot-action-wave .arm-r {
+  transform: rotate(-25deg);
+  animation: none;
+}
+
+/* cheer 动作的双臂已经在上面定义了，不需要 fallback */
+
+/* 腿：轻微踏步 */
+.mascot-svg .leg-l {
+  animation: legStepL 1.2s ease-in-out infinite;
+}
+
+.mascot-svg .leg-r {
+  animation: legStepR 1.2s ease-in-out infinite;
+}
+
+@keyframes legStepL {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes legStepR {
+
+  0%,
+  100% {
+    transform: translateY(-2px);
+  }
+
+  50% {
+    transform: translateY(0);
+  }
+}
+
+/* 说话气泡 */
+.mascot-bubble {
+  position: absolute;
+  top: -10px;
+  right: 100%;
+  margin-right: 12px;
+  padding: 8px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: #fff;
+  color: var(--label-color);
+  font-size: calc(0.72rem * var(--font-scale));
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  opacity: 0;
+  animation: bubblePop 6s ease-in-out infinite;
+}
+
+.mascot-bubble::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  bottom: 14px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #fff;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+@keyframes bubblePop {
+
+  0%,
+  15%,
+  100% {
+    opacity: 0;
+    transform: translateX(6px) scale(0.85);
+  }
+
+  20%,
+  90% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 360px) {
+  .level-coin {
+    width: 58px;
+    height: 58px;
+  }
+
+  .level-chest {
+    width: 64px;
+    height: 64px;
+  }
+
+  .level-trophy {
+    width: 70px;
+    height: 76px;
+  }
+
+  .mascot-svg {
+    transform: scale(0.88);
+  }
+
+  .level-label {
+    font-size: calc(0.68rem * var(--font-scale));
+  }
+}
+
+/* ===== 减少动效 ===== */
+@media (prefers-reduced-motion: reduce) {
+
+  .mascot-wrap,
+  .mascot-svg .body-group,
+  .mascot-svg .tuft,
+  .mascot-svg .arm-l,
+  .mascot-svg .arm-r,
+  .mascot-svg .eye-l,
+  .mascot-svg .eye-r,
+  .mascot-svg .leg-l,
+  .mascot-svg .leg-r,
+  .mascot-bubble,
+  .level-completed .level-coin,
+  .level-chest,
+  .level-trophy,
+  .current-ring,
+  .current-glow {
+    animation: none !important;
+  }
+}
+

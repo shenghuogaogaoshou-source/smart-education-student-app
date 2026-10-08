@@ -1,0 +1,91 @@
+:root,
+:root[data-stage="elementary"] {
+  /* 小学端：奶杏蜜桃 · 暖米白 + 蜜桃橘 + 柔粉 + 奶黄 + 淡薄荷（可爱梦幻 · 精灵暖毛绒） */
+  --page: #FFFCF7;
+  --page-glow-1: #FFD9B8;
+  --page-glow-2: #FFC8C8;
+  --page-glow-3: #FFF0C8;
+  --surface: #FFFFFF;
+  --surface-soft: #FFF7EC;
+  --surface-strong: #F7EFE9;
+  /* 文字：深暖棕，清晰护眼 */
+  --ink: #4A3024;
+  --ink-soft: #6B4A3A;
+  --muted: #8C7A6E;
+  --line: #F2E8DF;
+  /* 主色：饱和蜜桃橘（突出主体） */
+  --primary: #FF9D6E;
+  --primary-deep: #E87045;
+  --primary-ink: #FFFFFF;
+  --primary-wash: #FFE6D5;
+  /* 辅色：柔和粉 */
+  --accent: #FFB0B0;
+  --accent-deep: #E07878;
+  --accent-wash: #FFE4E4;
+  /* 点缀：淡薄荷浅绿 */
+  --warm-accent: #BFE6C8;
+  --warm-accent-wash: #EAF6EE;
+  /* 星星装饰 */
+  --star-color: #FFC98A;
+  /* 毛玻璃（带蜜桃淡彩着色） */
+  --glass-bg: rgba(255, 252, 247, 0.82);
+  --glass-tint: rgba(255, 157, 110, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.92);
+  --glass-ink: #4A3024;
+  --glass-muted: #8C7A6E;
+  --radius-lg: 26px;
+  --radius-md: 18px;
+  --shadow: 0 18px 45px rgba(232, 112, 69, 0.18);
+  --content-gap: 18px;
+}
+
+:root[data-stage="secondary"] {
+  /* 中学端：梦幻马卡龙 · 奶白 + 梦幻天蓝 + 梦境紫 + 糖果粉 */
+  --page: #FDFBF8;
+  --page-glow-1: #C8DEEF;
+  --page-glow-2: #D4C4E8;
+  --page-glow-3: #F5D4DC;
+  --surface: #FFFFFF;
+  --surface-soft: #F6F1EC;
+  --surface-strong: #EDE4D6;
+  --ink: #3D3A4A;
+  --ink-soft: #5F5B70;
+  --muted: #8A8699;
+  --line: #EDE4DA;
+  /* 主色：梦幻天蓝 */
+  --primary: #A8C8E4;
+  --primary-deep: #6E9DC8;
+  --primary-ink: #FFFFFF;
+  --primary-wash: #EAF1F8;
+  /* 辅色：梦境紫 */
+  --accent: #CFBDE8;
+  --accent-deep: #8F74BE;
+  --accent-wash: #EFE7F8;
+  /* 点缀：糖果粉 */
+  --warm-accent: #F5B5C8;
+  --warm-accent-wash: #FCEAF0;
+  /* 星星装饰 */
+  --star-color: #F5C7A5;
+  /* 毛玻璃（带淡彩着色） */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-tint: rgba(168, 200, 228, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --glass-ink: #3D3A4A;
+  --glass-muted: #8A8699;
+  --radius-lg: 26px;
+  --radius-md: 18px;
+  --shadow: 0 18px 45px rgba(110, 157, 200, 0.14);
+  --content-gap: 18px;
+}
+
+:root[data-font-scale="standard"] {
+  --font-scale: 1;
+}
+
+:root[data-font-scale="large"] {
+  --font-scale: 1.12;
+}
+
+:root[data-font-scale="xlarge"] {
+  --font-scale: 1.24;
+}
