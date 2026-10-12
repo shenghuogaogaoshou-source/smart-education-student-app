@@ -1,44 +1,42 @@
-import { ArrowLeft, BookOpen, Clock, FlaskConical, GraduationCap, Lightbulb, PenTool, Send, Sparkles, Target, Wand2 } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, BookOpen, Clock, FlaskConical, GraduationCap, Lightbulb, PenTool, Send, Sparkles, Target, Wand2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAppState } from '../../app/AppState'
 
-type Shortcut = { icon: typeof Sparkles; title: string; desc: string; color: string }
+type Shortcut = { icon: typeof Sparkles; title: string; desc: string }
 
 const SHORTCUTS_BY_STAGE: Record<'elementary' | 'secondary', Shortcut[]> = {
   elementary: [
-    { icon: PenTool, title: '拍照答疑', desc: '不会的题扫一扫', color: 'from-sky-400/30 to-cyan-300/20' },
-    { icon: Clock, title: '今日预习', desc: '跟着 AI 学新课', color: 'from-violet-400/30 to-fuchsia-300/20' },
-    { icon: BookOpen, title: '字词闯关', desc: '拼音听写 · 成语接龙', color: 'from-amber-400/30 to-orange-300/20' },
-    { icon: Sparkles, title: '故事陪读', desc: '和 AI 一起读故事', color: 'from-pink-400/30 to-rose-300/20' },
+    { icon: BookOpen, title: '认识 AI', desc: '发现身边的 AI 超能力' },
+    { icon: PenTool, title: '提示词练习', desc: '把话说清楚，让 AI 听懂' },
+    { icon: FlaskConical, title: '教 AI 认世界', desc: '收集样本，试试图像分类' },
+    { icon: Sparkles, title: '真相侦探社', desc: '查证 AI 回答，保护小秘密' },
   ],
   secondary: [
-    { icon: PenTool, title: '拍照答疑', desc: '掌握解题套路', color: 'from-sky-400/30 to-cyan-300/20' },
-    { icon: GraduationCap, title: '名校真题', desc: '完整答案，详解解析', color: 'from-violet-400/30 to-fuchsia-300/20' },
-    { icon: FlaskConical, title: '实验助手', desc: '理化实验模拟演示', color: 'from-emerald-400/30 to-teal-300/20' },
-    { icon: Target, title: '错题复盘', desc: '把错题变成提分点', color: 'from-amber-400/30 to-orange-300/20' },
+    { icon: BookOpen, title: 'AI 原理答疑', desc: '理解数据、模型与算法' },
+    { icon: GraduationCap, title: '数据侦探营', desc: '采集、清洗、标注与分割' },
+    { icon: FlaskConical, title: 'AI 实验助手', desc: '从采集到训练，再到测试' },
+    { icon: Target, title: '模型评估复盘', desc: '用准确率与错误案例找问题' },
   ],
 }
 
 const SUGGESTIONS_BY_STAGE: Record<'elementary' | 'secondary', string[]> = {
   elementary: [
-    '怎么写好看的排比句？',
-    '30 ÷ 6 为什么等于 5？',
-    '地球为什么是圆的？',
-    '推荐几本适合我的课外书',
+    '语音助手是怎么听懂我说话的？',
+    '怎样教 AI 分清苹果和香蕉？',
+    '使用 AI 时，哪些个人信息不能告诉它？',
   ],
   secondary: [
-    '什么是熵？',
-    '洛必达法则怎么使用？',
-    '我是文科生，想深入学习人工智能，应该怎么学习？',
-    '工商管理专业是学什么的，好找工作吗？',
+    'AI 与按固定规则运行的程序有什么区别？',
+    '训练数据中的偏差会怎样影响 AI 的判断？',
+    '推荐算法为什么总给我推送相似的内容？',
   ],
 }
 
-const TOOL_CHIPS: Array<{ icon: typeof Lightbulb; label: string; color: string }> = [
-  { icon: Lightbulb, label: '知识答疑', color: 'amber' },
-  { icon: PenTool, label: '题目解析', color: 'blue' },
-  { icon: Wand2, label: '学习规划', color: 'emerald' },
+const TOOL_CHIPS: Array<{ icon: typeof Lightbulb; label: string }> = [
+  { icon: Lightbulb, label: '知识答疑' },
+  { icon: PenTool, label: '题目解析' },
+  { icon: Wand2, label: '学习规划' },
 ]
 
 export function AiPanel({ onClose }: { onClose: () => void }) {
@@ -76,17 +74,17 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
             <span className="ai-name-accent">{state.aiName}</span>
             <span className="ai-name-suffix"> - 你的智能学习助教</span>
           </h1>
-          <p>{state.stage === 'elementary' ? '陪你一起探索，把学习变好玩~' : '直连名校精品内容，即刻获取可信权威的学习辅导服务'}</p>
+          <p>{state.stage === 'elementary' ? '认识 AI、动手尝试，一起发现智能世界的奥秘' : '理解数据与模型，在实验中探索 AI 的原理与边界'}</p>
         </div>
 
         {/* 快捷入口 */}
         <section className="ai-section">
-          <h2 className="ai-section-title">期末真题复习</h2>
+          <h2 className="ai-section-title">AI 学习探索</h2>
           <div className="ai-shortcut-grid">
             {shortcuts.map((s, i) => {
               const Icon = s.icon
               return (
-                <button key={i} type="button" className={`ai-shortcut-card bg-gradient-to-br ${s.color}`}>
+                <button key={i} type="button" className="ai-shortcut-card">
                   <div>
                     <strong>{s.title}</strong>
                     <small>{s.desc}</small>
@@ -103,9 +101,10 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
           <h2 className="ai-section-title">你也许想问</h2>
           <div className="ai-suggestion-list">
             {suggestions.map((q, i) => (
-              <button key={i} type="button" className={`ai-suggestion ${i < 2 ? 'ai-suggestion-soft' : 'ai-suggestion-primary'}`} onClick={() => setInput(q)}>
-                <Sparkles aria-hidden="true" size={14} />
+              <button key={i} type="button" className="ai-panel-question" onClick={() => setInput(q)}>
+                <span className="ai-question-number">0{i + 1}</span>
                 <span>{q}</span>
+                <ArrowUpRight aria-hidden="true" size={15} />
               </button>
             ))}
           </div>
@@ -118,7 +117,7 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
           {TOOL_CHIPS.map((t, i) => {
             const Icon = t.icon
             return (
-              <button key={i} type="button" className={`ai-tool-chip tool-${t.color}`}>
+              <button key={i} type="button" className="ai-tool-chip">
                 <Icon aria-hidden="true" size={14} />
                 <span>{t.label}</span>
               </button>

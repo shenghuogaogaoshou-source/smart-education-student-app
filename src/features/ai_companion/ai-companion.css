@@ -52,8 +52,8 @@
   width: min(100%, 460px);
   height: 100%;
   padding: max(12px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom));
-  background: #fafbfd;
-  color: #1a2233;
+  background: #ffffff;
+  color: #303231;
   overflow: hidden;
 }
 
@@ -72,14 +72,14 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: #f0f2f6;
-  color: #1a2233;
+  background: #f5f6f5;
+  color: #303231;
   cursor: pointer;
   transition: background .15s;
 }
 
 .ai-header-btn:hover {
-  background: #e6e8ee;
+  background: #ecefed;
 }
 
 .ai-header-actions {
@@ -90,6 +90,8 @@
 /* 标题区 */
 .ai-panel-title {
   margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed #d9ddda;
 }
 
 .ai-panel-title h1 {
@@ -101,19 +103,16 @@
 }
 
 .ai-name-accent {
-  background: linear-gradient(135deg, #4f9fff, #7c5cff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #4bbd70;
 }
 
 .ai-name-suffix {
-  color: #1a2233;
+  color: #303231;
 }
 
 .ai-panel-title p {
   margin: 0;
-  color: #6b7280;
+  color: #747775;
   font-size: calc(.78rem * var(--font-scale));
   line-height: 1.55;
 }
@@ -126,7 +125,7 @@
 .ai-section-title {
   font-size: calc(.82rem * var(--font-scale));
   font-weight: 700;
-  color: #374151;
+  color: #505451;
   margin: 0 0 12px;
 }
 
@@ -152,7 +151,36 @@
   cursor: pointer;
   overflow: hidden;
   transition: transform .15s, box-shadow .15s;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .04);
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+
+.ai-shortcut-card:nth-child(1) {
+  background: #def8fa;
+}
+
+.ai-shortcut-card:nth-child(2) {
+  background: #eee8fb;
+}
+
+.ai-shortcut-card:nth-child(2) .ai-shortcut-icon {
+  color: #b5a4df;
+}
+
+.ai-shortcut-card:nth-child(3) {
+  background: #eaf6ef;
+}
+
+.ai-shortcut-card:nth-child(3) .ai-shortcut-icon {
+  color: #8ebaa0;
+}
+
+.ai-shortcut-card:nth-child(4) {
+  background: #fcf3e5;
+}
+
+.ai-shortcut-card:nth-child(4) .ai-shortcut-icon {
+  color: #cfb48b;
 }
 
 .ai-shortcut-card:active {
@@ -162,13 +190,13 @@
 .ai-shortcut-card strong {
   font-size: calc(.82rem * var(--font-scale));
   font-weight: 700;
-  color: #1a2233;
+  color: #303231;
   display: block;
 }
 
 .ai-shortcut-card small {
   font-size: calc(.65rem * var(--font-scale));
-  color: #6b7280;
+  color: #747775;
   display: block;
   margin-top: 3px;
 }
@@ -177,7 +205,7 @@
   position: absolute;
   right: 12px;
   bottom: 10px;
-  opacity: .55;
+  color: #83b9c5;
 }
 
 /* 推荐问题 */
@@ -187,33 +215,51 @@
   gap: 8px;
 }
 
-.ai-suggestion {
-  display: flex;
+.ai-panel-question {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 11px 14px;
-  border: 0;
-  border-radius: 14px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #414542;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .15s ease;
   font-size: calc(.75rem * var(--font-scale));
-  cursor: pointer;
+  line-height: 1.5;
   text-align: left;
-  transition: transform .12s;
+  cursor: pointer;
 }
 
-.ai-suggestion:active {
-  transform: scale(.98);
+.ai-panel-question:hover {
+  color: #368452;
+  background: #f5f8f4;
+  box-shadow: 0 4px 12px rgba(48, 70, 54, .08);
+  transform: translateY(-2px);
 }
 
-.ai-suggestion-soft {
-  background: linear-gradient(135deg, #fff8ec, #fff3d6);
-  color: #7a5500;
+.ai-panel-question:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
-.ai-suggestion-primary {
-  background: #fff;
-  color: #374151;
-  border: 1px solid #eef0f4;
+@media (prefers-reduced-motion: reduce) {
+  .ai-panel-question {
+    transition: none;
+  }
+
+  .ai-panel-question:hover {
+    transform: none;
+  }
+}
+
+.ai-question-number {
+  color: #999080;
+  font-size: .65rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 弹性空间 */
@@ -235,7 +281,9 @@
   align-items: center;
   gap: 5px;
   padding: 7px 12px;
-  border: 1px solid transparent;
+  border: 1px solid #e8eae8;
+  background: #ffffff;
+  color: #454a46;
   border-radius: 999px;
   font-size: calc(.68rem * var(--font-scale));
   font-weight: 600;
@@ -247,23 +295,9 @@
   transform: scale(.95);
 }
 
-.tool-amber {
-  background: #fff8ec;
-  color: #b45309;
-  border-color: #fde68a;
-}
-
-.tool-blue {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-}
-
-.tool-emerald {
-  background: #ecfdf5;
-  color: #047857;
-  border-color: #a7f3d0;
-}
+.ai-tool-chip:nth-child(1) svg { color: #dfa63f; }
+.ai-tool-chip:nth-child(2) svg { color: #719bd5; }
+.ai-tool-chip:nth-child(3) svg { color: #53b88d; }
 
 /* 输入区 */
 .ai-input-bar {
@@ -274,7 +308,7 @@
   padding: 10px 12px 12px;
   background: #fff;
   border-radius: 20px;
-  border: 1px solid #eef0f4;
+  border: 1px solid #eceeec;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, .03);
 }
 
@@ -286,12 +320,23 @@
   outline: none;
   background: transparent;
   font-size: calc(.82rem * var(--font-scale));
-  color: #1a2233;
+  color: #303231;
   resize: none;
 }
 
+.ai-input:focus,
+.ai-input:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.ai-input-bar:focus-within {
+  border-color: #b7dcc4;
+}
+
 .ai-input::placeholder {
-  color: #9ca3af;
+  color: #9ca19d;
 }
 
 .ai-input-actions {
@@ -306,16 +351,16 @@
   display: grid;
   place-items: center;
   padding: 6px 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #eceeec;
   border-radius: 999px;
-  background: #f9fafb;
+  background: #ffffff;
   cursor: pointer;
 }
 
 .ai-reasoning-tag {
   font-size: calc(.62rem * var(--font-scale));
   font-weight: 600;
-  color: #6b7280;
+  color: #747775;
 }
 
 .ai-input-cam {
@@ -325,8 +370,8 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: #f3f4f6;
-  color: #374151;
+  background: #f5f6f5;
+  color: #505451;
   cursor: pointer;
 }
 
@@ -337,13 +382,14 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4f9fff, #7c5cff);
+  background: #51b979;
   color: #fff;
   cursor: pointer;
   transition: opacity .15s;
 }
 
 .ai-input-send:disabled {
-  opacity: .4;
+  background: #e9ebea;
+  color: #ffffff;
   cursor: default;
 }
