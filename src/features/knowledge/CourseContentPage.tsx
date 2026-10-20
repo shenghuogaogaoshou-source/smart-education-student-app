@@ -433,7 +433,7 @@ function QmxContent({ story }: { story: NonNullable<typeof stories[0]> }) {
           <button
             type="button"
             className="story-player__main"
-            onClick={() => readAloud.play()}
+            onClick={() => (readAloud.isPlaying ? readAloud.pause() : readAloud.play())}
             aria-label={readAloud.isPlaying ? '暂停播读' : '开始播读'}
           >
             {readAloud.isPlaying ? <Pause size={20} /> : <Play size={20} />}
