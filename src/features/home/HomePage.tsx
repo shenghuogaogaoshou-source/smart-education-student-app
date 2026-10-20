@@ -1,18 +1,10 @@
 import { ArrowRight, Camera, ChevronRight, Clock3, Search, Sparkles } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HomeSearch } from './HomeSearch'
 import { AchievementShowcase } from './AchievementShowcase'
 import { CameraToolSheet } from './CameraToolSheet'
 import { games, homeCopy } from './homeData'
 import './home.css'
-
-const carouselGradients = [
-  'linear-gradient(135deg, #FFF5E6 0%, #FFD9B8 30%, #FF9D6E 65%, #E87045 100%)',
-  'linear-gradient(135deg, #FFE4EF 0%, #FFB8D4 30%, #FF8AB0 65%, #E85F8A 100%)',
-  'linear-gradient(135deg, #FFF8E0 0%, #FFE8A8 30%, #FFC958 65%, #FFA82E 100%)',
-  'linear-gradient(135deg, #F3E6FF 0%, #E0B8E8 30%, #C88AB4 65%, #A85F8A 100%)',
-  'linear-gradient(135deg, #FFF0E0 0%, #FFCFA8 30%, #FF9D8A 65%, #E87060 100%)',
-]
 
 const carouselDecorations = [
   { size: 48, icon: Sparkles },
@@ -29,7 +21,6 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const copy = homeCopy
-  const gradients = carouselGradients
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -58,7 +49,6 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
   }
 
   const currentNews = copy.news[currentNewsIndex]
-  const currentGradient = gradients[currentNewsIndex % gradients.length]
   const deco = carouselDecorations[currentNewsIndex % carouselDecorations.length]
   const DecorIcon = deco.icon
 
@@ -78,14 +68,16 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
       <section className="news-carousel-section" aria-label="最新 AI 通识资讯">
         <div
           className="news-carousel"
-          style={{ background: currentGradient }}
+          style={{ '--news-cover': `url('${currentNews.cover}')` } as CSSProperties}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
+          {/* 背景图放在 ::before 上并单独压暗，遮罩只压暗背景，文字层保持在最上方 */}
+          <div className="news-carousel-overlay" style={{ background: currentNews.gradient }} aria-hidden="true" />
           <div className="carousel-content">
             <span className="carousel-tag">AI 通识新鲜报</span>
-            <h2 className="carousel-title">{currentNews}</h2>
+            <h2 className="carousel-title">{currentNews.title}</h2>
             <p className="carousel-desc">点击了解更多 AI 精彩内容</p>
           </div>
           <div className="carousel-decoration">

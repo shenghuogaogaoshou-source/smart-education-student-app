@@ -1,9 +1,43 @@
 import { Camera, FileScan, Languages, ScanLine, SearchCheck, Sparkles } from 'lucide-react'
 
+// 首页「AI 通识新鲜报」轮播：每条资讯配一张绘本背景图和一层渐变遮罩。
+// 遮罩只压暗背景，文字层始终在遮罩之上，不使用 filter 以免把标题一起变灰。
+export type HomeNewsItem = {
+  id: string
+  title: string
+  cover: string
+  gradient: string
+}
+
 export const homeCopy = {
   greeting: '你好，小小探索家',
   subline: '今天想和 AI 一起发现什么？',
-  news: ['AI 也要学会分清“像”和“一样”', '机器人怎样听懂不同的说话声音', '让电脑看图时，为什么要多看几个例子'],
+  news: [
+    {
+      id: 'comic-1',
+      title: 'AI 也要学会分清“像”和“一样”',
+      cover: '/courses/qmx/bg-robot-classroom.jpg',
+      gradient: 'linear-gradient(135deg, rgba(40, 35, 55, 0.75) 0%, rgba(80, 60, 100, 0.65) 50%, rgba(120, 80, 140, 0.55) 100%)',
+    },
+    {
+      id: 'comic-2',
+      title: '机器人怎样听懂不同的说话声音',
+      cover: '/courses/qmx/bg-girl-laptop.jpg',
+      gradient: 'linear-gradient(135deg, rgba(60, 40, 80, 0.75) 0%, rgba(100, 70, 120, 0.65) 50%, rgba(140, 100, 160, 0.55) 100%)',
+    },
+    {
+      id: 'comic-3',
+      title: 'AI 还在保护环境？小学生也能参与！',
+      cover: '/courses/qmx/bg-robot-earth.jpg',
+      gradient: 'linear-gradient(135deg, rgba(50, 60, 80, 0.75) 0%, rgba(80, 100, 140, 0.65) 50%, rgba(110, 140, 180, 0.55) 100%)',
+    },
+    {
+      id: 'comic-4',
+      title: '让电脑看图时，为什么要多看几个例子',
+      cover: '/courses/qmx/bg-robot-kid.jpg',
+      gradient: 'linear-gradient(135deg, rgba(80, 50, 60, 0.75) 0%, rgba(120, 80, 100, 0.65) 50%, rgba(160, 110, 140, 0.55) 100%)',
+    },
+  ] satisfies HomeNewsItem[],
 }
 
 export const games = [
