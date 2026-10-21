@@ -7,6 +7,24 @@ import { WorksGalleryPage } from './WorksGalleryPage'
 import { WorksProvider } from './WorksProvider'
 
 describe('WorksGalleryPage', () => {
+  it('uses illustrated back and ranking-period controls', () => {
+    render(
+      <AppStateProvider>
+        <WorksGalleryPage onBack={vi.fn()} />
+      </AppStateProvider>,
+    )
+
+    const back = screen.getByRole('button', { name: '返回' })
+    expect(back).toHaveClass('gallery-back-button')
+    expect(back.querySelector('svg')).not.toBeNull()
+
+    for (const label of ['每天', '每周', '每年']) {
+      const button = screen.getByRole('button', { name: label })
+      expect(button).toHaveClass('gallery-period-button')
+      expect(button.querySelector('svg')).not.toBeNull()
+    }
+  })
+
   it('只展示真实已发布作品并共享点赞收藏', async () => {
     const user = userEvent.setup()
     const repository = createMemoryWorkRepository()

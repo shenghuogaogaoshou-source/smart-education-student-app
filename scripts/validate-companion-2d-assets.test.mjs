@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import test, { afterEach } from 'node:test'
+import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,7 +27,7 @@ function frame(direction, layers) {
   }
 }
 
-it('reports a missing direction and a direction without its body layer', async () => {
+test('reports a missing direction and a direction without its body layer', async () => {
   const root = await makeFixture()
   const directions = [
     'front', 'front-right', 'right', 'back-right',
@@ -39,11 +40,11 @@ it('reports a missing direction and a direction without its body layer', async (
 
   const report = await validateCompanionAssetTree(root, [{ id: 'momo', frames }])
 
-  expect(report.errors).toContain('momo/back: missing layer body')
-  expect(report.errors).toContain('momo: missing direction front-left')
+  assert.ok(report.errors.includes('momo/back: missing layer body'))
+  assert.ok(report.errors.includes('momo: missing direction front-left'))
 })
 
-it('accepts complete transparent WebP layer files with bounded metadata', async () => {
+test('accepts complete transparent WebP layer files with bounded metadata', async () => {
   const root = await makeFixture()
   const directions = [
     'front', 'front-right', 'right', 'back-right',
@@ -68,6 +69,6 @@ it('accepts complete transparent WebP layer files with bounded metadata', async 
 
   const report = await validateCompanionAssetTree(root, [{ id: 'momo', frames }])
 
-  expect(report.errors).toEqual([])
-  expect(report.filesChecked).toBe(10)
+  assert.deepEqual(report.errors, [])
+  assert.equal(report.filesChecked, 10)
 })

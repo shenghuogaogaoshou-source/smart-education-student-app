@@ -4,13 +4,14 @@
 // 创建后动态注册到模块市场，可拖入画布使用
 // ============================================================
 import { useState, useCallback } from 'react'
-import { X, Plus, Trash2, ShieldCheck, ShieldAlert, Eye, Code2 } from 'lucide-react'
+import { X, Plus, Trash2, ShieldCheck, ShieldAlert, Eye, Code2, Sparkles, Loader2 } from 'lucide-react'
 import {
   addCustomModule,
   validateCode,
   DEFAULT_USER_CODE,
   type CustomModuleDef,
 } from '../../lib/customModules'
+import { generateModuleDraft, type AiModuleDraft } from '../../lib/aiAssistant'
 import type { PortDef, ParamDef, DataType, ModuleCategory } from '../../types/circuit'
 
 const DATA_TYPES: DataType[] = ['image', 'label', 'confidence', 'signal', 'text', 'number', 'audio']
@@ -56,6 +57,12 @@ export function CustomModuleCreator({ onClose, onCreated }: Props) {
   const [showPreview, setShowPreview] = useState(false)
   const [error, setError] = useState('')
 
+  // AI 助手：一句话需求 → 生成整套模块定义
+  const [requirement, setRequirement] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiDraft, setAiDraft] = useState<AiModuleDraft | null>(null)
+
   const validation = validateCode(code)
 
   const addInput = useCallback(() => {
@@ -99,6 +106,34 @@ export function CustomModuleCreator({ onClose, onCreated }: Props) {
     setParams(params.filter((_, i) => i !== idx))
   }
 
+  // AI 助手：把一句话需求变成填好的表单（失败只提示，不动已有内容）
+  const runAssistant = async () => {
+    const req = requirement.trim()
+    if (!req || aiBusy) return
+    setAiBusy(true)
+    setAiError('')
+    setAiDraft(null)
+    try {
+      const draft = await generateModuleDraft(req)
+      setName(draft.name)
+      setSubtitle(draft.subtitle)
+      setCategory(draft.category)
+      setIcon(draft.icon)
+      setAccent(draft.accent)
+      setDescription(draft.description)
+      setInputs(draft.inputs)
+      setOutputs(draft.outputs)
+      setParams(draft.params)
+      setCode(draft.code)
+      setError('')
+      setAiDraft(draft)
+    } catch (err) {
+      setAiError((err as Error).message || 'AI 生成失败，请换个说法重试')
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   const handleCreate = () => {
     setError('')
     if (!name.trim()) {
@@ -122,18 +157,25 @@ export function CustomModuleCreator({ onClose, onCreated }: Props) {
       return
     }
 
-    const mod = addCustomModule({
-      name: name.trim(),
-      subtitle: subtitle.trim() || name.trim(),
-      category,
-      icon,
-      accent,
-      description: description.trim() || '用户自定义模块',
-      inputs,
-      outputs,
-      params,
-      userCode: code,
-    })
+    let mod: CustomModuleDef
+    try {
+      mod = addCustomModule({
+        name: name.trim(),
+        subtitle: subtitle.trim() || name.trim(),
+        category,
+        icon,
+        accent,
+        description: description.trim() || '用户自定义模块',
+        inputs,
+        outputs,
+        params,
+        userCode: code,
+      })
+    } catch (err) {
+      // 保存失败（存储已满 / 被禁用）必须让用户看到，否则模块只在本次会话存在
+      setError((err as Error).message || '创建失败')
+      return
+    }
 
     onCreated?.(mod)
     onClose()
@@ -162,6 +204,57 @@ export function CustomModuleCreator({ onClose, onCreated }: Props) {
 
         {/* 内容 */}
         <div className="max-h-[calc(88vh-120px)] overflow-y-auto px-5 py-4">
+          {/* AI 助手：一句话生成模块 */}
+          <div
+            className="mb-4 rounded-xl p-3"
+            style={{ border: '2px solid var(--ink)', background: 'rgba(168,136,199,0.1)', boxShadow: '2px 2px 0 0 var(--ink)' }}
+          >
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-violet-sig" />
+              <span className="chip font-bold text-text-dim">让 AI 帮你设计</span>
+            </div>
+            <textarea
+              value={requirement}
+              onChange={(e) => setRequirement(e.target.value)}
+              placeholder="例如：做一个模块，当标签包含「垃圾」时输出真信号；或者：把 0~1 的置信度换算成 0~100 的百分比并输出数值"
+              rows={3}
+              className="w-full resize-y rounded-lg p-2 font-kalam text-[12.5px] leading-relaxed text-text placeholder:text-text-faint focus:outline-none"
+              style={{ border: '1.5px solid var(--ink)', background: 'var(--surface)' }}
+            />
+            <button
+              onClick={runAssistant}
+              disabled={aiBusy || !requirement.trim()}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 font-mono text-[12px] font-bold text-ink transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ border: '2px solid var(--ink)', background: 'var(--violet)', boxShadow: '2px 2px 0 0 var(--ink)' }}
+            >
+              {aiBusy ? <Loader2 size={13} className="spin-slow" /> : <Sparkles size={13} />}
+              {aiBusy ? 'AI 生成中…' : '让 AI 生成模块'}
+            </button>
+            {aiError && (
+              <p
+                className="mt-2 rounded-md px-2 py-1.5 text-[11.5px] font-bold text-red-sig"
+                style={{ border: '1.5px solid var(--red)', background: 'rgba(198,107,90,0.1)' }}
+              >
+                {aiError}
+              </p>
+            )}
+            {aiDraft && (
+              <div
+                className="mt-2 rounded-md px-2 py-1.5 text-[11.5px] leading-relaxed"
+                style={{ border: '1.5px solid var(--green)', background: 'rgba(138,171,110,0.1)' }}
+              >
+                <p className="font-bold text-green-sig">
+                  已生成「{aiDraft.name} · {aiDraft.subtitle}」：{aiDraft.description}
+                </p>
+                {aiDraft.explanation && <p className="mt-0.5 text-text-dim">{aiDraft.explanation}</p>}
+                <p className="mt-0.5 text-text-faint">下面各栏已自动填好，可以直接点「创建模块」。</p>
+              </div>
+            )}
+            <p className="mt-2 text-[10.5px] leading-relaxed text-text-faint">
+              生成的代码仍会经过本机安全检查；API Key 保存在浏览器本地，仅适合课堂/本地使用。
+            </p>
+          </div>
+
           {/* 基本信息 */}
           <Section title="基本信息">
             <div className="grid grid-cols-2 gap-3">

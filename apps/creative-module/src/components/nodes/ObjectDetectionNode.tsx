@@ -5,7 +5,7 @@
 // ============================================================
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
-import { ScanSearch, Box, AlertTriangle, Loader2 } from 'lucide-react'
+import { Box, AlertTriangle, Loader2 } from 'lucide-react'
 import { NodeShell } from './NodeShell'
 import { getModule } from '../../lib/moduleRegistry'
 import { useCircuit } from '../../store/circuitStore'

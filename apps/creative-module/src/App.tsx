@@ -85,7 +85,10 @@ export default function App() {
     const persist = () => {
       const { nodes, edges } = useCircuit.getState()
       labDraft.current = captureDraft(nodes, edges)
-      saveDraft(labDraft.current)
+      // 存不下时（本地存储已满 / 隐私模式）明确告警，别让学生以为已经保存
+      if (!saveDraft(labDraft.current)) {
+        console.warn('画布草稿保存失败：本地存储已满或不可用，刷新后可能丢失修改')
+      }
     }
     const unsubscribe = useCircuit.subscribe((state, previous) => {
       if (state.running || (state.nodes === previous.nodes && state.edges === previous.edges)) return

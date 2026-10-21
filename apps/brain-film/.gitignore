@@ -14,3 +14,7 @@ desktop.ini
 .DS_Store
 # 后端运行时数据(作品库、日志)
 data/
+
+# Python 缓存
+__pycache__/
+*.pyc

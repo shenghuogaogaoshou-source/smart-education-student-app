@@ -26,25 +26,48 @@ function DelayTimerNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
   const startAtRef = useRef(0)
   const fireTimerRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
+  // 倒计时/回落链是否仍在跑：定时器被清掉后要靠它重新武装
+  const armedRef = useRef(false)
+
+  // 清掉所有挂起的定时器与动画帧（停止 / 卸载 / 依赖变化时都走这里）
+  const clearTimers = () => {
+    armedRef.current = false
+    if (fireTimerRef.current) {
+      clearTimeout(fireTimerRef.current)
+      fireTimerRef.current = null
+    }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }
 
   useEffect(() => {
     if (!running) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      if (fireTimerRef.current) clearTimeout(fireTimerRef.current)
-      return
+      // 停止：清定时器 + 复位边沿检测与显示状态。
+      // 不复位 lastTrigRef 的话，停止→运行时 trig 仍是 true，上升沿永远不会再来，
+      // 表现为“再运行也不触发、界面卡在倒计时中”。
+      clearTimers()
+      lastTrigRef.current = false
+      setPhase('idle')
+      setElapsed(0)
+      return () => clearTimers()
     }
 
-    // 上升沿：启动
-    if (trig && !lastTrigRef.current) {
+    // 上升沿（或延时参数变化导致链被清掉后仍在激活状态）：启动倒计时
+    if (trig && (!lastTrigRef.current || !armedRef.current)) {
       startAtRef.current = performance.now()
       setPhase('counting')
       setElapsed(0)
       if (fireTimerRef.current) clearTimeout(fireTimerRef.current)
+      armedRef.current = true
       fireTimerRef.current = window.setTimeout(() => {
         // 到时：先亮，再回落
         emitPacket(id, 'delayed', { type: 'signal', active: true, ts: Date.now() })
         setPhase('fire')
         fireTimerRef.current = window.setTimeout(() => {
+          fireTimerRef.current = null
+          armedRef.current = false
           emitPacket(id, 'delayed', { type: 'signal', active: false, ts: Date.now() })
           setPhase('idle')
         }, 250)
@@ -60,17 +83,16 @@ function DelayTimerNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
     }
     // 下降沿：取消
     if (!trig && lastTrigRef.current) {
-      if (fireTimerRef.current) {
-        clearTimeout(fireTimerRef.current)
-        fireTimerRef.current = null
-      }
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      clearTimers()
       setPhase('idle')
       setElapsed(0)
     }
 
     lastTrigRef.current = trig
-    return () => { /* noop */ }
+    // 卸载 / 依赖变化：挂起的 fireTimer、回落定时器与 raf 一并清掉，
+    // 否则节点被删后还会发出一次 delayed 脉冲
+    return () => clearTimers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trig, running, delayMs, id, emitPacket])
 
   const percent = phase === 'counting' ? Math.min(100, (elapsed / delayMs) * 100) : phase === 'fire' ? 100 : 0

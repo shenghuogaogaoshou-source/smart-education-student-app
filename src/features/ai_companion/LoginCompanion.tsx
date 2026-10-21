@@ -6,7 +6,11 @@ import { startSpeechCapture, speakCompanionReply } from './browserSpeech'
 import { requestCompanionReply } from './companionChat'
 import { getCompanionItem } from './companionCatalog'
 import { CompanionBubble } from './CompanionBubble'
-import { createConversationController, motionForConversationStatus } from './conversation/conversationMachine'
+import {
+  createConversationController,
+  motionForConversationStatus,
+  type ConversationSnapshot,
+} from './conversation/conversationMachine'
 import { selectCompanionAction } from './interaction/actionSelector'
 import { createGestureMachine } from './interaction/gestureMachine'
 import { PartnerAppearance } from './PartnerAppearance'
@@ -18,6 +22,14 @@ type LoginCompanionProps = {
 }
 
 export const LOGIN_COMPANION_HANDOFF_KEY = 'student-app-login-companion-bounds'
+
+function loginConversationError(reason: ConversationSnapshot['errorReason']) {
+  if (reason === 'permission-denied') return '麦克风还没有获得允许，可以在地址栏里打开麦克风权限。'
+  if (reason === 'not-supported') return '当前浏览器暂不支持语音识别，可以登录后用文字和我聊天。'
+  if (reason === 'request-error') return '知识问答暂时没有连上，可以稍后再问一次。'
+  if (reason === 'start-failed' || reason === 'recognition-error') return '麦克风刚才没有启动成功，可以再试一次。'
+  return '我没有听清楚，可以靠近一点再说一次吗？'
+}
 
 export function LoginCompanion({ loadout: presentedLoadout, onBoundsChange }: LoginCompanionProps) {
   const { state } = useAppState()
@@ -140,7 +152,7 @@ export function LoginCompanion({ loadout: presentedLoadout, onBoundsChange }: Lo
 
   const bubbleMessage = conversation.status === 'transcribing'
     ? conversation.interimText
-    : conversation.reply || reactionMessage
+    : conversation.reply || (conversation.status === 'error' ? loginConversationError(conversation.errorReason) : reactionMessage)
   const bubbleState = conversation.status === 'idle' && !conversation.reply ? 'idle' : conversation.status
   const motion = conversation.status === 'idle'
     ? reactionMotion

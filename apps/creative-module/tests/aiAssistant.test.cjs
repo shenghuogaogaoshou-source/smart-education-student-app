@@ -100,7 +100,7 @@ test('缺少名称或代码时报中文错误', () => {
   assert.throws(() => ai.normalizeDraft({ name: 'X', outputs: [{ id: 's', type: 'signal' }] }), /求值代码/);
 });
 
-test('默认接入 DeepSeek 且可被本地设置覆盖', () => {
-  assert.equal(ai.AI_DEFAULTS.endpoint, 'https://api.deepseek.com/chat/completions');
-  assert.match(ai.AI_DEFAULTS.apiKey, /^sk-/);
+test('默认通过智芽代理接入 DeepSeek，浏览器端不保存密钥', () => {
+  assert.equal(ai.AI_DEFAULTS.endpoint, '/api/deepseek/chat/completions');
+  assert.equal(ai.AI_DEFAULTS.apiKey, '');
 });

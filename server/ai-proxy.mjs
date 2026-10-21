@@ -74,10 +74,26 @@ async function createReply(body, { apiKey = process.env.DEEPSEEK_API_KEY, fetchI
   return prepareStudentReply(content)
 }
 
+async function proxyJsonRequest({ url, apiKey, body, fetchImpl }) {
+  if (!apiKey) throw new Error('missing_api_key')
+  const upstream = await fetchImpl(url, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  if (!upstream.ok) throw new Error('provider_error')
+  return upstream.json()
+}
+
 export async function handleCompanionApiRequest(
   { method, path, body },
   {
     apiKey = process.env.DEEPSEEK_API_KEY,
+    arkApiKey = process.env.ARK_API_KEY,
+    arkImageModel = process.env.ARK_IMAGE_MODEL || process.env.ARK_MODEL,
     fetchImpl = fetch,
     interpretIntent = interpretCompanionIntent,
     recognizeImage = recognize,
@@ -114,6 +130,40 @@ export async function handleCompanionApiRequest(
       }
     }
   }
+  if (path === '/api/deepseek/chat/completions') {
+    try {
+      const result = await proxyJsonRequest({
+        url: 'https://api.deepseek.com/chat/completions',
+        apiKey,
+        body: {
+          ...body,
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+        },
+        fetchImpl,
+      })
+      return { status: 200, body: result }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'provider_error'
+      return { status: code === 'missing_api_key' ? 503 : 502, body: { error: code } }
+    }
+  }
+  if (path === '/api/ark/images/generations') {
+    try {
+      const result = await proxyJsonRequest({
+        url: process.env.ARK_IMAGE_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+        apiKey: arkApiKey,
+        body: {
+          ...body,
+          model: arkImageModel || body?.model,
+        },
+        fetchImpl,
+      })
+      return { status: 200, body: result }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'provider_error'
+      return { status: code === 'missing_api_key' ? 503 : 502, body: { error: code } }
+    }
+  }
   if (path !== '/api/companion/reply') return { status: 404, body: { error: 'not_found' } }
 
   try {
@@ -146,7 +196,13 @@ export function startProxyServer(port = PORT) {
       }
       return
     }
-    const limit = path === '/api/companion/recognize' ? 7 * 1024 * 1024 : MAX_BODY_BYTES
+    const limit = path === '/api/companion/recognize'
+      ? 7 * 1024 * 1024
+      : path === '/api/deepseek/chat/completions'
+        ? 1024 * 1024
+        : path === '/api/ark/images/generations'
+          ? 256 * 1024
+          : MAX_BODY_BYTES
     let body = {}
     try {
       body = await readJson(request, limit)

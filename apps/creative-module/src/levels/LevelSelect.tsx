@@ -32,6 +32,9 @@ const SCENE_ICON: Record<SceneType, typeof Waves> = {
   ecocity: Building2,
 }
 
+// 关卡按年级分成三档板块（顺序即展示顺序）
+const GRADE_BANDS = ['1-2年级', '3-4年级', '5-6年级'] as const
+
 const DIFFICULTY_COLOR: Record<string, string> = {
   入门: '#8aab6e',
   简单: '#6ba3c3',
@@ -107,24 +110,54 @@ export function LevelSelect({ onBack, onEnter }: LevelSelectProps) {
             </div>
           </div>
 
-          {/* 关卡时间线 */}
-          <div className="space-y-4">
-            {LEVELS.map((level, idx) => {
-              const unlocked = level.id <= maxUnlocked
-              const best = bestScores[level.id]
-              const passed = best !== undefined
-              const isNext = level.id === maxUnlocked && !passed
+          {/* 关卡时间线：按年级分三个板块 */}
+          <div className="space-y-7">
+            {GRADE_BANDS.map((band) => {
+              const bandLevels = LEVELS.filter((l) => l.grade === band)
+              if (bandLevels.length === 0) return null
+              // 该板块涉及的难度（按出现顺序去重）
+              const bandDiffs = [...new Set(bandLevels.map((l) => l.difficulty))]
               return (
-                <LevelCard
-                  key={level.id}
-                  level={level}
-                  index={idx}
-                  unlocked={unlocked}
-                  passed={passed}
-                  best={best}
-                  isNext={isNext}
-                  onEnter={() => unlocked && onEnter(level.id)}
-                />
+                <section key={band} className="space-y-4">
+                  {/* 板块标题：年级徽章 + 关卡数/难度摘要 + 分隔线 */}
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="handwritten grid shrink-0 place-items-center rounded-lg px-2.5 py-1 text-[16px] font-bold text-ink"
+                      style={{
+                        border: '2.5px solid var(--ink)',
+                        background: 'var(--surface)',
+                        boxShadow: '3px 3px 0 0 var(--ink)',
+                      }}
+                    >
+                      {band}
+                    </span>
+                    <span className="chip shrink-0 text-text-faint">
+                      {bandLevels.length} 个关卡 · {bandDiffs.join(' / ')}
+                    </span>
+                    <div className="h-[2.5px] flex-1 bg-ink/25" />
+                  </div>
+
+                  <div className="space-y-4">
+                    {bandLevels.map((level) => {
+                      const unlocked = level.id <= maxUnlocked && !level.comingSoon
+                      const best = bestScores[level.id]
+                      const passed = best !== undefined
+                      const isNext = !level.comingSoon && level.id === maxUnlocked && !passed
+                      return (
+                        <LevelCard
+                          key={level.id}
+                          level={level}
+                          isLastInBand={level.id === bandLevels[bandLevels.length - 1].id}
+                          unlocked={unlocked}
+                          passed={passed}
+                          best={best}
+                          isNext={isNext}
+                          onEnter={() => unlocked && onEnter(level.id)}
+                        />
+                      )
+                    })}
+                  </div>
+                </section>
               )
             })}
           </div>
@@ -136,7 +169,7 @@ export function LevelSelect({ onBack, onEnter }: LevelSelectProps) {
 
 function LevelCard({
   level,
-  index,
+  isLastInBand,
   unlocked,
   passed,
   best,
@@ -144,7 +177,8 @@ function LevelCard({
   onEnter,
 }: {
   level: Level
-  index: number
+  /** 是否为所在年级板块的最后一张卡（板块末尾不画时间线竖线） */
+  isLastInBand: boolean
   unlocked: boolean
   passed: boolean
   best: number | undefined
@@ -235,6 +269,11 @@ function LevelCard({
               </div>
             </div>
           </div>
+        ) : level.comingSoon ? (
+          <div className="flex items-center gap-1.5 font-mono text-[11px] text-text-faint">
+            <Lock size={12} />
+            敬请期待
+          </div>
         ) : unlocked ? (
           <div
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 font-mono text-[12px] font-bold text-ink"
@@ -252,7 +291,7 @@ function LevelCard({
       </div>
 
       {/* 序号竖线装饰 */}
-      {index < LEVELS.length - 1 && (
+      {!isLastInBand && (
         <div className="pointer-events-none absolute -bottom-4 left-12 h-4 w-[2.5px] bg-ink/30" />
       )}
     </div>

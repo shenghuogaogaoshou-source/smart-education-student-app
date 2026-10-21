@@ -9,27 +9,6 @@ export type Difficulty = '入门' | '简单' | '中等' | '中高' | '挑战'
 /** 场景类型（决定可视化渲染器） */
 export type SceneType = 'ocean' | 'forest' | 'city' | 'crossroad' | 'ecocity'
 
-/** 场景中漂浮的物体（鱼/垃圾/火苗/行人…） */
-export interface SceneObject {
-  id: number
-  /** 物体类别标签（分类器应输出的标签） */
-  kind: string
-  /** 显示名 */
-  label: string
-  /** 当前 x 坐标（0~1，相对场景宽度） */
-  x: number
-  /** 当前 y 坐标（0~1，相对场景高度） */
-  y: number
-  /** 水平速度（每秒移动占比） */
-  vx: number
-  /** 外观样式 key（用于绘制不同外观） */
-  appearance: string
-  /** 是否已被处理（抓取/放行） */
-  resolved?: boolean
-  /** 处理结果：correct=正确处理, wrong=错误处理, miss=漏处理 */
-  result?: 'correct' | 'wrong' | 'miss'
-}
-
 /** 引导提示 */
 export interface LevelHint {
   /** 提示序号 */
@@ -40,6 +19,10 @@ export interface LevelHint {
   expect: 'addModule' | 'connect' | 'setParam' | 'run' | 'custom'
   /** 期望的模块类型/端口（用于检测完成） */
   target?: string
+  /** setParam 步骤期望达到的参数值（如 IF 的「当标签包含」=「垃圾」） */
+  expectValue?: string
+  /** setParam 步骤期望修改的参数名 */
+  expectParam?: string
 }
 
 /** 期望的电路连线模板（用于引导检测） */
@@ -78,6 +61,8 @@ export interface Level {
   passMinHandled: number
   /** 自由度：true=有引导，false=完全自由 */
   guided: boolean
+  /** 关卡数据已就绪但暂不可玩（显示「敬请期待」） */
+  comingSoon?: boolean
 }
 
 /** 关卡运行时统计 */
@@ -92,14 +77,4 @@ export interface LevelStats {
   total: number
   /** 当前已处理率 */
   handled: number
-}
-
-/** 关卡运行状态 */
-export interface LevelRunState {
-  status: 'idle' | 'running' | 'paused' | 'passed' | 'failed'
-  stats: LevelStats
-  /** 当前引导步骤索引 */
-  hintStep: number
-  /** 已完成的引导步骤 */
-  completedSteps: number[]
 }

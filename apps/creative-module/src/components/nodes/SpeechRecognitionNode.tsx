@@ -38,6 +38,13 @@ function SpeechRecognitionNodeComp({ id, data, selected }: NodeProps<CircuitNode
         : 'zh-CN'
   const continuous = data.params.mode === 'stream'
   const minConf = Number(data.params.confidenceThreshold ?? 0.7)
+  // 置信度阈值只用于过滤结果，不参与识别器的创建：
+  // 放进 ref 供 onresult 读取，并从依赖里移除，否则拖动滑块会把
+  // SpeechRecognition 实例反复 abort / 重建，识别被不停打断
+  const minConfRef = useRef(minConf)
+  useEffect(() => {
+    minConfRef.current = minConf
+  }, [minConf])
 
   useEffect(() => {
     if (!supported) return
@@ -85,7 +92,7 @@ function SpeechRecognitionNodeComp({ id, data, selected }: NodeProps<CircuitNode
       }
       setInterim(interimText)
       if (finalText) {
-        if (bestConf >= minConf) {
+        if (bestConf >= minConfRef.current) {
           const trimmed = finalText.trim()
           setTranscript(trimmed)
           if (continuous || !interimText) {
@@ -157,7 +164,7 @@ function SpeechRecognitionNodeComp({ id, data, selected }: NodeProps<CircuitNode
       setState('idle')
       setInterim('')
     }
-  }, [running, hasAudio, supported, lang, continuous, id, emitPacket, minConf])
+  }, [running, hasAudio, supported, lang, continuous, id, emitPacket])
 
   const status: 'idle' | 'running' | 'ready' | 'error' =
     state === 'error' ? 'error' : state === 'running' || state === 'starting' ? 'running' : hasAudio ? 'ready' : 'idle'

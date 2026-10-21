@@ -104,22 +104,21 @@ GET https://ark.cn-beijing.volces.com/api/v3/models      Header: Authorization: 
 后端起在**原来这台电脑**上,另一台设备只负责显示:
 
 ```
-电脑:  python server.py --lan            (或双击 启动手机模式.cmd)
-另一台: 浏览器/App 打开  http://<电脑IP>:8765/     ← 手机 App 里就填这个地址
+电脑:  launch.ps1 -Lan            (或双击 启动手机模式.cmd)
+另一台: 浏览器打开  http://<电脑IP>:5174/     ← 窗口启动时会打印这个地址
 ```
 
-前端所有 AI 请求都打到 `http://<电脑IP>:8765/api/*`,Key 一直留在这台机器上。手机 App 就是这种模式。
+前端所有 AI 请求都打到同一台机器上的 `/api/*`,Key 一直留在服务器。手机端不需要装 App。
 
 ### 方式 B:把后端整体搬过去
 
 ```
-必备: Python 3.8+(零依赖,不用 pip 装东西) · ffmpeg(合成带配音的影片要用)
+必备: Python 3.8+(零依赖,不用 pip 装东西) · Node 20+(跑 Vite) · ffmpeg(拼接带配音的影片要用)
 要拷贝的东西:
     脑洞放映厅/server.py          后端(托管网页 + 代理 AI + 作品库 SQLite)
-    脑洞放映厅/index.html  js/  css/   前端
+    脑洞放映厅/src/  css/  index.html  package.json  vite.config.ts   前端
     脑洞放映厅/.env               ← Key 都在这里(换网络要改下面的 HTTPS_PROXY)
-    脑洞放映厅/manifest.webmanifest  sw.js  icon-*.png   (手机 App / PWA 用)
-启动:  python server.py --port 8765 [--lan]
+启动:  npm install && launch.ps1       (只开后端: python server.py --port 8766)
 ```
 
 `.env` 里的字段(照抄字段名,填你自己确认过的值):

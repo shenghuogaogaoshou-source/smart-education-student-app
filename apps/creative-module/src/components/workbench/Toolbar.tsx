@@ -13,6 +13,7 @@ interface ToolbarProps {
 export function Toolbar({ onOpenLevels, onOpenWorks }: ToolbarProps) {
   const running = useCircuit((s) => s.running)
   const setRunning = useCircuit((s) => s.setRunning)
+  const resetCircuit = useCircuit((s) => s.resetCircuit)
   const modelStatus = useCircuit((s) => s.modelStatus)
   const engine = useCircuit((s) => s.engine)
   const nodes = useCircuit((s) => s.nodes)
@@ -108,7 +109,9 @@ export function Toolbar({ onOpenLevels, onOpenWorks }: ToolbarProps) {
         <button
           onClick={() => {
             if (confirm('清空当前电路？所有节点和连线将被移除。')) {
-              useCircuit.setState({ nodes: [], edges: [], selectedNodeId: null })
+              // 用 resetCircuit 而不是裸 setState：它还会停止运行并清理求值器状态，
+              // 否则清空后仍处于 running，自动保存会被跳过、刷新后旧电路又回来了
+              resetCircuit()
             }
           }}
           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-[12px] text-text-dim transition hover:text-red-sig"

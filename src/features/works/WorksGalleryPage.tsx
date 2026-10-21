@@ -1,15 +1,15 @@
-import { ArrowLeft, Bookmark, Heart, Sparkles } from 'lucide-react'
+import { Bookmark, CalendarDays, CalendarRange, ChevronLeft, Heart, Sparkles, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { rankPublishedWorks, type RankingPeriod } from './moderation'
 import { useOptionalWorks } from './WorksProvider'
 import './works.css'
 
-const periodLabels: Array<{ id: RankingPeriod; label: string }> = [
-  { id: 'day', label: '每天' },
-  { id: 'week', label: '每周' },
-  { id: 'year', label: '每年' },
-]
+const periodLabels = [
+  { id: 'day', label: '每天', Icon: Sun },
+  { id: 'week', label: '每周', Icon: CalendarDays },
+  { id: 'year', label: '每年', Icon: CalendarRange },
+] as const satisfies Array<{ id: RankingPeriod; label: string; Icon: typeof Sun }>
 
 export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; onWorkClick?: (workId: string) => void }) {
   const [period, setPeriod] = useState<RankingPeriod>('day')
@@ -20,8 +20,8 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
   return (
     <div className="works-gallery-page">
       <header className="gallery-header">
-        <button className="back-button" type="button" onClick={onBack} aria-label="返回">
-          <ArrowLeft size={20} />
+        <button className="gallery-back-button" type="button" onClick={onBack} aria-label="返回">
+          <ChevronLeft aria-hidden="true" size={21} />
         </button>
         <div className="gallery-header-title">
           <h1>作品展示</h1>
@@ -30,8 +30,17 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
       </header>
 
       <div className="gallery-period-tabs" aria-label="作品热度时间范围">
-        {periodLabels.map(({ id, label }) => (
-          <button key={id} type="button" aria-pressed={period === id} onClick={() => setPeriod(id)}>{label}</button>
+        {periodLabels.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            className="gallery-period-button"
+            type="button"
+            aria-pressed={period === id}
+            onClick={() => setPeriod(id)}
+          >
+            <Icon aria-hidden="true" size={16} />
+            <span>{label}</span>
+          </button>
         ))}
       </div>
 

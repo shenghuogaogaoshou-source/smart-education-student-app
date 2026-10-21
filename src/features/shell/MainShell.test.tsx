@@ -99,13 +99,35 @@ describe('main shell navigation', () => {
 
     await user.click(screen.getByRole('button', { name: /脑洞放映厅/ }))
 
-    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191')
+    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
     expect(screen.queryByRole('navigation', { name: '主要导航' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI伙伴' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '返回首页' }))
     expect(screen.getByRole('heading', { name: /你好/ })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: '主要导航' })).toBeInTheDocument()
+  })
+
+  it('opens the most recently played game directly from the empty works card', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('zhiya:last-played-game', 'creative-module')
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: /第一件作品正在等你/ }))
+
+    expect(screen.getByTitle('创造模块')).toHaveAttribute('src', 'http://127.0.0.1:5192/?gameVersion=20261021-3')
+    expect(screen.queryByRole('heading', { name: '继续创作' })).not.toBeInTheDocument()
+  })
+
+  it('opens the default game when no recent game has been recorded', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: /第一件作品正在等你/ }))
+
+    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
   })
 
   it('uses only the in-map interactive companion on the elementary test tab', async () => {
@@ -165,7 +187,7 @@ describe('main shell navigation', () => {
     expect(screen.getByRole('button', { name: 'AI伙伴' })).toBeInTheDocument()
   })
 
-  it('resumes the existing creation flow when asked to continue a game', async () => {
+  it('opens the last played game when asked to continue a game', async () => {
     const user = userEvent.setup()
     renderWithCompanionCommand({
       kind: 'command',
@@ -175,7 +197,8 @@ describe('main shell navigation', () => {
 
     await user.click(screen.getByRole('button', { name: '执行伙伴指令' }))
 
-    expect(screen.getByRole('heading', { name: '继续创作' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '脑洞放映厅' })).toBeInTheDocument()
+    expect(screen.getByTitle('脑洞放映厅')).toBeInTheDocument()
   })
 
   it('opens account security only after the high-risk password succeeds', async () => {

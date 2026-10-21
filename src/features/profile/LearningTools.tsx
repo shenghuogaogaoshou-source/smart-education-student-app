@@ -1,4 +1,7 @@
 import { Bookmark, Bot, ChevronRight, History, NotebookPen } from 'lucide-react'
+import { useAppState } from '../../app/AppState'
+import { getGradeBand } from '../../app/learning'
+import { getCourseForBand } from '../knowledge/courseCatalog'
 
 export function LearningTools({
   onOpenTools,
@@ -13,6 +16,11 @@ export function LearningTools({
   onOpenHistory?: () => void
   onOpenAiCenter?: () => void
 }) {
+  const { state } = useAppState()
+  const course = getCourseForBand(getGradeBand(state.grade))
+  const wrongQuestionCount = Math.min(6, course.quizzes.length)
+  const pendingWrongCount = Math.ceil(wrongQuestionCount * 2 / 3)
+
   return (
     <section className="profile-section tools-section" aria-labelledby="tools-title">
       <div className="section-heading-row">
@@ -27,7 +35,7 @@ export function LearningTools({
         <span>
           <strong>错题本</strong>
           <small>知识和测试中的疑问会整理在这里</small>
-          <em>还没有内容，慢慢积累就好</em>
+          <em>{wrongQuestionCount} 道测试错题 · {pendingWrongCount} 道待复习</em>
         </span>
         <ChevronRight aria-hidden="true" />
       </button>
@@ -35,12 +43,12 @@ export function LearningTools({
         <button type="button" onClick={onOpenFavorites}>
           <Bookmark aria-hidden="true" />
           <span>我的收藏</span>
-          <strong>6 项</strong>
+          <strong>4 部作品</strong>
         </button>
         <button type="button" onClick={onOpenHistory}>
           <History aria-hidden="true" />
           <span>学习记录</span>
-          <strong>本周 12 项</strong>
+          <strong>{course.parts.length} 个知识 · {course.quizzes.length} 个测试</strong>
         </button>
       </div>
       <button className="ai-center" type="button" onClick={onOpenAiCenter}>

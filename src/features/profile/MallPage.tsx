@@ -11,7 +11,6 @@ import {
   type CompanionCatalogItem,
 } from '../ai_companion/companionCatalog'
 import { PartnerAppearance } from '../ai_companion/PartnerAppearance'
-import { Companion2DRenderer } from '../ai_companion/render2d/Companion2DRenderer'
 import { CompanionRotator } from '../ai_companion/render2d/CompanionRotator'
 import type { CompanionDirection } from '../ai_companion/render2d/types'
 import './profile.css'
@@ -124,13 +123,6 @@ export function MallPage({ onBack }: { onBack: () => void }) {
     const isOwned = loadout.owned[item.category].includes(item.id)
     const isEquipped = loadout.equipped[item.category] === item.id
     const categoryLabel = CATEGORY_LABELS[item.category]
-    const appearanceThumbnailLoadout = item.category === 'appearance'
-      ? {
-          ...buildCompanionPreviewLoadout(loadout, item),
-          equipped: { appearance: item.id, outfit: null, decoration: null },
-        }
-      : loadout
-
     return (
       <article key={item.id} className={`mall-item mall-item-${categoryLabel} ${isOwned ? 'owned' : ''} ${isEquipped ? 'equipped' : ''}`}>
         <button
@@ -142,12 +134,13 @@ export function MallPage({ onBack }: { onBack: () => void }) {
           <span className="mall-pet-frame" style={{ background: item.gradient }}>
             {item.category === 'appearance' ? (
               <span className="mall-pet-thumbnail">
-                <Companion2DRenderer
-                  loadout={appearanceThumbnailLoadout}
-                  scene="mall"
-                  direction="front"
-                  motion="idle"
-                  reduceMotion={state.reduceMotion}
+                <img
+                  className="mall-front-portrait"
+                  data-testid={`mall-front-portrait-${item.id}`}
+                  src={`/pets/front/${item.id}-card-v2.png`}
+                  alt=""
+                  aria-hidden="true"
+                  draggable={false}
                 />
               </span>
             ) : (

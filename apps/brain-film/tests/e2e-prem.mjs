@@ -43,20 +43,52 @@ const DRAFT = {
 
 const SEED = `(() => {
   try {
-    localStorage.setItem('bh_draft', ${JSON.stringify(JSON.stringify(DRAFT))});
-    localStorage.setItem('bh_profile', JSON.stringify({ director: '测试导演' }));
+    /* 只在第一次播种:刷新后若还无条件写入,会把我自己塞的草稿冲掉 */
+    if (!localStorage.getItem('bh_draft')) {
+      localStorage.setItem('bh_draft', ${JSON.stringify(JSON.stringify(DRAFT))});
+      localStorage.setItem('bh_profile', JSON.stringify({ director: '测试导演' }));
+    }
   } catch (e) {}
+  const REMOTE_WORK = {
+    id: 'server-only-1', savedAt: '2026-10-20T08:00:00.000Z',
+    director: '备份导演', intern: '小映', title: '服务器备份作品', style: '水彩',
+    cards: [], synopsis: '', idea: '', story: '', refl: ['', ''], statement: '', log: [],
+    panels: [{ cap: '云端留下的一页', prm: '', svg: '', thumb: '' }],
+    filmMs: 0, filmSeconds: 0, videoUrl: '', videoModel: '',
+  };
+  window.__bhArchiveCalls = [];
   const realFetch = window.fetch ? window.fetch.bind(window) : null;
   window.confirm = () => true;
   window.fetch = async (input, init) => {
     const url = String(typeof input === 'string' ? input : (input && input.url) || '');
     const path = url.replace(/^https?:\\/\\/[^/]+/, '');
-    if (path === '/api/config') {
+    const pathname = path.split('?')[0];
+    if (pathname === '/api/config') {
       return new Response(JSON.stringify({ ok: true, backend: true, ai: false, version: 'test',
         modules: { story: { ready: false }, polish: { ready: false }, synopsis: { ready: false },
                    image: { ready: false }, video: { ready: false }, tts: { ready: false } },
         limits: { images: 12, voiceChars: 300, videosPerDay: 0, videoUnlimited: true, videosToday: 0, maxFilmSegments: 10 } }),
         { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (pathname === '/api/works' && (!init || !init.method || init.method === 'GET')) {
+      return new Response(JSON.stringify({ ok: true, works: [{
+        id: REMOTE_WORK.id, title: REMOTE_WORK.title, director: REMOTE_WORK.director,
+        style: REMOTE_WORK.style, pages: 1, updated_at: REMOTE_WORK.savedAt,
+      }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (pathname === '/api/works/server-only-1' && (!init || !init.method || init.method === 'GET')) {
+      return new Response(JSON.stringify({ ok: true, work: REMOTE_WORK }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (pathname === '/api/works' && init && init.method === 'POST') {
+      const work = JSON.parse(init.body || '{}').work || {};
+      window.__bhArchiveCalls.push({ method: 'POST', id: work.id });
+      return new Response(JSON.stringify({ ok: true, id: work.id }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (/^\\/api\\/works\\/[\\w-]+$/.test(pathname) && init && init.method === 'DELETE') {
+      window.__bhArchiveCalls.push({ method: 'DELETE', id: pathname.split('/').pop() });
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (realFetch) return realFetch(input, init);
     throw new Error('没有 mock 这个请求:' + path);
@@ -141,6 +173,15 @@ try {
 
   await cdp.send('Page.navigate', { url: APP });
   await waitFor(`!!document.querySelector('#film .page')`, 25000, '首映礼分镜区');
+
+  console.log('\n== 0. 本机作品库恢复服务器备份 ==');
+  await waitFor(`(() => { try { return JSON.parse(localStorage.getItem('bh_archive') || '[]').some(w => w.id === 'server-only-1'); } catch (e) { return false; } })()`,
+    8000, '服务器备份恢复到本机作品库');
+  const recovered = await js(`(() => {
+    const list = JSON.parse(localStorage.getItem('bh_archive') || '[]');
+    return { count: list.length, title: (list.find(w => w.id === 'server-only-1') || {}).title || '' };
+  })()`);
+  check('服务器备份会自动恢复到本机作品库', recovered.count === 1 && recovered.title === '服务器备份作品', JSON.stringify(recovered));
 
   console.log('\n== 1. 每一页的画面都画出来了 ==');
   const pages = await js(`Array.from(document.querySelectorAll('#film .page')).map(pg => ({
@@ -254,7 +295,9 @@ try {
       cover: !!document.querySelector('.arch-thumb img'),
     };
   })()`);
-  check('作品进了作品库', saved.works === 1, saved.works + ' 部');
+  check('新作品和服务器恢复的作品都在作品库', saved.works === 2, saved.works + ' 部');
+  const backupPost = await js(`window.__bhArchiveCalls.some(c => c.method === 'POST' && /^f/.test(c.id || ''))`);
+  check('装订新作品会同步备份到本机服务器', backupPost);
   check('两格有 AI 图的作品,存档里保留了画面', saved.thumbs.filter(n => n > 0).length === 2, '缩略图长度 ' + saved.thumbs.join('/'));
   check('存档不会撑爆本机存储(单部 < 400KB)', saved.bytes > 0 && saved.bytes < 400000, Math.round(saved.bytes / 1024) + ' KB');
   check('作品库封面用的是画面', saved.cover);
@@ -280,7 +323,48 @@ try {
     JSON.stringify(afterReplay.pages.slice(1)));
   check('重看时片子也还在', afterReplay.video, '页码 ' + afterReplay.pos.trim());
 
-  console.log('\n== 9. 页面没有报错 ==');
+  console.log('\n== 9. 删除也会同步服务器 ==');
+  await click('#btn-archive');
+  await sleep(250);
+  await click('.arch-item[data-id="server-only-1"] [data-act="del"]');
+  await sleep(250);
+  const backupDelete = await js(`window.__bhArchiveCalls.some(c => c.method === 'DELETE' && c.id === 'server-only-1')`);
+  check('删除作品会同步删除服务器备份', backupDelete);
+
+  console.log('\n== 10. Esc 能关掉设置弹窗 ==');
+  await click('#btn-settings');
+  await sleep(250);
+  const openedSettings = await js(`!document.querySelector('#m-settings').classList.contains('hidden')`);
+  await js(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true; })()`);
+  await sleep(250);
+  const closedSettings = await js(`document.querySelector('#m-settings').classList.contains('hidden')`);
+  check('点开设置弹窗', openedSettings);
+  check('按 Esc 能关掉(以前只能点完成)', closedSettings);
+
+  console.log('\n== 11. 刷新后失效的「本机录制」片子不挂死链接 ==');
+  await sleep(900);                      /* 等防抖的 saveDraft 落完,免得它把我的改动又盖回去 */
+  const seededBlob = await js(`(() => {
+    const d = JSON.parse(localStorage.getItem('bh_draft') || '{}');
+    d.stage = 'prem';
+    d.videoUrl = 'blob:http://127.0.0.1:5174/deadbeef';
+    d.videoModel = '本机录制(无配音)';
+    localStorage.setItem('bh_draft', JSON.stringify(d));
+    return (JSON.parse(localStorage.getItem('bh_draft') || '{}').videoUrl || '');
+  })()`);
+  check('测试草稿里确实放了失效 blob 地址', String(seededBlob).startsWith('blob:'), String(seededBlob).slice(0, 40));
+  await cdp.send('Page.reload');
+  await waitFor(`!!document.querySelector('#film .page')`, 25000, '刷新后首映礼');
+  await sleep(1200);
+  const blobState = await js(`(() => {
+    const box = document.querySelector('#film-player');
+    const v = document.querySelector('#film-player video');
+    const d = JSON.parse(localStorage.getItem('bh_draft') || '{}');
+    return { hidden: box.classList.contains('hidden'), src: (v || {}).src || '', draftUrl: String(d.videoUrl || '').slice(0, 40) };
+  })()`);
+  check('失效的 blob 片子被清掉,播放器收起', blobState.hidden && !String(blobState.src).startsWith('blob:'),
+    'hidden=' + blobState.hidden + ' src=' + String(blobState.src).slice(0, 30) + ' 草稿里=' + blobState.draftUrl);
+
+  console.log('\n== 12. 页面没有报错 ==');
   check('控制台没有 JS 错误', cdp.errors.length === 0, cdp.errors.join(' | '));
 
   const failed = results.filter(r => !r.ok);

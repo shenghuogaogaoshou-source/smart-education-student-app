@@ -38,7 +38,6 @@ describe('primary-only state migration', () => {
     expect(migrated.grade).toBe('grade5')
     expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
     expect(localStorage.getItem('student-app-primary-v3-migrated')).toBe('1')
-    const persisted = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
     saveState({ ...migrated, nickname: '新名字' })
     expect(loadState().nickname).toBe('新名字')
   })

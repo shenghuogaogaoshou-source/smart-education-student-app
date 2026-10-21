@@ -10,12 +10,6 @@ import { isSignalActive, type CircuitNodeData } from '../../types/circuit'
 
 type GateKind = 'and' | 'or' | 'not'
 
-function computeGate(kind: GateKind, a: boolean, b: boolean): boolean {
-  if (kind === 'and') return a && b
-  if (kind === 'or') return a || b
-  return !a // not
-}
-
 function GateShell({ data, selected }: NodeProps<CircuitNodeData>) {
   const module = getModule(data.moduleType)!
   const kind = data.moduleType as GateKind
@@ -24,7 +18,6 @@ function GateShell({ data, selected }: NodeProps<CircuitNodeData>) {
   const aActive = isSignalActive(data.inputs.a)
   const bActive = isSignalActive(data.inputs.b)
   const hasB = kind !== 'not'
-  const outActive = computeGate(kind, aActive, bActive)
   const outSignal = isSignalActive(data.outputs.signal)
 
   const opLabel = { and: 'AND', or: 'OR', not: 'NOT' }[kind]

@@ -1,6 +1,7 @@
 import { ChevronRight, Settings, UserRound } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
+import type { GameId } from '../games/gameRegistry'
 import { GrowthSection } from './GrowthSection'
 import { LearningOverview } from './LearningOverview'
 import { LearningTools } from './LearningTools'
@@ -44,7 +45,7 @@ export function ProfilePage({
   onOpenHistory?: () => void
   onOpenAiCenter?: () => void
   onOpenWorksManage?: () => void
-  onContinueCreate?: () => void
+  onContinueCreate?: (gameId?: GameId) => void
   onOpenWorksManageWithFilter?: (filter: string) => void
 }) {
   const { state } = useAppState()

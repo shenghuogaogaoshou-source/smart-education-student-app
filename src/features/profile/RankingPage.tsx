@@ -1,4 +1,4 @@
-import { ArrowLeft, Crown, Medal, Sparkles, Trophy } from 'lucide-react'
+import { ArrowLeft, Crown, Medal, Sparkles } from 'lucide-react'
 import './profile.css'
 
 type Ranker = {

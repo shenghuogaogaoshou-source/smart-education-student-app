@@ -4,6 +4,7 @@
 // ============================================================
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
+import { AlertTriangle } from 'lucide-react'
 import { NodeShell } from './NodeShell'
 import { getModule } from '../../lib/moduleRegistry'
 import { isSignalActive, type CircuitNodeData } from '../../types/circuit'
@@ -16,12 +17,26 @@ function IfNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const label = labelPkt && labelPkt.type === 'label' ? String(labelPkt.value) : null
 
   const target = String(data.params.targetLabel ?? '')
-  const match = label !== null && target.trim() !== '' && label.toLowerCase().includes(target.toLowerCase())
+  const targetEmpty = target.trim() === ''
+  const match = label !== null && !targetEmpty && label.toLowerCase().includes(target.toLowerCase())
   const active = isSignalActive(data.outputs.signal)
 
   return (
     <NodeShell module={module} selected={selected} status={status}>
       <div className="space-y-2">
+        {/* 没填目标标签 —— 空条件永远比不出结果 */}
+        {targetEmpty && (
+          <div
+            className="flex items-start gap-1.5 rounded-lg p-2 text-red-sig"
+            style={{ border: '1.5px solid var(--red)', background: 'rgba(198,107,90,0.1)' }}
+          >
+            <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+            <span className="text-[11px] leading-relaxed">
+              还没设置目标标签，信号永远不触发。请在元件底部的输入框（或点右上角 🔧）把「当标签包含」填成 AI 会输出的词，例如 暗 / 亮 / 垃圾。
+            </span>
+          </div>
+        )}
+
         {/* 规则展示 */}
         <div
           className="rounded-lg p-2 font-mono text-[11px] leading-relaxed"

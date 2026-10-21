@@ -7,6 +7,7 @@ import { NodeProps } from 'reactflow'
 import { Megaphone } from 'lucide-react'
 import { NodeShell } from './NodeShell'
 import { getModule } from '../../lib/moduleRegistry'
+import { useCircuit } from '../../store/circuitStore'
 import { isSignalActive, type CircuitNodeData } from '../../types/circuit'
 
 // -------------------- WebAudio 音效合成（无外部资源） --------------------
@@ -110,11 +111,14 @@ function playBeep(type: string, gainValue: number, durMs: number) {
 // -------------------- 组件 --------------------
 function BuzzerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const module = getModule(data.moduleType)!
+  const running = useCircuit((s) => s.running)
   const trig = isSignalActive(data.inputs.trigger)
   const txtPkt = data.inputs.text
   const customText = txtPkt?.type === 'text' ? String(txtPkt.value) : ''
   const lastTrigRef = useRef(false)
   const playTimerRef = useRef<number | null>(null)
+  // 本节点发出的语句：卸载/停止时只能取消“自己的”播报
+  const utterRef = useRef<SpeechSynthesisUtterance | null>(null)
 
   const mode = String(data.params.playMode ?? 'sound')
   const preset = String(data.params.presetSound ?? 'beep')
@@ -126,10 +130,38 @@ function BuzzerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const [idx, setIdx] = useState(0)
   const [msg, setMsg] = useState('待机')
 
+  /**
+   * 掐断播放链：清掉挂起的 repeat 定时器，并取消本节点发出的语句。
+   * 不这么做的话，删除节点 / 点停止 / 离开关卡后，剩余 repeat × duration 还会继续响。
+   */
+  const stopChain = () => {
+    if (playTimerRef.current) {
+      clearTimeout(playTimerRef.current)
+      playTimerRef.current = null
+    }
+    const u = utterRef.current
+    utterRef.current = null
+    if (u) {
+      // 先摘掉回调，再取消：浏览器没有“按语句取消”的 API，只能确定这条是我的才 cancel
+      u.onend = null
+      u.onerror = null
+      u.onstart = null
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    }
+  }
+
   useEffect(() => {
+    if (!running) {
+      // 停止 / 离开运行：立即掐断，否则剩余重复次数还会继续响
+      stopChain()
+      setPlaying(false)
+      setIdx(0)
+      lastTrigRef.current = trig
+      return
+    }
     if (trig && !lastTrigRef.current) {
       // 上升沿：播放
-      if (playTimerRef.current) { clearTimeout(playTimerRef.current); playTimerRef.current = null }
+      stopChain()
       setPlaying(true); setIdx(0); setMsg(mode === 'sound' ? `🔔 播放 ${preset}…` : '📢 朗读自定义文字…')
 
       const gain = Math.max(0, Math.min(1, volume))
@@ -145,6 +177,8 @@ function BuzzerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
             try {
               const u = new SpeechSynthesisUtterance(customText)
               u.volume = gain; u.rate = 1.0; u.lang = 'zh-CN'
+              u.onend = () => { if (utterRef.current === u) utterRef.current = null }
+              utterRef.current = u
               window.speechSynthesis.speak(u)
             } catch { /* noop */ }
           }
@@ -154,7 +188,14 @@ function BuzzerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
       tickOnce(0)
     }
     lastTrigRef.current = trig
-  }, [trig, mode, preset, volume, dur, repeat, customText])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, trig, mode, preset, volume, dur, repeat, customText])
+
+  // 卸载（删除节点 / 换关卡）：同样要掐断
+  useEffect(() => () => {
+    stopChain()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <NodeShell module={module} selected={selected} status={playing ? 'running' : 'ready'}>

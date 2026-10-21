@@ -136,7 +136,7 @@ export function WorkCheckPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="absolute bottom-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] max-w-[380px] flex-col overflow-hidden rounded-xl bg-surface"
+      className="absolute bottom-3 right-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] flex-col overflow-hidden rounded-xl bg-surface"
       style={{ border: '2.5px solid var(--ink)', boxShadow: '5px 5px 0 0 var(--ink)' }}
     >
       {/* 标题 */}

@@ -303,12 +303,18 @@ function OceanSceneComp({ running, onCanvasReady, onArmSignalReady, onStatsChang
     imageXRef.current = 1.3
     grabbedRef.current = false
     resultRef.current = null
+    // 机械臂/离场状态也要清：否则上一局锁存的抓取信号会让机器人抓走新一局的第一张照片
+    armActiveRef.current = false
+    armExtendRef.current = 0
+    leaveModeRef.current = 'passed'
     onStatsChangeRef.current({ ...statsRef.current })
 
     lastTimeRef.current = performance.now()
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - lastTimeRef.current) / 1000)
+      // 慢设备（CPU 推理）上 rAF 会掉到几帧每秒，若把 dt 钳在 0.05，场景就会变成
+      // 慢动作：一张照片要飘约 30 秒才走完一个阶段。放宽到 0.2 保证真实时间一致。
+      const dt = Math.min(0.2, (now - lastTimeRef.current) / 1000)
       lastTimeRef.current = now
 
       const canvas = canvasRef.current

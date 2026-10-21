@@ -27,6 +27,16 @@ function ImageInputNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
   const fileRef = useRef<HTMLInputElement>(null)
   const [loaded, setLoaded] = useState(false)
   const [sampleIdx, setSampleIdx] = useState(0)
+  // img.onload 里读到的是闭包里的旧 running（图片可能在点“运行”之前就挂载好了）
+  // → 用 ref 读取最新的 running
+  const runningRef = useRef(running)
+  useEffect(() => {
+    runningRef.current = running
+  }, [running])
+  // 绘制代次：每成功绘制一次 +1；emittedGenRef 记录“已发出的代次”，
+  // 用来保证 onload 与 emit 副作用不会把同一张图发两遍（首次加载只发一次）
+  const drawGenRef = useRef(0)
+  const emittedGenRef = useRef(-1)
 
   // 把一张图绘制到 canvas
   const drawImage = (src: string) => {
@@ -45,8 +55,10 @@ function ImageInputNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
       else { sh = img.width / cr; sy = (img.height - sh) / 2 }
       ctx.clearRect(0, 0, c.width, c.height)
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height)
+      drawGenRef.current += 1
       setLoaded(true)
-      if (running) {
+      if (runningRef.current) {
+        emittedGenRef.current = drawGenRef.current
         emitPacket(id, 'image', { type: 'image', canvas: c, ts: Date.now() })
       }
     }
@@ -60,14 +72,22 @@ function ImageInputNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // running 切换为 true 时重新发出当前图
+  // running 切换为 true 时重新发出当前图；图片晚到（loaded 变 true）而正在运行时也补发一次
   useEffect(() => {
-    if (running && loaded) {
-      const c = canvasRef.current
-      if (c) emitPacket(id, 'image', { type: 'image', canvas: c, ts: Date.now() })
+    if (!running) {
+      // 停止后清掉代次标记：下次运行要重新发出当前图
+      emittedGenRef.current = -1
+      return
     }
+    if (!loaded) return
+    const gen = drawGenRef.current
+    if (emittedGenRef.current === gen) return   // onload 已经发过了，别重复
+    const c = canvasRef.current
+    if (!c) return
+    emittedGenRef.current = gen
+    emitPacket(id, 'image', { type: 'image', canvas: c, ts: Date.now() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running])
+  }, [running, loaded, id, emitPacket])
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

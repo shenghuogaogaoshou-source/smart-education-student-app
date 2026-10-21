@@ -1,6 +1,7 @@
 import { cpSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { npmInvocation } from './processCommand.mjs'
 
 const root = process.cwd()
 const games = [
@@ -9,10 +10,11 @@ const games = [
 ]
 
 for (const [workspace, id] of games) {
-  const build = spawnSync('npm', ['--workspace', workspace, 'run', 'build'], {
+  const npm = npmInvocation()
+  const build = spawnSync(npm.command, [...npm.prefix, '--workspace', workspace, 'run', 'build'], {
     cwd: root,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
   })
   if (build.status !== 0) {
     process.exit(build.status ?? 1)

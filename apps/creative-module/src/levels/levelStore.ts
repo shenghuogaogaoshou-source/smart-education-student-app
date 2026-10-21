@@ -40,7 +40,7 @@ function saveProgress(state: { maxUnlocked: number; bestScores: Record<number, n
   }
 }
 
-export const useLevelProgress = create<LevelProgressState>((set, get) => ({
+export const useLevelProgress = create<LevelProgressState>((set) => ({
   ...loadProgress(),
 
   unlockNext: (levelId) =>

@@ -611,20 +611,24 @@
 }
 
 .works-workbench {
+  display: grid;
+  gap: 12px;
   margin-top: 13px;
+  padding: 18px;
 }
 
 .work-statuses {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 10px;
 }
 
 .work-statuses button {
   min-width: 0;
-  padding: 9px 2px;
-  border: 0;
-  border-radius: 12px;
+  min-height: 68px;
+  padding: 12px 5px;
+  border: 1px solid color-mix(in srgb, var(--primary) 9%, var(--line));
+  border-radius: 15px;
   background: var(--surface-soft);
   color: var(--ink);
 }
@@ -635,14 +639,14 @@
 }
 
 .work-statuses span {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--muted);
-  font-size: calc(.58rem * var(--font-scale));
+  font-size: calc(.62rem * var(--font-scale));
 }
 
 .draft-work {
-  margin-top: 12px;
-  padding: 16px;
+  margin-top: 2px;
+  padding: 18px;
   border-radius: var(--radius-md);
   background: var(--surface-soft);
 }
@@ -732,8 +736,8 @@
   grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
-  margin-top: 12px;
-  padding: 3px;
+  margin-top: 2px;
+  padding: 12px 4px;
 }
 
 .completed-work>svg {
@@ -2171,6 +2175,17 @@
   filter: drop-shadow(0 5px 5px rgba(55, 67, 101, .12));
 }
 
+.mall-front-portrait {
+  position: absolute;
+  inset: 5px 4px 3px;
+  display: block;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  border-radius: 19px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 5px rgba(75, 52, 75, .1));
+}
+
 .mall-product-art {
   width: 100%;
   height: 100%;
@@ -2719,10 +2734,21 @@
 
 .wb-card-header {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wb-card--interactive {
   cursor: pointer;
 }
 
@@ -2784,6 +2810,22 @@
 }
 
 .wb-answer.correct strong {
+  color: #2F7A56;
+}
+
+.wb-explanation {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: color-mix(in srgb, var(--ink) 76%, var(--muted));
+  font-size: calc(.65rem * var(--font-scale));
+  line-height: 1.55;
+}
+
+.wb-explanation svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
   color: #2F7A56;
 }
 
@@ -2893,6 +2935,70 @@
   color: var(--muted);
 }
 
+.fav-work-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.fav-work-card {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--glass-bg) 94%, #fff);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.fav-work-cover {
+  display: grid;
+  width: 92px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 16px;
+  color: color-mix(in srgb, var(--ink) 62%, #fff);
+}
+
+.fav-work-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.fav-work-copy > span {
+  color: var(--primary-deep);
+  font-size: calc(.61rem * var(--font-scale));
+  font-weight: 800;
+}
+
+.fav-work-copy strong {
+  color: var(--ink);
+  font-size: calc(.9rem * var(--font-scale));
+}
+
+.fav-work-copy p,
+.fav-work-copy small {
+  margin: 0;
+  color: var(--muted);
+  font-size: calc(.64rem * var(--font-scale));
+  line-height: 1.45;
+}
+
+.fav-remove-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 86%, #fff);
+  color: var(--muted);
+  cursor: pointer;
+}
+
 /* ===== 学习记录页 ===== */
 .history-flow {
   display: grid;
@@ -2916,6 +3022,104 @@
 .history-group-header span {
   color: var(--muted);
   font-size: calc(0.64rem * var(--font-scale));
+}
+
+.history-course-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
+  border-radius: 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 9%, #fff), color-mix(in srgb, var(--accent) 8%, #fff));
+}
+
+.history-course-summary span,
+.history-course-summary strong,
+.history-course-summary small {
+  display: block;
+}
+
+.history-course-summary span {
+  color: var(--primary-deep);
+  font-size: calc(.62rem * var(--font-scale));
+  font-weight: 800;
+}
+
+.history-course-summary strong {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: calc(1rem * var(--font-scale));
+}
+
+.history-course-summary small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: calc(.62rem * var(--font-scale));
+}
+
+.history-course-summary > svg {
+  flex: 0 0 auto;
+  color: var(--primary-deep);
+}
+
+.history-curriculum-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-curriculum-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 93%, #fff);
+}
+
+.history-curriculum-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--primary) 10%, #fff);
+  color: var(--primary-deep);
+}
+
+.history-curriculum-list--test .history-curriculum-icon {
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  color: var(--accent-deep);
+}
+
+.history-curriculum-card small,
+.history-curriculum-card strong {
+  display: block;
+}
+
+.history-curriculum-card small {
+  color: var(--muted);
+  font-size: calc(.58rem * var(--font-scale));
+}
+
+.history-curriculum-card strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: calc(.76rem * var(--font-scale));
+}
+
+.history-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, #fff);
+  color: var(--primary-deep);
+  font-size: calc(.56rem * var(--font-scale));
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .history-timeline {
@@ -3671,8 +3875,10 @@
   width: 100%;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 11px;
-  padding: 15px;
+  gap: 14px;
+  min-height: 112px;
+  margin-top: 4px;
+  padding: 21px 20px;
   border: 1px dashed rgb(172 118 88 / 30%);
   border-radius: 18px;
   background: #fff8ef;

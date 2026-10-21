@@ -7,7 +7,6 @@ import { defaultState } from '../../app/model'
 import { saveState } from '../../app/storage'
 import { AiCompanion } from './AiCompanion'
 import { HANDOFF_DURATION_MS } from './CompanionHandoff'
-import { classifyDemoCommand } from './safety'
 
 const savedMatchMedia = window.matchMedia
 const savedInnerHeight = window.innerHeight
@@ -239,14 +238,6 @@ describe('temporary AI companion', () => {
     expect(screen.queryByTestId('companion-handoff')).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: '绒桃 Momo AI 伙伴形象' })).toBeInTheDocument()
     expect(sessionStorage.getItem('student-app-login-companion-bounds')).toBeNull()
-  })
-
-  it('classifies unclear and risk-sensitive demo commands deterministically', () => {
-    expect(classifyDemoCommand('那个帮我弄一下')).toBe('unclear')
-    expect(classifyDemoCommand('把明天的学习安排改到晚上')).toBe('medium')
-    expect(classifyDemoCommand('帮我修改账号密码')).toBe('high')
-    expect(classifyDemoCommand('你真蠢')).toBe('blocked')
-    expect(classifyDemoCommand('打开我的作品')).toBe('safe')
   })
 
   it('shows a page-aware reaction first and opens the assistant on a second tap', async () => {

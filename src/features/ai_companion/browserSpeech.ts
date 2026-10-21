@@ -53,6 +53,7 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
 
   const recognition = new Recognition()
   let finalTranscript = ''
+  let latestInterimTranscript = ''
   let finished = false
 
   recognition.lang = 'zh-CN'
@@ -69,10 +70,14 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
       if (result?.isFinal) finalTranscript += text
       else interimTranscript += text
     }
-    if (interimTranscript.trim()) onInterim?.(interimTranscript.trim())
+    if (interimTranscript.trim()) {
+      latestInterimTranscript = interimTranscript.trim()
+      onInterim?.(latestInterimTranscript)
+    }
   }
   recognition.onerror = (event) => {
     if (finished) return
+    if (event.error === 'aborted') return
     finished = true
     const reason = event.error === 'not-allowed' || event.error === 'service-not-allowed'
       ? 'permission-denied'
@@ -84,7 +89,7 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
   recognition.onend = () => {
     if (finished) return
     finished = true
-    const transcript = finalTranscript.trim()
+    const transcript = finalTranscript.trim() || latestInterimTranscript
     if (transcript) onComplete(transcript)
     else onError('no-speech')
   }

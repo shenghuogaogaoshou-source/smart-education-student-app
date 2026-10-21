@@ -14,8 +14,9 @@ interface WorkbenchProps {
 
 export function Workbench({ onOpenLevels }: WorkbenchProps) {
   const [worksOpen, setWorksOpen] = useState(false)
+
   return (
-    <div className="relative flex h-full w-full flex-col bg-bg">
+    <div className="flex h-full w-full flex-col bg-bg">
       <Toolbar onOpenLevels={onOpenLevels} onOpenWorks={() => setWorksOpen(true)} />
       {/* 画布保持挂载，市场与检视器由画布内独立面板承载。 */}
       <div className="min-h-0 w-full flex-1">

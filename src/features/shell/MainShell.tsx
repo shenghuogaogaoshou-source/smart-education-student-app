@@ -5,12 +5,11 @@ import { AiCompanion } from '../ai_companion/AiCompanion'
 import { AppCommandProvider, useAppCommand, useOptionalAppCommand } from '../ai_companion/commands/AppCommandContext'
 import type { CompanionCommand } from '../ai_companion/commands/commandTypes'
 import { EmbeddedGamePage } from '../games/EmbeddedGamePage'
-import type { GameId } from '../games/gameRegistry'
+import { getLastPlayedGame, rememberLastPlayedGame, type GameId } from '../games/gameRegistry'
 import { HomePage } from '../home/HomePage'
 import { NotificationsPage } from '../home/NotificationsPage'
 import { AiCenterPage } from '../profile/AiCenterPage'
 import { CalendarPage } from '../profile/CalendarPage'
-import { ContinueCreatePage } from '../profile/ContinueCreatePage'
 import { FavoritesPage } from '../profile/FavoritesPage'
 import { HistoryPage } from '../profile/HistoryPage'
 import { LearningSchedulePage } from '../profile/LearningSchedulePage'
@@ -55,7 +54,6 @@ type View =
   | { kind: 'history'; id: number }
   | { kind: 'ai-center'; id: number }
   | { kind: 'works-manage'; id: number; filter?: string }
-  | { kind: 'continue-create'; id: number }
   | { kind: 'embedded-game'; id: number; gameId: GameId }
   | { kind: 'course-content'; id: number; courseId: string; chapterNum: number }
 
@@ -119,6 +117,13 @@ function MainShellBody() {
     push(nextView)
   }
 
+  const openGame = (gameId: GameId) => {
+    rememberLastPlayedGame(gameId)
+    push({ kind: 'embedded-game', gameId })
+  }
+
+  const openLastPlayedGame = () => openGame(getLastPlayedGame())
+
   const executeCompanionCommand = (command: CompanionCommand) => {
     const band = getGradeBand(state.grade)
     const course = getCourseForBand(band)
@@ -148,7 +153,7 @@ function MainShellBody() {
         return
       }
       case 'resume-game':
-        push({ kind: 'continue-create' })
+        openLastPlayedGame()
         return
       case 'search-course':
         selectTab('knowledge')
@@ -379,23 +384,15 @@ function MainShellBody() {
           onWorkClick={(workId) => push({ kind: 'work', workId })}
           onContinueCreate={(work) => {
             if (work?.source === 'brain-film' || work?.source === 'creative-module') {
-              push({ kind: 'embedded-game', gameId: work.source })
+              openGame(work.source)
+            } else if (work) {
+              push({ kind: 'work', workId: work.id })
             } else {
-              push({ kind: 'continue-create' })
+              openLastPlayedGame()
             }
           }}
           initialFilter={view.filter}
         />
-        <AiCompanion scene={companionScene} />
-        <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
-      </main>
-    )
-  }
-
-  if (view.kind === 'continue-create') {
-    return (
-      <main className={shellClassName}>
-        <ContinueCreatePage onBack={pop} />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
@@ -435,7 +432,7 @@ function MainShellBody() {
             onOpenNotifications={() => push({ kind: 'notifications' })}
             onNavigateToKnowledge={() => selectTab('knowledge')}
             onOpenContent={(courseId, chapterNum) => push({ kind: 'course-content', courseId, chapterNum })}
-            onOpenGame={(gameId) => push({ kind: 'embedded-game', gameId })}
+            onOpenGame={openGame}
           />
         )}
         {activeTab === 'knowledge' && (
@@ -460,7 +457,7 @@ function MainShellBody() {
             onOpenHistory={() => push({ kind: 'history' })}
             onOpenAiCenter={() => push({ kind: 'ai-center' })}
             onOpenWorksManage={() => push({ kind: 'works-manage' })}
-            onContinueCreate={() => push({ kind: 'continue-create' })}
+            onContinueCreate={(gameId) => gameId ? openGame(gameId) : openLastPlayedGame()}
             onOpenWorksManageWithFilter={(filter) => push({ kind: 'works-manage', filter })}
           />
         )}

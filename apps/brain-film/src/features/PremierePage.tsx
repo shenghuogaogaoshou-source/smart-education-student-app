@@ -56,7 +56,7 @@ export function PremierePage() { return (
 
     <div className="navrow">
       <button className="btn" data-go="sc-board">← 回去改分镜</button>
-      <button id="btn-save" className="btn btn-big btn-primary">📖 保存到智芽·我的作品</button>
+      <button id="btn-save" className="btn btn-big btn-primary">📖 装订成册,存进作品库</button>
       <button id="btn-exportfilm" className="btn">⬇️ 导出这部</button>
       <button id="btn-print" className="btn">🖨️ 打印成片手册</button>
     </div>

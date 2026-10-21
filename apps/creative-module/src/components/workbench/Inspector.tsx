@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import * as Icons from 'lucide-react'
 import { Code2, Trash2, Info, ChevronRight, X, Layers, RotateCcw, Pencil } from 'lucide-react'
 import { useCircuit } from '../../store/circuitStore'
-import { getModule, isPreview } from '../../lib/moduleRegistry'
+import { getModule } from '../../lib/moduleRegistry'
 import { TYPE_COLOR, TYPE_LABEL, type CircuitNodeData } from '../../types/circuit'
 import type { ParamDef } from '../../types/circuit'
 
@@ -17,7 +17,6 @@ export function Inspector() {
 
   if (!node) return <EmptyInspector />
 
-  const mod = getModule(node.data.moduleType)!
   return <NodeInspector key={node.id} nodeId={node.id} data={node.data} />
 }
 
@@ -211,20 +210,40 @@ function ParamControl({
   onChange,
 }: {
   def: ParamDef
-  value: string | number
+  value?: string | number
   onChange: (v: string | number) => void
 }) {
+  // 旧草稿里可能没有这个参数（undefined / null）—— 一律退回模块定义的默认值，
+  // 否则滑块会显示 NaN、文本框会显示 undefined
+  const resolved = value ?? def.default
+
+  // 数值参数统一钳制在 [min, max] 里（老草稿里可能存着越界或非数字的值）
+  const min = def.min ?? 0
+  const max = def.max ?? 100
+  const clampNumber = (v: string | number): number => {
+    let n = Number(v)
+    if (!Number.isFinite(n)) n = Number(def.default)
+    if (!Number.isFinite(n)) n = min
+    return Math.min(max, Math.max(min, n))
+  }
+  const numberValue = clampNumber(resolved)
+
+  // 下拉参数的值不在选项里时（选项改过 / 旧草稿）回落到第一个选项
+  const optionValues = def.options?.map((o) => o.value) ?? []
+  const current = String(resolved)
+  const selectValue = optionValues.includes(current) ? current : optionValues[0] ?? ''
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <label className="font-kalam text-[13px] text-text-dim">{def.label}</label>
         {def.type === 'number' && (
-          <span className="font-mono text-[12px] font-bold text-amber-dim">{String(value)}</span>
+          <span className="font-mono text-[12px] font-bold text-amber-dim">{String(numberValue)}</span>
         )}
       </div>
       {def.type === 'select' ? (
         <select
-          value={String(value)}
+          value={selectValue}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-md px-2 py-1.5 font-mono text-[12px] text-text focus:outline-none"
           style={{ border: '1.5px solid var(--ink)', background: 'var(--surface)' }}
@@ -238,17 +257,17 @@ function ParamControl({
       ) : def.type === 'number' ? (
         <input
           type="range"
-          min={def.min}
-          max={def.max}
+          min={min}
+          max={max}
           step={def.step}
-          value={Number(value)}
-          onChange={(e) => onChange(Number(e.target.value))}
+          value={numberValue}
+          onChange={(e) => onChange(clampNumber(e.target.value))}
           className="w-full accent-amber"
         />
       ) : (
         <input
           type="text"
-          value={String(value)}
+          value={String(resolved)}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-md px-2 py-1.5 font-mono text-[12px] text-text focus:outline-none"
           style={{ border: '1.5px solid var(--ink)', background: 'var(--surface)' }}

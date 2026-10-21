@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -208,6 +209,57 @@ class VideoSlotTests(unittest.TestCase):
             server.release_video_slot(usage_id)
             self.assertEqual(server.videos_today(), 0)
             server.reserve_video_slot()          # 还能再占,说明真的还回去了
+
+
+class FilmPruneTests(unittest.TestCase):
+    """片库清理:太老的成片要回收,但作品库还引用着的绝不能删(否则「重看」变死链)"""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.films = pathlib.Path(self.temp.name) / 'films'
+        self.films.mkdir()
+        for name, value in (('DATA_DIR', self.temp.name),
+                            ('DB_PATH', str(pathlib.Path(self.temp.name) / 'bh.db')),
+                            ('LOG_PATH', str(pathlib.Path(self.temp.name) / 'server.log')),
+                            ('FILM_DIR', str(self.films))):
+            patcher = patch.object(server, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        server.init_db()
+
+    def _make_film(self, name, age_days):
+        p = self.films / name
+        p.write_bytes(b'x' * 16)
+        old = time.time() - age_days * 86400
+        os.utime(p, (old, old))
+        return p
+
+    def test_old_unreferenced_films_are_removed_and_fresh_ones_kept(self):
+        old = self._make_film('film-old.mp4', 90)
+        fresh = self._make_film('film-fresh.mp4', 0)
+        server.prune_films(keep_days=30)
+        self.assertFalse(old.exists(), '90 天前的成片该清掉')
+        self.assertTrue(fresh.exists(), '今天的成片不能删')
+
+    def test_films_referenced_by_a_work_survive_pruning(self):
+        kept = self._make_film('film-used.mp4', 400)
+        with server.db() as conn:
+            conn.execute('INSERT INTO works(id,title,director,style,pages,created_at,updated_at,payload)'
+                         ' VALUES(?,?,?,?,?,?,?,?)',
+                         ('w1', '旧作品', '导演', '蜡笔', 4, '2020-01-01', '2020-01-01',
+                          '{"videoUrl":"/api/films/film-used.mp4"}'))
+        server.prune_films(keep_days=30)
+        self.assertTrue(kept.exists(), '作品库引用的片子被删掉了 → 重看会 404')
+
+    def test_half_baked_work_dirs_are_cleaned(self):
+        work = self.films / 'film-x.d'
+        work.mkdir()
+        (work / 'v0.src').write_bytes(b'junk')
+        old = time.time() - 7200
+        os.utime(work, (old, old))
+        server.prune_films(keep_days=30)
+        self.assertFalse(work.exists())
 
 
 if __name__ == '__main__':

@@ -2,7 +2,8 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
-import { createDefaultState } from '../../app/model'
+import { createDefaultState, defaultState } from '../../app/model'
+import { saveState } from '../../app/storage'
 import { createMemoryWorkRepository } from '../works/memoryRepository'
 import { WorksProvider } from '../works/WorksProvider'
 import { homeCopy } from './homeData'
@@ -109,5 +110,39 @@ describe('home page', () => {
 
     await user.click(screen.getByRole('button', { name: /创造模块/ }))
     expect(onOpenGame).toHaveBeenCalledWith('creative-module')
+  })
+
+  it('shows the latest completed knowledge title and opens that chapter', async () => {
+    const user = userEvent.setup()
+    const onOpenContent = vi.fn()
+    saveState({
+      ...defaultState,
+      learningProgress: {
+        ...defaultState.learningProgress,
+        'grade5-6': {
+          knowledgeCompleted: ['ael-3', 'ael-1', 'ael-2'],
+          testsPassed: ['ael-1'],
+        },
+      },
+    })
+    render(<AppStateProvider><HomePage onOpenContent={onOpenContent} /></AppStateProvider>)
+
+    expect(screen.getByText('上次学到')).toBeInTheDocument()
+    expect(screen.getByText('数据侦探营')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '继续学习' }))
+    expect(onOpenContent).toHaveBeenCalledWith('ael', 2)
+  })
+
+  it('uses the first knowledge chapter before any chapter is completed', () => {
+    saveState({
+      ...defaultState,
+      learningProgress: {
+        ...defaultState.learningProgress,
+        'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+      },
+    })
+    render(<AppStateProvider><HomePage /></AppStateProvider>)
+
+    expect(screen.getByText('AI 系统拆解站')).toBeInTheDocument()
   })
 })

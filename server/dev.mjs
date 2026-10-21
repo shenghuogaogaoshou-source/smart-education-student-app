@@ -8,7 +8,7 @@ const specs = buildDevProcessSpecs(root, forwardedArgs)
 const children = specs.map((spec) => {
   const child = spawn(spec.command, spec.args, {
     cwd: spec.cwd,
-    env: process.env,
+    env: { ...process.env, ...spec.env },
     stdio: 'inherit',
   })
   child.processName = spec.name

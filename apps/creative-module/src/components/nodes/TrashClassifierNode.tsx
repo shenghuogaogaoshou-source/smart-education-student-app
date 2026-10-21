@@ -4,7 +4,7 @@
 // ============================================================
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
-import { Recycle, Fish, Trash2 } from 'lucide-react'
+import { Fish, Trash2 } from 'lucide-react'
 import { NodeShell } from './NodeShell'
 import { getModule } from '../../lib/moduleRegistry'
 import type { CircuitNodeData } from '../../types/circuit'

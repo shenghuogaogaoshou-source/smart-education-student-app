@@ -13,7 +13,7 @@
   3) 作品备份(SQLite):换电脑/清缓存也能取回
 
 用法:
-  python server.py                 # http://127.0.0.1:8765(只本机可访问)
+  python server.py                 # http://127.0.0.1:8766(只本机可访问,和 Vite 代理一致)
   python server.py --port 9000     # 换端口
   python server.py --lan           # 允许局域网访问(机房:学生机连老师这台)
   python server.py --no-ai         # 不代理 AI(纯离线课堂:剧本走整理模式、画面走程序化插画)
@@ -78,7 +78,12 @@ PROXY = ''          # 走代理时形如 http://127.0.0.1:7890
 
 def log(*a):
     line = datetime.now().strftime('[%m-%d %H:%M:%S] ') + ' '.join(str(x) for x in a)
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        # Windows 的 GBK 终端打印 emoji 会抛异常；日志不能反过来打断清理/生成流程。
+        encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+        print(line.encode(encoding, 'replace').decode(encoding), flush=True)
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(LOG_PATH, 'a', encoding='utf-8') as f:
@@ -907,8 +912,7 @@ MIME = {
     '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
     '.webp': 'image/webp', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4',
     '.webm': 'video/webm', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
-    '.webmanifest': 'application/manifest+json; charset=utf-8', '.apk': 'application/vnd.android.package-archive', '.map': 'application/json; charset=utf-8',
-    '.md': 'text/markdown; charset=utf-8',
+    '.map': 'application/json; charset=utf-8', '.md': 'text/markdown; charset=utf-8',
 }
 BLOCKED = {'.env', 'bh.db', 'server.log', 'package-lock.json'}
 
@@ -1314,11 +1318,30 @@ class Handler(BaseHTTPRequestHandler):
         return self._err(404, '没有这个接口:' + path)
 
 
+def referenced_films():
+    """作品库里还被引用着的影片文件名(prune 时不要删)"""
+    keep = set()
+    try:
+        with db() as conn:
+            for row in conn.execute('SELECT payload FROM works'):
+                text = str(row['payload'] or '')
+                for m in re.finditer(r'/api/films/([\w\-.]+\.mp4)', text):
+                    keep.add(m.group(1))
+    except sqlite3.Error as e:
+        log('读取作品引用失败,这次不清理影片:', e)
+        return None
+    return keep
+
+
 def prune_films(keep_days=30, keep_count=60):
-    """清一清片库:半截的临时目录、太久以前的成片 —— 以前这些从不会回收"""
+    """清一清片库:半截的临时目录、太久以前的成片 —— 以前这些从不会回收。
+       作品库里还被引用的片子一律不动,否则「重看」会变成死链接。"""
     try:
         if not os.path.isdir(FILM_DIR):
             return 0
+        keep = referenced_films()
+        if keep is None:
+            return 0                     # 读不出引用关系就这次别删,宁可留着也不能删错
         now = time.time()
         films = []
         removed = 0
@@ -1329,7 +1352,7 @@ def prune_films(keep_days=30, keep_count=60):
                     if now - os.path.getmtime(full) > 3600:      # 一小时前的工作目录肯定是残留
                         shutil.rmtree(full, ignore_errors=True)
                     continue
-                if not name.endswith('.mp4') or not os.path.isfile(full):
+                if not name.endswith('.mp4') or not os.path.isfile(full) or name in keep:
                     continue
                 if now - os.path.getmtime(full) > keep_days * 86400:
                     os.remove(full)
@@ -1356,7 +1379,7 @@ def main():
     global ENV, NO_AI
     ap = argparse.ArgumentParser(description='脑洞放映厅后端 v4')
     ap.add_argument('--host', default='127.0.0.1')
-    ap.add_argument('--port', type=int, default=8765)
+    ap.add_argument('--port', type=int, default=8766)
     ap.add_argument('--lan', action='store_true', help='允许局域网访问(0.0.0.0)')
     ap.add_argument('--no-ai', action='store_true', help='不代理 AI(纯离线课堂)')
     args = ap.parse_args()

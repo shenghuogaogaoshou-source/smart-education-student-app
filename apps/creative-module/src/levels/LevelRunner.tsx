@@ -27,6 +27,9 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
   const setRunning = useCircuit((s) => s.setRunning)
   const resetCircuit = useCircuit((s) => s.resetCircuit)
   const setPaletteFilter = useCircuit((s) => s.setPaletteFilter)
+  // AI 推理引擎与模型状态：模型没就绪就开跑，每张照片都会被判「漏掉」，关卡无法通过
+  const engine = useCircuit((s) => s.engine)
+  const modelStatus = useCircuit((s) => s.modelStatus)
 
   const unlockNext = useLevelProgress((s) => s.unlockNext)
   const recordScore = useLevelProgress((s) => s.recordScore)
@@ -86,14 +89,6 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelId])
 
-  if (!level) {
-    return (
-      <div className="grid h-full place-items-center">
-        <span className="text-text-faint">关卡不存在</span>
-      </div>
-    )
-  }
-
   const accuracy = stats.handled > 0 ? stats.correct / stats.handled : 0
   const best = bestScores[levelId]
 
@@ -129,6 +124,18 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
     setStats({ correct: 0, wrong: 0, missed: 0, total: 0, handled: 0 })
   }
 
+  // 关卡不存在：所有 Hook 都必须在任何提前 return 之前调用（规则：Hooks 不能有条件执行）
+  if (!level) {
+    return (
+      <div className="grid h-full place-items-center">
+        <span className="text-text-faint">关卡不存在</span>
+      </div>
+    )
+  }
+
+  // 模型就绪前不能开跑（否则每张照片都判「漏掉」，关卡无法通过）
+  const engineReady = engine === 'coco-ssd'
+
   return (
     <div className="level-app paper-bg flex h-full w-full flex-col overflow-hidden">
       {/* 关卡工具栏 */}
@@ -155,10 +162,10 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
           </div>
         </div>
 
-        {/* 运行控制 */}
+        {/* 运行控制：部署在板上的 AI 模型就绪后才允许运行 */}
         <button
-          onClick={() => !passed && setRunning(!running)}
-          disabled={passed}
+          onClick={() => !passed && engineReady && setRunning(!running)}
+          disabled={passed || !engineReady}
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[13px] font-bold transition-all disabled:opacity-50"
           style={{
             border: '2.5px solid var(--ink)',
@@ -170,6 +177,20 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
           {running ? <Square size={13} /> : <Play size={13} />}
           {running ? '停止' : '运行'}
         </button>
+
+        {/* 模型状态提示：加载中 / 加载失败 */}
+        {!engineReady && (
+          <span
+            className="chip shrink-0 rounded px-2 py-1 text-[11px] font-bold"
+            style={{
+              border: '2px solid var(--ink)',
+              color: modelStatus === 'error' ? 'var(--red)' : 'var(--text-dim)',
+              background: modelStatus === 'error' ? 'rgba(198,107,90,0.14)' : 'rgba(212,160,74,0.16)',
+            }}
+          >
+            {modelStatus === 'error' ? '模型加载失败，无法判断垃圾' : '模型加载中…'}
+          </span>
+        )}
 
         {/* 重置 */}
         <button
@@ -223,6 +244,8 @@ export function LevelRunner({ levelId, onBack }: LevelRunnerProps) {
               <LevelScenePanel
                 running={running}
                 sceneType={level.sceneType}
+                stats={stats}
+                passAccuracy={level.passAccuracy}
                 onStatsChange={handleStatsChange}
                 onSceneCanvasReady={handleSceneCanvasReady}
                 onArmSignalReady={handleArmSignalReady}

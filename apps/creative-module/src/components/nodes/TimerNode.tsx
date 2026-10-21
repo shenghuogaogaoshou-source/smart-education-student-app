@@ -17,17 +17,30 @@ function TimerNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) {
   const emitPacket = useCircuit((s) => s.emitPacket)
 
   const timerRef = useRef<number | null>(null)
+  // 回落脉冲的 setTimeout：必须跟踪，否则停止/卸载后还会发出过期的 active:false
+  const pulseTimersRef = useRef<number[]>([])
   const [pulse, setPulse] = useState(false)
   const [count, setCount] = useState(0)
 
   const interval = Number(data.params.interval ?? 2)
+
+  const clearPulseTimers = () => {
+    pulseTimersRef.current.forEach((t) => clearTimeout(t))
+    pulseTimersRef.current = []
+  }
 
   useEffect(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-    if (!running) return
+    if (!running) {
+      // 运行结束：清掉挂起的回落脉冲，并把“已触发”计数归零（下一次运行重新计数）
+      clearPulseTimers()
+      setPulse(false)
+      setCount(0)
+      return
+    }
     const ms = Math.max(200, interval * 1000)
     // 占空比：脉冲持续脉冲宽度 = min(间隔×30%, 300ms)，保证间隔内有足够回落时间
     const pulseWidth = Math.min(300, Math.max(80, ms * 0.3))
@@ -36,15 +49,22 @@ function TimerNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) {
       setPulse(true)
       setCount((c) => c + 1)
       // 闪烁回落：pulseWidth 后 active=false，保证信号是闪烁脉冲而非持久为真
-      setTimeout(() => {
+      const pt = window.setTimeout(() => {
+        pulseTimersRef.current = pulseTimersRef.current.filter((t) => t !== pt)
         emitPacket(id, 'signal', { type: 'signal', active: false, ts: Date.now() })
         setPulse(false)
       }, pulseWidth)
+      pulseTimersRef.current.push(pt)
     }
     timerRef.current = window.setInterval(tick, ms)
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+      clearPulseTimers()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, interval, id, emitPacket])
 
   const status = running ? 'running' : 'idle'

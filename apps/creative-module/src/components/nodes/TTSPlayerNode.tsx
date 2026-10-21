@@ -8,14 +8,23 @@ import { NodeShell } from './NodeShell'
 import { getModule } from '../../lib/moduleRegistry'
 import type { CircuitNodeData } from '../../types/circuit'
 
-let queue: string[] = []
-let busy = false
+/** 每个 TTS 节点独占的播报状态（原先放在模块级 → 所有节点共用一份队列，串台） */
+interface TtsCtl {
+  queue: string[]
+  busy: boolean
+  /** 当前正在播的语句，用于身份校验：旧语句的 onend 不得推进新队列 */
+  utter: SpeechSynthesisUtterance | null
+  /** 已卸载：晚到的回调不再改状态 */
+  disposed: boolean
+  onPlaying: () => void
+  onEnd: () => void
+}
 
-function playNext(params: Record<string, string | number>, onPlaying: () => void, onEnd: () => void) {
-  if (busy || queue.length === 0) return
-  const text = queue.shift()!
-  if (!text) return playNext(params, onPlaying, onEnd)
-  if (!('speechSynthesis' in window)) { onEnd(); return }
+function playNext(ctl: TtsCtl, params: Record<string, string | number>) {
+  if (ctl.disposed || ctl.busy || ctl.queue.length === 0) return
+  const text = ctl.queue.shift()!
+  if (!text) return playNext(ctl, params)
+  if (!('speechSynthesis' in window)) { ctl.onEnd(); return }
 
   try {
     const voices = window.speechSynthesis.getVoices()
@@ -31,13 +40,30 @@ function playNext(params: Record<string, string | number>, onPlaying: () => void
     u.rate = Math.max(0.5, Math.min(2, Number(params.rate ?? 1)))
     u.pitch = Math.max(0.5, Math.min(2, Number(params.pitch ?? 1)))
     u.volume = Math.max(0, Math.min(1, Number(params.volume ?? 80) / 100))
-    u.onstart = () => { busy = true; onPlaying() }
-    u.onend = () => { busy = false; playNext(params, onPlaying, onEnd) }
-    u.onerror = () => { busy = false; playNext(params, onPlaying, onEnd) }
+    u.onstart = () => {
+      if (ctl.disposed || ctl.utter !== u) return
+      ctl.busy = true
+      ctl.onPlaying()
+    }
+    u.onend = () => {
+      if (ctl.utter !== u) return   // 已不是当前语句（被取消/替换）：不推进队列
+      ctl.utter = null
+      ctl.busy = false
+      ctl.onEnd()
+      playNext(ctl, params)
+    }
+    u.onerror = () => {
+      if (ctl.utter !== u) return
+      ctl.utter = null
+      ctl.busy = false
+      ctl.onEnd()
+      playNext(ctl, params)
+    }
+    ctl.utter = u
     window.speechSynthesis.speak(u)
   } catch {
-    busy = false
-    playNext(params, onPlaying, onEnd)
+    ctl.busy = false
+    playNext(ctl, params)
   }
 }
 
@@ -50,6 +76,23 @@ function TTSPlayerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const lastTextRef = useRef('')
   const lastTsRef = useRef<number>(0)
 
+  // 队列 / 忙碌标记 / 当前语句全部是本节点私有的（模块级单例会让不同节点互相抢播）
+  const ctlRef = useRef<TtsCtl | null>(null)
+  if (!ctlRef.current) {
+    ctlRef.current = {
+      queue: [],
+      busy: false,
+      utter: null,
+      disposed: false,
+      onPlaying: () => setSpeaking(true),
+      onEnd: () => {
+        setSpeaking(false)
+        if (ctlRef.current && ctlRef.current.queue.length === 0) setCurrent('')
+      },
+    }
+  }
+  const ctl = ctlRef.current
+
   const pktTs = pkt?.ts ?? 0
   useEffect(() => {
     if (!text || !pkt) return
@@ -59,25 +102,43 @@ function TTSPlayerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
 
     const qMode = String(data.params.queueMode ?? 'queue')
     if (qMode === 'immediate') {
+      // 立刻打断：只清本节点的队列与语句身份，再取消浏览器中正在播的语音
+      ctl.busy = false
+      ctl.utter = null
       if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-      queue = [text]
+      ctl.queue = [text]
+      setSpeaking(false)
     } else {
-      queue.push(text)
+      ctl.queue.push(text)
     }
     setCurrent(text)
-    playNext(
-      data.params,
-      () => setSpeaking(true),
-      () => {
-        setSpeaking(false)
-        if (queue.length === 0) setCurrent('')
-      },
-    )
-  }, [text, pkt, pktTs, data.params.queueMode, data.params.voice, data.params.rate, data.params.pitch, data.params.volume])
+    playNext(ctl, data.params)
+  }, [text, pkt, pktTs, data.params, ctl])
+
+  // 卸载：停掉本节点的播报（浏览器没有“取消单条语句”的 API，
+  // 因此先摘掉本节点语句的回调再 cancel，避免它再去推进/污染队列）
+  useEffect(() => {
+    return () => {
+      const c = ctlRef.current
+      if (!c) return
+      c.disposed = true
+      c.queue = []
+      c.busy = false
+      const u = c.utter
+      c.utter = null
+      if (u) {
+        u.onend = null
+        u.onerror = null
+        u.onstart = null
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
 
   const rate = Number(data.params.rate ?? 1)
   const pitch = Number(data.params.pitch ?? 1)
   const vol = Number(data.params.volume ?? 80)
+  const queued = ctl.queue.length
 
   return (
     <NodeShell module={module} selected={selected} status={speaking ? 'running' : text ? 'ready' : 'idle'}>
@@ -88,7 +149,7 @@ function TTSPlayerNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
             {String(data.params.voice)}
           </span>
           <span className="chip text-text-faint">
-            {speaking ? '朗读中…' : queue.length > 0 ? `排队 ${queue.length}` : '等待文本'}
+            {speaking ? '朗读中…' : queued > 0 ? `排队 ${queued}` : '等待文本'}
           </span>
         </div>
 

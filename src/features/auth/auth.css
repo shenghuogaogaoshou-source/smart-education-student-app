@@ -119,7 +119,7 @@
   display: grid;
   width: 128px;
   height: 128px;
-  place-items: end center;
+  place-items: center;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 22%, #fff);
   border-radius: 50%;
@@ -146,12 +146,19 @@
 
 .login-companion__target .partner-appearance {
   position: relative;
+  left: 0;
+  top: 0;
   z-index: 1;
-  width: 102px;
-  margin-bottom: 4px;
-  transform-origin: center bottom;
+  width: 104px;
+  margin: 0;
+  transform-origin: center center;
   transition: transform .24s ease, filter .24s ease;
   filter: drop-shadow(0 8px 10px color-mix(in srgb, var(--primary) 20%, transparent));
+}
+
+.login-companion__target .partner-appearance[data-companion-id='momo'] {
+  left: -4px;
+  top: -3px;
 }
 
 .login-companion__target .partner-appearance__safe-frame {

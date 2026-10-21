@@ -1,5 +1,8 @@
-import { ArrowRight, Camera, ChevronRight, Clock3, Search, Sparkles } from 'lucide-react'
+import { ArrowRight, Camera, Clock3, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useAppState } from '../../app/AppState'
+import { getGradeBand } from '../../app/learning'
+import { getCourseForBand } from '../knowledge/courseCatalog'
 import { HomeSearch } from './HomeSearch'
 import { AchievementShowcase } from './AchievementShowcase'
 import { CameraToolSheet } from './CameraToolSheet'
@@ -16,12 +19,20 @@ const carouselDecorations = [
 ]
 
 export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavigateToKnowledge, onOpenContent, onOpenGame }: { onOpenContent?: (courseId: string, chapterNum: number) => void; onWorkClick?: (workId: string) => void; onMoreWorks?: () => void; onOpenNotifications?: () => void; onNavigateToKnowledge?: () => void; onOpenGame?: (gameId: GameId) => void }) {
+  const { state } = useAppState()
   const [cameraOpen, setCameraOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const copy = homeCopy
+  const band = getGradeBand(state.grade)
+  const course = getCourseForBand(band)
+  const completedPartIds = state.learningProgress[band].knowledgeCompleted
+  const latestPart = course.parts.find((part) => part.id === completedPartIds[completedPartIds.length - 1]) ?? course.parts[0]
+  const courseProgress = course.parts.length > 0
+    ? Math.round((completedPartIds.length / course.parts.length) * 100)
+    : 0
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -121,8 +132,22 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
 
       <section className="continue-card">
         <div className="continue-icon"><Clock3 aria-hidden="true" size={21} /></div>
-        <div><span>上次学到</span><h2>AI 怎样认出图片</h2><div className="mini-progress"><span /></div></div>
-        <button type="button" aria-label="继续学习" onClick={() => { if (onNavigateToKnowledge) onNavigateToKnowledge(); else setNotice('知识内容等待开发中') }}><ArrowRight aria-hidden="true" size={20} /></button>
+        <div>
+          <span>上次学到</span>
+          <h2>{latestPart.title}</h2>
+          <div className="mini-progress" aria-label={`已完成 ${courseProgress}%`}><span style={{ width: `${courseProgress}%` }} /></div>
+        </div>
+        <button
+          type="button"
+          aria-label="继续学习"
+          onClick={() => {
+            if (onOpenContent) onOpenContent(course.id, latestPart.number)
+            else if (onNavigateToKnowledge) onNavigateToKnowledge()
+            else setNotice('知识内容等待开发中')
+          }}
+        >
+          <ArrowRight aria-hidden="true" size={20} />
+        </button>
       </section>
 
       <AchievementShowcase onWorkClick={onWorkClick} onMoreWorks={onMoreWorks} />

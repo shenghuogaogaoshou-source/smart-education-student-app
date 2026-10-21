@@ -4,7 +4,7 @@
 // 两个后端：
 //   1) 文本检查：DeepSeek（复用自定义模块助手的 Key 与配置）
 //   2) 实物图：火山方舟 Ark · doubao-seedream 文生图
-// 安全提示：Key 在前端一定是公开的，只适合本地/课堂演示。
+// 两个能力都经智芽本地代理调用，Key 只保存在服务端。
 // ============================================================
 import type { Edge, Node } from 'reactflow'
 import { getModule } from './moduleRegistry'
@@ -13,7 +13,7 @@ import type { CircuitNodeData, DataType } from '../types/circuit'
 
 // -------------------- 实物图（火山方舟） --------------------
 export const IMAGE_API_DEFAULTS = {
-  endpoint: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+  endpoint: '/api/ark/images/generations',
   model: 'doubao-seedream-4-0-20260415',
   // 老模型兜底：主模型不可用时换这个重试
   fallbackModel: 'doubao-seedream-4-0-250828',
@@ -27,13 +27,16 @@ export interface ImageSettings {
 }
 
 const IMAGE_SETTINGS_KEY = 'aicircuit.imageSettings'
+const LEGACY_IMAGE_ENDPOINT = 'https://ark.cn-beijing.volces.com/api/v3/images/generations'
 
 export function loadImageSettings(): ImageSettings {
   try {
     const raw = localStorage.getItem(IMAGE_SETTINGS_KEY)
     const parsed = raw ? JSON.parse(raw) : null
     return {
-      endpoint: typeof parsed?.endpoint === 'string' && parsed.endpoint ? parsed.endpoint : IMAGE_API_DEFAULTS.endpoint,
+      endpoint: typeof parsed?.endpoint === 'string' && parsed.endpoint && parsed.endpoint !== LEGACY_IMAGE_ENDPOINT
+        ? parsed.endpoint
+        : IMAGE_API_DEFAULTS.endpoint,
       model: typeof parsed?.model === 'string' && parsed.model ? parsed.model : IMAGE_API_DEFAULTS.model,
       apiKey: typeof parsed?.apiKey === 'string' && parsed.apiKey ? parsed.apiKey : IMAGE_API_DEFAULTS.apiKey,
     }
@@ -104,11 +107,6 @@ export function summarizeCircuit(
         .map((e) => e.targetHandle as string),
     }
   })
-
-  const nameOf = (id: string) => {
-    const m = modules.find((x) => x.id === id)
-    return m ? `${m.name}${m.subtitle ? `(${m.subtitle})` : ''}` : id
-  }
 
   const links = edges.map((e) => {
     const src = nodes.find((n) => n.id === e.source)
@@ -351,7 +349,10 @@ export async function aiCheckCircuit(
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model,
         temperature: 0.2,
@@ -439,7 +440,10 @@ export async function generateProductImage(prompt: string, timeoutMs = 120000): 
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
         body: body(m),
         signal: controller.signal,
       })

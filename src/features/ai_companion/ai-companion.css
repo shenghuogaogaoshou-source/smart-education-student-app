@@ -800,24 +800,40 @@
 }
 
 .ai-panel-full.is-conversing .ai-chat-companion {
-  grid-template-columns: 92px minmax(0, 1fr);
-  min-height: 118px;
+  grid-template-columns: clamp(112px, 31vw, 132px) minmax(0, 1fr);
+  min-height: 132px;
   padding-block: 0;
 }
 
 .ai-chat-companion__art {
+  display: grid;
   min-width: 0;
+  place-items: center;
   overflow: visible;
 }
 
-.ai-chat-companion__art .companion-rotator__stage {
+.ai-chat-companion__art .companion-rotator {
+  justify-items: center;
   width: 100%;
-  max-width: 142px;
+}
+
+.ai-chat-companion__art .companion-rotator__stage {
+  width: min(100%, 136px);
+  max-width: 136px;
+  aspect-ratio: 12 / 13;
+  margin-inline: auto;
+}
+
+.ai-chat-companion__art .companion-2d {
+  inset: 1.5% 4% 1%;
+  width: 92%;
+  height: 97.5%;
 }
 
 .ai-chat-companion__art .companion-rotator__controls {
-  margin-top: -3px;
-  transform: scale(.9);
+  margin-top: 1px;
+  white-space: nowrap;
+  transform: scale(.82);
 }
 
 .ai-chat-companion__copy {

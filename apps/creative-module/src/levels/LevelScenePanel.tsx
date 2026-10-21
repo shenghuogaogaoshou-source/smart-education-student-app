@@ -4,7 +4,7 @@
 // sceneCanvas 和 armSignalHandler 通过回调暴露给父组件，
 // 由父组件创建 SceneContext.Provider 供画布中的节点访问
 // ============================================================
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { OceanScene } from './scenes/OceanScene'
 import type { LevelStats } from './types'
 import { CheckCircle2, XCircle, CircleSlash, Target } from 'lucide-react'
@@ -13,6 +13,10 @@ interface LevelScenePanelProps {
   running: boolean
   /** 当前关卡的场景类型 */
   sceneType: string
+  /** 本局统计（由 LevelRunner 持有，重置时归零，HUD 才不会显示上一局数据） */
+  stats: LevelStats
+  /** 通关所需正确率（用于正确率颜色阈值） */
+  passAccuracy: number
   /** 统计变化回调（供父组件做通关检测） */
   onStatsChange: (stats: LevelStats) => void
   /** 场景 canvas 就绪回调（父组件用于创建 SceneContext） */
@@ -24,21 +28,14 @@ interface LevelScenePanelProps {
 export function LevelScenePanel({
   running,
   sceneType,
+  stats,
+  passAccuracy,
   onStatsChange,
   onSceneCanvasReady,
   onArmSignalReady,
 }: LevelScenePanelProps) {
-  const [stats, setStats] = useState<LevelStats>({
-    correct: 0,
-    wrong: 0,
-    missed: 0,
-    total: 0,
-    handled: 0,
-  })
-
   const handleStatsChange = useCallback(
     (s: LevelStats) => {
-      setStats(s)
       onStatsChange(s)
     },
     [onStatsChange],
@@ -119,7 +116,12 @@ export function LevelScenePanel({
             <span className="text-text-dim">正确率</span>
             <span
               style={{
-                color: accuracy >= 0.8 ? 'var(--green)' : accuracy >= 0.5 ? 'var(--amber-dim)' : 'var(--red)',
+                color:
+                  accuracy >= passAccuracy
+                    ? 'var(--green)'
+                    : accuracy >= passAccuracy * 0.6
+                      ? 'var(--amber-dim)'
+                      : 'var(--red)',
               }}
             >
               {handled > 0 ? Math.round(accuracy * 100) : '--'}%

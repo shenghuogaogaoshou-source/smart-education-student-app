@@ -280,7 +280,7 @@ const textInput: AIModule = {
   icon: 'Keyboard',
   accent: '#94A3B8',
   description: '手动输入或预设文本，支持自动输出、按钮发送、外部信号触发。',
-  inputs: [],
+  inputs: [{ id: 'send', label: '发送信号（可选）', type: 'signal', optional: true }],
   outputs: [{ id: 'text', label: '文本', type: 'text' }],
   params: [
     {
@@ -713,8 +713,8 @@ const textMerge: AIModule = {
   description: '将 2~3 个文本输入拼接为一条输出，支持连接符和模板占位符。',
   inputs: [
     { id: 'text1', label: '文本 1', type: 'text' },
-    { id: 'text2', label: '文本 2', type: 'text' },
-    { id: 'text3', label: '文本 3', type: 'text' },
+    { id: 'text2', label: '文本 2（可选）', type: 'text', optional: true },
+    { id: 'text3', label: '文本 3（可选）', type: 'text', optional: true },
   ],
   outputs: [{ id: 'text', label: '合并后', type: 'text' }],
   params: [
@@ -764,7 +764,7 @@ const counter: AIModule = {
   description: '统计信号触发次数，可自动重置或手动重置，达目标时输出达标信号。',
   inputs: [
     { id: 'trigger', label: '触发', type: 'signal' },
-    { id: 'reset', label: '重置', type: 'signal' },
+    { id: 'reset', label: '重置（可选）', type: 'signal', optional: true },
   ],
   outputs: [
     { id: 'number', label: '计数值', type: 'number' },
@@ -1222,6 +1222,68 @@ else:
     led.off()                                     # 灭`,
 }
 
+// -------------------- 数值显示：把 number / confidence 端口显示出来 --------------------
+// 「亮度值 / 数量 / 计数值 / 音量 / 置信度」这些数值输出端口需要消费端，
+// 否则它们在市场上拖线必被拒绝，等于装饰。
+const numberDisplay: AIModule = {
+  type: 'numberDisplay',
+  name: '数值仪表',
+  subtitle: 'Number Gauge · 读数',
+  category: 'output',
+  icon: 'Gauge',
+  accent: '#9a8a6a',
+  description: '接收数值（亮度、数量、计数、音量、置信度…），把当前读数显示出来。',
+  inputs: [{ id: 'value', label: '数值', type: 'number' }],
+  outputs: [],
+  params: [
+    {
+      id: 'unit',
+      label: '单位',
+      type: 'select',
+      default: '',
+      options: [
+        { label: '无', value: '' },
+        { label: '%（百分比）', value: '%' },
+        { label: '个（计数）', value: '个' },
+        { label: '次（累计）', value: '次' },
+      ],
+      editable: true,
+    },
+    {
+      id: 'decimals',
+      label: '小数位数（0~2）',
+      type: 'number',
+      default: 0,
+      min: 0,
+      max: 2,
+      step: 1,
+      editable: true,
+    },
+    {
+      id: 'maxValue',
+      label: '满量程（进度条用）',
+      type: 'number',
+      default: 100,
+      min: 1,
+      max: 1000,
+      step: 1,
+      editable: true,
+    },
+  ],
+  explanation:
+    'AI 的判断常常是一个数字：画面有多亮、检测到几个物体、拍了几次手、声音有多大。' +
+    '数值仪表把这些数字直接摆在画布上，让"AI 到底算出了什么"一眼就能看见，' +
+    '也是调试阈值（IF 的标签、音量检测的门限）时最直接的依据。',
+  code: (p) => `# 数值仪表：把数值显示出来
+value  = number_in
+unit   = "${p.unit}"
+digits = ${p.decimals}
+max_v  = ${p.maxValue}
+
+print(f"{round(value, digits)}{unit}")      # 读数
+draw_bar(value / max_v)                    # 进度条`,
+}
+
 // -------------------- 生态预览：开放架构愿景（第二、三阶段开放） --------------------
 const previewModules: AIModule[] = [
   {
@@ -1294,38 +1356,13 @@ export const MODULES: Record<string, AIModule> = {
   buzzer,
   ttsPlayer,
   ledIndicator,
+  numberDisplay,
   // 关卡专用模块
   sceneCamera,
   trashClassifier,
   roboticArm,
   ...Object.fromEntries(previewModules.map((m) => [m.type, m])),
 }
-
-/** 核心可用模块类型 */
-export const CORE_MODULE_TYPES = [
-  'camera',
-  'imageClassifier',
-  'objectDetection',
-  'speechRecognition',
-  'soundClassification',
-  'volumeDetector',
-  'if',
-  'output',
-  'microphone',
-  'textInput',
-  'imageInput',
-  'and',
-  'or',
-  'not',
-  'timer',
-  'counter',
-  'delayTimer',
-  'textMerge',
-  'textDisplay',
-  'buzzer',
-  'ttsPlayer',
-  'ledIndicator',
-]
 
 /** 预览模块类型（市场展示，暂不可拖入） */
 export const PREVIEW_MODULE_TYPES = previewModules.map((m) => m.type)
@@ -1364,7 +1401,7 @@ export const MODULES_BY_CATEGORY: Record<ModuleCategory, AIModule[]> = {
     ...previewModules.filter((m) => m.category === 'perception'),
   ],
   logic: [ifNode, andNode, orNode, notNode, timerNode, counter, delayTimer, textMerge],
-  output: [output, textDisplay, buzzer, ttsPlayer, ledIndicator, ...previewModules.filter((m) => m.category === 'output')],
+  output: [output, textDisplay, buzzer, ttsPlayer, ledIndicator, numberDisplay, ...previewModules.filter((m) => m.category === 'output')],
 }
 
 export const CATEGORY_META: Record<ModuleCategory, { label: string; icon: string; accent: string }> = {

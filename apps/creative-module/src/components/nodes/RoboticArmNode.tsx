@@ -18,12 +18,17 @@ function RoboticArmNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const active = isSignalActive(data.inputs.signal)
   const hasInput = !!data.inputs.signal
 
-  // 信号变化时通知场景
+  // 信号变化时通知场景。
+  // 注意：即便入端不存在也要推 false —— 否则删掉 IF→机械臂 的连线后，
+  // 场景里 armActiveRef 会一直停在 true，机械臂把每一张照片都抓走。
   useEffect(() => {
-    if (hasInput && scene) {
-      scene.onArmSignal(active)
-    }
+    scene?.onArmSignal(hasInput && active)
   }, [active, hasInput, scene])
+
+  // 卸载（删除节点 / 换关卡）：把机械臂状态推回 false，避免场景残留“抓取中”
+  useEffect(() => {
+    return () => { scene?.onArmSignal(false) }
+  }, [scene])
 
   const status = hasInput ? (active ? 'running' : 'ready') : 'idle'
 

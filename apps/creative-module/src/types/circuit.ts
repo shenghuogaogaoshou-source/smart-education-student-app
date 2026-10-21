@@ -137,7 +137,19 @@ export const TYPE_LABEL: Record<DataType, string> = {
   audio: '音频',
 }
 
-/** 判断两个数据类型是否可连接 */
+/** 判断两个数据类型是否可连接
+ *  number 与 confidence 都是数值语义（0~1 置信度、0~100 音量、计数），互相兼容，
+ *  否则「亮度值 / 数量 / 音量」这些数值输出端口永远找不到可连的入端。 */
 export function canConnect(from: DataType, to: DataType): boolean {
-  return from === to
+  if (from === to) return true
+  const numeric = (t: DataType) => t === 'number' || t === 'confidence'
+  return numeric(from) && numeric(to)
+}
+
+/** 入端是否齐备：声明为 optional 的端口可以不接线 */
+export function inputsReady(
+  ports: PortDef[],
+  inputs: Record<string, Packet | undefined>,
+): boolean {
+  return ports.every((p) => p.optional || inputs[p.id] !== undefined)
 }

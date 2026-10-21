@@ -11,14 +11,17 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 5175 --strictPort
 ```
 
-该命令同时启动四个进程：
+该命令同时启动五个进程：
 
 - 智芽主应用：`http://127.0.0.1:5175/`
+- 脑洞放映厅后端：`http://127.0.0.1:8766/`
 - 脑洞放映厅：`http://127.0.0.1:5191/`
 - 创造模块：`http://127.0.0.1:5192/`
 - AI 代理：`http://127.0.0.1:8787/`
 
 两个游戏随智芽一起启动，但不会自动打开浏览器。学生从首页点击游戏卡片后，游戏会在智芽应用框内打开；返回后回到首页原来的滚动位置。
+
+游戏 AI 密钥保存在本地、不会提交到 Git：脑洞放映厅读取 `apps/brain-film/.env`，创造模块的文本和绘图请求通过 `server/.env.local` 与智芽本地代理转发。`npm run dev` 会自动寻找已安装的 Python 3.12，也可以通过环境变量 `ZHIYA_PYTHON` 指定解释器。
 
 ## 作品流程
 
@@ -40,13 +43,11 @@ npm run dev -- --host 127.0.0.1 --port 5175 --strictPort
 ## 验证
 
 ```powershell
-npm test -- --run
-npm run test:server
-npm --workspace @zhiya/brain-film test
-npm --workspace @zhiya/brain-film run build
-npm --workspace @zhiya/creative-module run build
+npm run test:all
 npm run build
 ```
+
+`npm run test:all` 会依次运行智芽主应用、AI 代理与开发进程、构建脚本、脑洞放映厅前端与 Python、创造模块的完整自动化测试。`npm run build` 会构建主应用和两个内嵌游戏，并将游戏产物复制到 `dist/embedded-games/`。
 
 ## 已实现
 

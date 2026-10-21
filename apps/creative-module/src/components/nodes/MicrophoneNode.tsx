@@ -20,12 +20,18 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const rafRef = useRef<number | null>(null)
+  // 用户意图（而不是瞬时的 micState）：参数变更重启时 micState 会短暂变 'off'，
+  // 用 state 判断会让重启流程误以为“用户关了麦克风”而直接返回，麦克风就此沉默
+  const wantOnRef = useRef(false)
+  // 已卸载标记：getUserMedia 可能在卸载后才 resolve，那时必须立刻关掉轨道
+  const disposedRef = useRef(false)
 
   const [micState, setMicState] = useState<'off' | 'starting' | 'on' | 'error'>('off')
   const [errMsg, setErrMsg] = useState('')
   const [level, setLevel] = useState(0)
 
-  const stopMic = () => {
+  // 只释放底层资源，不改变用户意图
+  const releaseMic = () => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
@@ -35,6 +41,11 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
     audioCtxRef.current?.close().catch(() => {})
     audioCtxRef.current = null
     analyserRef.current = null
+  }
+
+  const stopMic = () => {
+    wantOnRef.current = false
+    releaseMic()
     setMicState('off')
     setLevel(0)
   }
@@ -46,6 +57,7 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
   const sensGain = 0.6 + sensitivity * 2.4   // 0.6~3.0 音量增益
 
   const startMic = async () => {
+    wantOnRef.current = true
     setMicState('starting')
     setErrMsg('')
     try {
@@ -58,6 +70,11 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
         } as MediaTrackConstraints,
         video: false,
       })
+      // 卸载或用户已关闭：晚到的流直接掐掉，否则音频轨道永远没人 stop()
+      if (disposedRef.current || !wantOnRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
       streamRef.current = stream
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: sampleRate as AudioContextOptions['sampleRate'] })
       audioCtxRef.current = ctx
@@ -68,6 +85,8 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
       analyserRef.current = analyser
       setMicState('on')
     } catch (e) {
+      if (disposedRef.current) return
+      wantOnRef.current = false
       setMicState('error')
       setErrMsg((e as Error).message || '无法访问麦克风')
     }
@@ -79,12 +98,16 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
-    if (!running || micState !== 'on') return
-    const buf = new Uint8Array(analyserRef.current!.frequencyBinCount)
+    if (!running || micState !== 'on' || !analyserRef.current) return
+    const analyser = analyserRef.current
+    const buf = new Uint8Array(analyser.frequencyBinCount)
+    // 电平表每帧刷新（保持灵敏），但推包限制在 ≥100ms 一次（≤10 次/秒）：
+    // 逐帧 emitPacket 会让整个 store 重算 DAG 60 次/秒
+    let lastEmit = 0
     const tick = () => {
-      const analyser = analyserRef.current
-      if (!analyser) return
-      analyser.getByteTimeDomainData(buf)
+      const an = analyserRef.current
+      if (!an) return
+      an.getByteTimeDomainData(buf)
       // 计算 RMS 音量（0~1），乘上灵敏度增益
       let sum = 0
       for (let i = 0; i < buf.length; i++) {
@@ -94,12 +117,19 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
       const rms = Math.sqrt(sum / buf.length)
       const lvl = Math.min(1, rms * 2.2 * sensGain)
       setLevel(lvl)
-      emitPacket(id, 'audio', {
-        type: 'audio',
-        stream: streamRef.current!,
-        level: lvl,
-        ts: Date.now(),
-      })
+      const now = Date.now()
+      if (now - lastEmit >= 100) {
+        lastEmit = now
+        const stream = streamRef.current
+        if (stream) {
+          emitPacket(id, 'audio', {
+            type: 'audio',
+            stream,
+            level: lvl,
+            ts: now,
+          })
+        }
+      }
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
@@ -110,14 +140,21 @@ function MicrophoneNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) 
 
   // 重启麦克风：参数变更（采样率/噪声抑制）时重新采集
   useEffect(() => {
-    if (micState !== 'on') return
-    stopMic()
-    const t = window.setTimeout(() => startMic(), 120)
+    // 用 ref 判断“用户想要麦克风开着”，而不是用瞬时的 micState
+    if (!wantOnRef.current) return
+    releaseMic()
+    setMicState('starting')
+    const t = window.setTimeout(() => { void startMic() }, 120)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sampleRate, noiseSuppress])
 
-  useEffect(() => () => stopMic(), [])
+  useEffect(() => () => {
+    disposedRef.current = true
+    wantOnRef.current = false
+    releaseMic()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const status = micState === 'on' ? (running ? 'running' : 'ready') : micState === 'error' ? 'error' : 'idle'
   const levelPct = Math.round(level * 100)

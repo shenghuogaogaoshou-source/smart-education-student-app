@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "test": "node --test tests/*.test.mjs",
-    "test:py": "python -m unittest discover -s tests -p \"test_*.py\"",
+    "test:py": "node scripts/run-python-tests.mjs",
     "test:e2e": "node tests/e2e-flows.mjs && node tests/e2e-prem.mjs && node tests/e2e-drag.mjs && node tests/e2e-film.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"

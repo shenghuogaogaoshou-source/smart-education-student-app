@@ -32,6 +32,9 @@ function CameraNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<number | null>(null)
+  // 已卸载标记：getUserMedia / getDisplayMedia 可能在卸载后才 resolve，
+  // 此时若照常写入 streamRef 就再也没人 stop()，摄像头指示灯会长亮不灭
+  const disposedRef = useRef(false)
 
   const [source, setSource] = useState<Source>('camera')
   const [camState, setCamState] = useState<'off' | 'starting' | 'on' | 'error'>('off')
@@ -78,14 +81,30 @@ function CameraNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) {
           audio: false,
         })
       }
+      // 拿流的过程中节点可能已被删除 / 电路已清空：立刻把轨道关掉，绝不写进 streamRef
+      if (disposedRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
       streamRef.current = stream
       setStream(stream)
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
+      if (disposedRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
       setCamState('on')
     } catch (e) {
+      // 失败路径（如 video.play() 被拒）也必须先关掉已拿到的流，
+      // 否则 streamRef 里留着一条活着的轨道，UI 却只显示错误、没有关闭入口
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+      if (videoRef.current) videoRef.current.srcObject = null
+      if (disposedRef.current) return
+      setStream(null)
       setCamState('error')
       setErrMsg((e as Error).message || '无法访问媒体设备')
     }
@@ -131,7 +150,14 @@ function CameraNodeComp({ id, data, selected }: NodeProps<CircuitNodeData>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, camState, fps, id, emitPacket, source])
 
-  useEffect(() => () => stopCam(), [])
+  useEffect(() => {
+    disposedRef.current = false
+    return () => {
+      disposedRef.current = true
+      stopCam()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const status = camState === 'on' ? (running ? 'running' : 'ready') : camState === 'error' ? 'error' : 'idle'
   const accent = source === 'screen' ? 'var(--amber)' : 'var(--cyan)'

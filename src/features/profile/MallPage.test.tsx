@@ -63,12 +63,15 @@ describe('points mall companion catalogue', () => {
     expect(screen.queryByText('云宝 Nimbo')).not.toBeInTheDocument()
   })
 
-  it('renders appearance cards with the normalized 2D companion renderer', () => {
+  it('uses the centered front portrait from the pet sheet for appearance cards', () => {
     renderMall()
 
     const yunduoCard = screen.getByRole('button', { name: '查看 云朵 Yunduo' })
-    expect(within(yunduoCard).getByTestId('companion-2d')).toHaveAttribute('data-companion-id', 'yunduo')
-    expect(yunduoCard.querySelector('.mall-pet-sprite')).toBeNull()
+    const portrait = within(yunduoCard).getByTestId('mall-front-portrait-yunduo')
+
+    expect(yunduoCard.querySelector('.companion-2d')).toBeNull()
+    expect(portrait).toHaveAttribute('src', '/pets/front/yunduo-card-v2.png')
+    expect(portrait).toHaveAttribute('alt', '')
   })
 
   it('shows elementary 3D companion clothing instead of the forthcoming placeholder', async () => {

@@ -14,11 +14,15 @@ import {
   applyNodeChanges,
 } from 'reactflow'
 import { getModule } from '../lib/moduleRegistry'
-import { EVALUATORS } from '../lib/evaluators'
-import { canConnect, type CircuitNodeData, type Packet } from '../types/circuit'
+import { EVALUATORS, clearEvaluatorState } from '../lib/evaluators'
+import { canConnect, inputsReady, type CircuitNodeData, type Packet } from '../types/circuit'
 
 // 非响应式：记录正在推理的节点，避免重入（丢帧）
 const busy = new Set<string>()
+// 推理中又被喂了新数据的节点：结束后补算一次，避免一次性信号被吞
+const pendingReeval = new Set<string>()
+// 每个节点连续补算的次数上限，防止环形连线自激
+const retryBudget = new Map<string, number>()
 
 function makeNode(type: string, id: string, x: number, y: number): Node<CircuitNodeData> {
   const mod = getModule(type)!
@@ -30,6 +34,8 @@ function makeNode(type: string, id: string, x: number, y: number): Node<CircuitN
     type: type.startsWith('custom_') ? 'custom' : type,
     position: { x, y },
     data: {
+      // 节点 id 也放进 data：求值器只能看到 data（计数器/音量按 id 存状态）
+      id,
       moduleType: type,
       params,
       outputs: {},
@@ -123,17 +129,21 @@ export const useCircuit = create<CircuitState>((set, get) => {
 
     // 4. 对每个目标节点：检查入端是否齐全 → 求值 → 递归传播
     for (const targetId of targetIds) {
-      if (busy.has(targetId)) continue // 上一帧还在推理，丢帧
+      if (busy.has(targetId)) {
+        // 上一帧还在推理：记一笔待补算，推理结束后用最新入端再算一次，
+        // 否则一次性信号源（定时器脉冲、单次识别结果）的这一帧会被永久丢掉
+        pendingReeval.add(targetId)
+        continue
+      }
       const targetNode = get().nodes.find((n) => n.id === targetId)
       if (!targetNode) continue
       const mod = getModule(targetNode.data.moduleType)
       const evaluator = EVALUATORS[targetNode.data.moduleType]
       if (!mod || !evaluator) continue
 
-      // 检查所有入端是否都有数据
+      // 检查入端是否就绪（optional 端口不接线也可求值）
       const inputs = { ...targetNode.data.inputs }
-      const allReady = mod.inputs.every((p) => p.optional || inputs[p.id] !== undefined)
-      if (!allReady) continue
+      if (!inputsReady(mod.inputs, inputs)) continue
 
       busy.add(targetId)
       // 运行中状态
@@ -149,12 +159,28 @@ export const useCircuit = create<CircuitState>((set, get) => {
             await propagate(targetId, outPort, outPkt)
           }
         }
+        // 终端模块（灯泡/LED/蜂鸣器）的求值器返回 null：不能让它停在"推理中"
+        patchNode(targetId, (d) =>
+          d.aiState?.status === 'running' ? { aiState: { ...d.aiState, status: 'ready' } } : {},
+        )
       } catch (err) {
         patchNode(targetId, () => ({
           aiState: { status: 'error', message: (err as Error).message },
         }))
       } finally {
         busy.delete(targetId)
+        if (pendingReeval.delete(targetId)) {
+          // 补算次数有上限（2 次）：环形连线会让"补算→再传播→又排队"无限自激
+          const used = retryBudget.get(targetId) ?? 0
+          if (used < 2) {
+            retryBudget.set(targetId, used + 1)
+            void get().reevaluate(targetId)
+          } else {
+            retryBudget.delete(targetId)
+          }
+        } else {
+          retryBudget.delete(targetId)
+        }
       }
     }
   }
@@ -174,10 +200,69 @@ export const useCircuit = create<CircuitState>((set, get) => {
     setEngine: (e) => set({ engine: e }),
     setPaletteFilter: (types) => set({ paletteFilter: types }),
 
+    // 键盘 Delete / React Flow 自带删除走的是 changes 通道，必须和 deleteNode / deleteEdge
+    // 做同样的下游复位，否则删掉的元件仍会留下下游的旧输入与“灯泡常亮”之类的残留状态
     onNodesChange: (changes) =>
-      set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) as Node<CircuitNodeData>[] })),
+      set((s) => {
+        const removed = changes
+          .filter((c): c is { id: string; type: 'remove' } => c.type === 'remove')
+          .map((c) => c.id)
+        if (!removed.length) {
+          return { nodes: applyNodeChanges(changes, s.nodes) as Node<CircuitNodeData>[] }
+        }
+        const removedSet = new Set(removed)
+        let nodes = s.nodes.filter((n) => !removedSet.has(n.id))
+        const edges = s.edges.filter((e) => !removedSet.has(e.source) && !removedSet.has(e.target))
+        for (const id of removed) {
+          clearEvaluatorState(id)
+          busy.delete(id)
+          const clr: Record<string, Record<string, undefined>> = {}
+          for (const e of s.edges) {
+            if (e.source !== id || !e.targetHandle) continue
+            clr[e.target] = { ...(clr[e.target] ?? {}), [e.targetHandle]: undefined }
+          }
+          nodes = nodes.map((n) =>
+            clr[n.id] ? { ...n, data: { ...n.data, inputs: { ...n.data.inputs, ...clr[n.id] } } } : n,
+          )
+        }
+        const rest = changes.filter((c) => c.type !== 'remove')
+        return {
+          nodes: applyNodeChanges(rest, nodes) as Node<CircuitNodeData>[],
+          edges,
+          selectedNodeId:
+            s.selectedNodeId && removedSet.has(s.selectedNodeId) ? null : s.selectedNodeId,
+        }
+      }),
 
-    onEdgesChange: (changes) => set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
+    onEdgesChange: (changes) =>
+      set((s) => {
+        // 被删掉的连线：目标节点的对应入端要清空（与 deleteEdge 行为一致）
+        const removed = changes
+          .filter((c): c is { id: string; type: 'remove' } => c.type === 'remove')
+          .map((c) => c.id)
+        if (!removed.length) return { edges: applyEdgeChanges(changes, s.edges) }
+
+        const cleared = new Map<string, Record<string, undefined>>()
+        for (const id of removed) {
+          const edge = s.edges.find((e) => e.id === id)
+          if (!edge || !edge.targetHandle) continue
+          cleared.set(edge.target, {
+            ...(cleared.get(edge.target) ?? {}),
+            [edge.targetHandle]: undefined,
+          })
+        }
+        return {
+          edges: applyEdgeChanges(changes, s.edges),
+          nodes: s.nodes.map((n) => {
+            const clr = cleared.get(n.id)
+            if (!clr) return n
+            return {
+              ...n,
+              data: { ...n.data, inputs: { ...n.data.inputs, ...clr }, aiState: { status: 'idle' } },
+            }
+          }),
+        }
+      }),
 
     onConnect: (c) => {
       const src = get().nodes.find((n) => n.id === c.source)
@@ -226,8 +311,15 @@ export const useCircuit = create<CircuitState>((set, get) => {
           if (!e.targetHandle) continue
           const node = s.nodes.find((n) => n.id === e.target)
           if (!node) continue
-          clearedInputs.set(e.target, { [e.targetHandle]: undefined })
+          // 同一目标节点可能有多条边（多个入端），需要合并而不是覆盖
+          clearedInputs.set(e.target, {
+            ...(clearedInputs.get(e.target) ?? {}),
+            [e.targetHandle]: undefined,
+          })
         }
+        // 节点被删：它自己的求值器内部状态（计数、音量窗口）一并清掉
+        clearEvaluatorState(id)
+        busy.delete(id)
         return {
           nodes: s.nodes
             .filter((n) => n.id !== id)
@@ -284,10 +376,25 @@ export const useCircuit = create<CircuitState>((set, get) => {
 
     clearInspectorRequest: () => set({ inspectorRequestId: null }),
 
-    setRunning: (r) => set({ running: r }),
+    setRunning: (r) =>
+      set((s) =>
+        r
+          ? { running: true }
+          : // 停止时清掉脉冲时间戳：否则连线的“数据流动”动画会一直跑下去
+            {
+              running: false,
+              nodes: s.nodes.map((n) => ({ ...n, data: { ...n.data, lastPulse: 0 } })),
+            },
+      ),
 
-    resetCircuit: () =>
-      set({ nodes: [], edges: [], selectedNodeId: null, running: false }),
+    resetCircuit: () => {
+      // 清空画布：同时复位求值器内部状态与 busy 锁，避免换关卡后计数/窗口继承旧数据
+      clearEvaluatorState()
+      busy.clear()
+      pendingReeval.clear()
+      retryBudget.clear()
+      set({ nodes: [], edges: [], selectedNodeId: null, running: false })
+    },
 
     emitPacket: (nodeId, portId, packet) => {
       void propagate(nodeId, portId, packet)
@@ -300,18 +407,29 @@ export const useCircuit = create<CircuitState>((set, get) => {
       const evaluator = EVALUATORS[node.data.moduleType]
       if (!mod || !evaluator) return
       const inputs = { ...node.data.inputs }
-      if (!mod.inputs.every((p) => p.optional || inputs[p.id] !== undefined)) return
+      if (!inputsReady(mod.inputs, inputs)) return
       if (busy.has(nodeId)) return
       busy.add(nodeId)
-      Promise.resolve(evaluator(node.data, inputs)).then((result) => {
-        if (result) {
+      Promise.resolve()
+        .then(() => evaluator(node.data, inputs))
+        .then((result) => {
+          if (!result) {
+            // 终端模块返回 null：把"推理中"状态收尾，否则节点状态会一直卡住
+            patchNode(nodeId, (d) =>
+              d.aiState?.status === 'running' ? { aiState: { ...d.aiState, status: 'ready' } } : {},
+            )
+            return
+          }
           if (result.aiState) patchNode(nodeId, () => ({ aiState: result.aiState }))
           for (const [outPort, outPkt] of Object.entries(result.outputs)) {
             void propagate(nodeId, outPort, outPkt)
           }
-        }
-        busy.delete(nodeId)
-      })
+        })
+        // 求值抛错也必须解锁，否则该节点会被 busy 永久挡住（画布“卡死”）
+        .catch((err: Error) => {
+          patchNode(nodeId, () => ({ aiState: { status: 'error', message: err?.message ?? '求值失败' } }))
+        })
+        .finally(() => busy.delete(nodeId))
     },
 
     loadDemoChain: () => {
@@ -323,6 +441,10 @@ export const useCircuit = create<CircuitState>((set, get) => {
       const cls = makeNode('imageClassifier', clsId, 360, 80)
       const ifN = makeNode('if', ifId, 720, 120)
       const out = makeNode('output', outId, 1060, 140)
+
+      // 示例链路必须是"能亮"的：感光器输出「亮 / 暗」，IF 的默认目标标签是空串
+      // （空串永远不匹配），所以这里显式设成「暗」——光线暗 → IF 输出真信号 → 灯泡点亮
+      ifN.data.params = { ...ifN.data.params, targetLabel: '暗' }
 
       const mkEdge = (s: string, sh: string, t: string, th: string, type: string): Edge => ({
         id: nextId('e'),

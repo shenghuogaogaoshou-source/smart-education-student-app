@@ -11,7 +11,8 @@
 .preferences-dialog [aria-pressed="true"] { background: #e9d4a2; border-color: #75613e; }
 .preferences-dialog p { font-size: 13px; line-height: 1.6; }
 :root[data-contrast="clear"] { --text: #211b13; --text-dim: #433924; --text-faint: #584b36; --ink: #211b13; --muted: #49425c; --faint: #514869; --line: #a99eb8; }
-:root[data-reading="large"] .app-viewport p, :root[data-reading="large"] .app-viewport textarea, :root[data-reading="large"] .app-viewport input, :root[data-reading="large"] .app-viewport label, :root[data-reading="large"] .inspector-sheet p, :root[data-reading="large"] .inspector-sheet input, :root[data-reading="large"] .inspector-sheet select { font-size: 18px !important; line-height: 1.75; }
+/* 大字模式：作用到正文/输入/按钮（原来写的是 .app-viewport，但应用里没有这个类，设置一直无效） */
+:root[data-reading="large"] #root p, :root[data-reading="large"] #root textarea, :root[data-reading="large"] #root input, :root[data-reading="large"] #root label, :root[data-reading="large"] #root button, :root[data-reading="large"] #root select, :root[data-reading="large"] .inspector-sheet p, :root[data-reading="large"] .inspector-sheet input, :root[data-reading="large"] .inspector-sheet select { font-size: 18px !important; line-height: 1.75; }
 
 .app-recovery { padding: 36px 24px; min-height: 100%; background: #fffaf1; color: #2a2415; }
 .app-recovery h1 { font-size: 22px; }

@@ -1,4 +1,5 @@
 import { ArrowRight, FolderKanban, Sparkles } from 'lucide-react'
+import type { GameId } from '../games/gameRegistry'
 import { useOptionalWorks } from '../works/WorksProvider'
 
 export function WorksWorkbench({
@@ -9,7 +10,7 @@ export function WorksWorkbench({
 }: {
   onWorkClick?: (workId: string) => void
   onOpenManage?: () => void
-  onContinueCreate?: () => void
+  onContinueCreate?: (gameId?: GameId) => void
   onOpenManageWithFilter?: (filter: string) => void
 }) {
   const works = useOptionalWorks()?.works ?? []
@@ -42,7 +43,7 @@ export function WorksWorkbench({
         </div>
 
         {!works.length && (
-          <button className="works-profile-empty" type="button" onClick={onContinueCreate}>
+          <button className="works-profile-empty" type="button" onClick={() => onContinueCreate?.()}>
             <Sparkles aria-hidden="true" />
             <span><strong>第一件作品正在等你</strong><small>去脑洞放映厅或创造模块试试看</small></span>
             <ArrowRight aria-hidden="true" />
@@ -56,7 +57,17 @@ export function WorksWorkbench({
             <p>{draft.description || '这份草稿还在等你继续完成'}</p>
             <div className="draft-action">
               <small>灵感还在，继续完成它吧</small>
-              <button type="button" onClick={(event) => { event.stopPropagation(); onContinueCreate?.() }}>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (draft.source === 'brain-film' || draft.source === 'creative-module') {
+                    onContinueCreate?.(draft.source)
+                  } else {
+                    onWorkClick?.(draft.id)
+                  }
+                }}
+              >
                 继续创作<ArrowRight aria-hidden="true" size={16} />
               </button>
             </div>

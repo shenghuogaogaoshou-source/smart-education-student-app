@@ -203,7 +203,7 @@ export const evaluateIf: Evaluator = (data, inputs) => {
 export const evaluateOutput: Evaluator = () => null
 
 // -------------------- AND：全部信号为真 --------------------
-export const evaluateAnd: Evaluator = (data, inputs) => {
+export const evaluateAnd: Evaluator = (_data, inputs) => {
   const a = isSignalActive(inputs.a)
   const b = isSignalActive(inputs.b)
   const active = a && b
@@ -214,7 +214,7 @@ export const evaluateAnd: Evaluator = (data, inputs) => {
 }
 
 // -------------------- OR：任一信号为真 --------------------
-export const evaluateOr: Evaluator = (data, inputs) => {
+export const evaluateOr: Evaluator = (_data, inputs) => {
   const a = isSignalActive(inputs.a)
   const b = isSignalActive(inputs.b)
   const active = a || b
@@ -225,7 +225,7 @@ export const evaluateOr: Evaluator = (data, inputs) => {
 }
 
 // -------------------- NOT：信号取反 --------------------
-export const evaluateNot: Evaluator = (data, inputs) => {
+export const evaluateNot: Evaluator = (_data, inputs) => {
   const a = isSignalActive(inputs.a)
   const active = !a
   return {
@@ -237,13 +237,15 @@ export const evaluateNot: Evaluator = (data, inputs) => {
 // -------------------- 计数器：累计触发次数 --------------------
 // 仅在 trigger 的上升沿（从 false 变 true）加 1；reset 为真时归零
 let counterStates: Record<string, { count: number; lastTriggerActive: boolean }> = {}
+/** 状态型求值器的键：节点 id（makeNode/草稿恢复都会写入 data.id） */
+const nodeKey = (data: CircuitNodeData) => String(data.id ?? 'anonymous')
 export const evaluateCounter: Evaluator = (data, inputs) => {
   const triggerActive = isSignalActive(inputs.trigger)
   const resetActive = isSignalActive(inputs.reset)
   const target = Math.max(1, Number(data.params.target ?? 5))
   const autoReset = data.params.autoReset === 'on'
 
-  const prev = counterStates[data.id as string] ?? { count: 0, lastTriggerActive: false }
+  const prev = counterStates[nodeKey(data)] ?? { count: 0, lastTriggerActive: false }
   let count = prev.count
 
   // 重置优先
@@ -257,7 +259,7 @@ export const evaluateCounter: Evaluator = (data, inputs) => {
   let reached = count >= target
   if (reached && autoReset) count = 0
 
-  counterStates[data.id as string] = { count, lastTriggerActive: triggerActive }
+  counterStates[nodeKey(data)] = { count, lastTriggerActive: triggerActive }
   const ts = Date.now()
   return {
     outputs: {
@@ -276,57 +278,11 @@ export const evaluateCounter: Evaluator = (data, inputs) => {
   }
 }
 
-// -------------------- 延时器：N 秒后输出信号 --------------------
-// 上升沿启动定时器，到期时 emit 一次；信号回落可取消挂起
-let delayStates: Record<string, { timeoutId: number | null; triggerActive: boolean }> = {}
-export const evaluateDelayTimer: Evaluator = (data, inputs, context?: { emit?: (port: string, pkt: Packet) => void }) => {
-  const triggerActive = isSignalActive(inputs.trigger)
-  const delaySec = Math.max(0.1, Number(data.params.delay ?? 2))
-  const delayMs = delaySec * 1000
-  const id = String(data.id ?? Math.random())
-  const st = delayStates[id] ?? { timeoutId: null, triggerActive: false }
-  let message = '等待触发'
-  let outputSignal = false
-
-  // 上升沿 → 启动定时器
-  if (triggerActive && !st.triggerActive) {
-    if (st.timeoutId != null) window.clearTimeout(st.timeoutId)
-    st.timeoutId = window.setTimeout(() => {
-      // 到时间后 emit 一个真信号（脉冲宽度 250ms，再回落）
-      if (context?.emit) {
-        context.emit('delayed', { type: 'signal', active: true, ts: Date.now() })
-      }
-      window.setTimeout(() => {
-        if (context?.emit) {
-          context.emit('delayed', { type: 'signal', active: false, ts: Date.now() })
-        }
-      }, 250)
-    }, delayMs)
-    message = `启动延时器 · ${delaySec} 秒后输出`
-  }
-  // 下降沿 → 取消挂起的定时器
-  else if (!triggerActive && st.triggerActive) {
-    if (st.timeoutId != null) {
-      window.clearTimeout(st.timeoutId)
-      st.timeoutId = null
-      message = '提前取消延时'
-    }
-  } else if (st.timeoutId != null) {
-    message = `延时中 · ${delaySec} 秒`
-  }
-
-  st.triggerActive = triggerActive
-  delayStates[id] = st
-
-  // 注意：真正的延迟输出通过 emit 在 setTimeout 中触发；
-  // 这里返回空或 last output 供节点UI展示当前状态。
-  return {
-    outputs: {
-      delayed: { type: 'signal', active: outputSignal, ts: Date.now() },
-    },
-    aiState: { status: 'ready', message, delaySec, triggerActive },
-  }
-}
+// -------------------- 延时器：真实延时由 DelayTimerNode 组件实现 --------------------
+// 组件持有 running 状态和进度动画，脉冲由它 emit('delayed')；
+// 求值器不再重复发信号（否则假的 false 包会盖掉组件刚发出的真脉冲），
+// 也避免每次求值都挂一个无人清理的定时器。
+export const evaluateDelayTimer: Evaluator = () => null
 
 // -------------------- 文本合并：多文本拼接 + 模板占位符 --------------------
 export const evaluateTextMerge: Evaluator = (data, inputs) => {
@@ -356,17 +312,23 @@ export const evaluateTextMerge: Evaluator = (data, inputs) => {
 }
 
 // -------------------- 音量检测：RMS → 0~100 数值 + 是否超阈值信号 --------------------
+// 按 windowSize（检测窗口，秒）对电平做滑动平均，让这个参数真正生效
+const volumeHistory: Record<string, { t: number; v: number }[]> = {}
 export const evaluateVolumeDetector: Evaluator = (data, inputs) => {
   const audioIn = inputs.audio
   if (!audioIn || audioIn.type !== 'audio') return null
 
   const threshold = Math.max(0, Math.min(100, Number(data.params.threshold ?? 60)))
-  // 使用数据包中已有的 level 字段（麦克风节点实时写入），应用灵敏度缩放
-  const sens = 1.0
-  const rawVol = (audioIn.level ?? 0) * sens
+  const winMs = Math.max(0.1, Number(data.params.windowSize ?? 0.5)) * 1000
+  const key = nodeKey(data)
+  const now = Date.now()
+  const buf = volumeHistory[key] ?? (volumeHistory[key] = [])
+  buf.push({ t: now, v: audioIn.level ?? 0 })
+  while (buf.length && now - buf[0].t > winMs) buf.shift()
+  const rawVol = buf.reduce((sum, h) => sum + h.v, 0) / buf.length
   const volume = Math.round(Math.max(0, Math.min(100, rawVol * 100)))
   const isLoud = volume >= threshold
-  const ts = Date.now()
+  const ts = now
 
   return {
     outputs: {
@@ -378,6 +340,7 @@ export const evaluateVolumeDetector: Evaluator = (data, inputs) => {
       message: isLoud ? `音量 ${volume} · 超限（≥${threshold}）` : `音量 ${volume} · 正常（<${threshold}）`,
       volume,
       threshold,
+      windowSize: winMs / 1000,
       isLoud,
     },
   }
@@ -433,7 +396,7 @@ export const evaluateSoundClassification: Evaluator = (data, inputs) => {
 // -------------------- 语音识别：Web Speech API 真实识别 --------------------
 // 求值器只负责把节点侧识别到的 transcript 打包输出
 // （真正的浏览器 API 调用在 SpeechRecognitionNode 组件内部，因为需要持续运行）
-export const evaluateSpeechRecognition: Evaluator = (data, inputs) => {
+export const evaluateSpeechRecognition: Evaluator = (_data, inputs) => {
   const audioIn = inputs.audio
   if (!audioIn || audioIn.type !== 'audio') return null
   // 真实识别由节点组件完成；evaluator 仅检查有音频流即进入 ready 态
@@ -466,6 +429,30 @@ export const evaluateBuzzer: Evaluator = () => null
 export const evaluateTtsPlayer: Evaluator = () => null
 export const evaluateLedIndicator: Evaluator = () => null
 
+// -------------------- 数值仪表：把 number / confidence 读数显示出来 --------------------
+export const evaluateNumberDisplay: Evaluator = (data, inputs) => {
+  // 入端声明为 number，但 canConnect 允许 confidence 互通（两者都是数值语义）
+  const pkt = inputs.value
+  if (!pkt || (pkt.type !== 'number' && pkt.type !== 'confidence')) return null
+  const decimals = Math.max(0, Math.min(2, Number(data.params.decimals ?? 0)))
+  const unit = String(data.params.unit ?? '')
+  // confidence 在 0~1；number 可能已经是 0~100（音量）或计数，按原值显示
+  const raw = pkt.type === 'confidence' ? pkt.value * 100 : pkt.value
+  const value = Number.isFinite(raw) ? raw : 0
+  const shown = `${value.toFixed(decimals)}${unit}`
+  const maxValue = Math.max(1, Number(data.params.maxValue ?? 100))
+  return {
+    outputs: {} as Record<string, Packet>,
+    aiState: {
+      status: 'ready',
+      message: `读数 ${shown}`,
+      value,
+      shown,
+      ratio: Math.max(0, Math.min(1, value / maxValue)),
+    },
+  }
+}
+
 export const EVALUATORS: Record<string, Evaluator> = {
   imageClassifier: evaluateImageClassifier,
   trashClassifier: evaluateTrashClassifier,
@@ -485,8 +472,20 @@ export const EVALUATORS: Record<string, Evaluator> = {
   counter: evaluateCounter,
   delayTimer: evaluateDelayTimer,
   textMerge: evaluateTextMerge,
+  numberDisplay: evaluateNumberDisplay,
   // camera / microphone / textInput / imageInput / timer / sceneCamera 没有输入端口，
   // 不参与求值（由组件自行采集并 emitPacket）
+}
+
+/** 清空状态型求值器的内部状态（画布清空 / 节点删除时调用，避免状态跨关卡继承） */
+export function clearEvaluatorState(nodeId?: string) {
+  if (nodeId === undefined) {
+    counterStates = {}
+    for (const key of Object.keys(volumeHistory)) delete volumeHistory[key]
+    return
+  }
+  delete counterStates[nodeId]
+  delete volumeHistory[nodeId]
 }
 
 /** 动态注册求值器（供自定义模块使用） */

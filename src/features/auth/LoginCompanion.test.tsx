@@ -135,6 +135,19 @@ describe('login companion', () => {
     expect(recognition.start).toHaveBeenCalledTimes(1)
   })
 
+  it('explains when the browser cannot provide speech recognition', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: undefined })
+    Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: undefined })
+    renderCompanion()
+    const button = screen.getByRole('button', { name: '和绒桃 Momo互动' })
+
+    fireEvent.pointerDown(button)
+    act(() => vi.advanceTimersByTime(650))
+
+    expect(screen.getByRole('status')).toHaveTextContent('当前浏览器暂不支持语音识别，可以登录后用文字和我聊天。')
+  })
+
   it('shows the interim transcript in the same bubble while the child is still speaking', () => {
     vi.useFakeTimers()
     const recognition = {

@@ -45,11 +45,18 @@ function loadFromStorage(): CustomModuleDef[] {
   }
 }
 
-function saveToStorage() {
+/**
+ * 写入 localStorage
+ * 失败必须抛出明确错误：以前这里静默忽略，addCustomModule 仍返回成功，
+ * 模块"能用"只是内存里的假象，刷新后直接消失。抛错才能让调用方提示用户。
+ */
+function saveToStorage(list: CustomModuleDef[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customModules))
-  } catch {
-    // 忽略写入失败
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+  } catch (e) {
+    throw new Error(
+      `自定义模块保存失败：本地存储不可用或空间已满（${(e as Error).message}）。请清理浏览器存储后重试。`,
+    )
   }
 }
 
@@ -67,15 +74,18 @@ export function getCustomModule(type: string): CustomModuleDef | undefined {
 function addCustomModule(def: Omit<CustomModuleDef, 'type' | 'createdAt'>): CustomModuleDef {
   const id = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
   const full: CustomModuleDef = { ...def, type: id, createdAt: Date.now() }
-  customModules = [...customModules, full]
-  saveToStorage()
+  const next = [...customModules, full]
+  // 先落盘再改内存：写入失败会抛错，注册表保持原样，不会留下"内存里有、磁盘上没有"的半更新
+  saveToStorage(next)
+  customModules = next
   return full
 }
 
 /** 删除自定义模块（内部实现，仅写存储；通知版见底部导出） */
 function removeCustomModule(type: string) {
-  customModules = customModules.filter((m) => m.type !== type)
-  saveToStorage()
+  const next = customModules.filter((m) => m.type !== type)
+  saveToStorage(next)
+  customModules = next
 }
 
 // -------------------- 转换为 AIModule --------------------
@@ -124,6 +134,42 @@ const DANGEROUS_PATTERNS = [
   /\bindexedDB\b/,
   /\bcaches\b/,
   /\bpostMessage\s*\(/,
+  // 逃逸链：用 constructor / __proto__ 或 DOM 引用爬到全局对象
+  /\bconstructor\b/,
+  /\b__proto__\b/,
+  /\bownerDocument\b/,
+  /\bdefaultView\b/,
+  /\bself\b/,
+  /\bparent\b/,
+  /\btop\b/,
+  /\bframes\b/,
+  /\bopener\b/,
+  // 其他可发起请求 / 创建执行上下文的 API
+  /\bWorker\b/,
+  /\bimportScripts\b/,
+  /\bEventSource\b/,
+  /\bRTCPeerConnection\b/,
+  /\bImage\s*\(/,
+  /\bAudio\s*\(/,
+]
+
+/**
+ * 作为生成函数形参"占位"的高风险全局，调用时一律传 undefined
+ * 这样用户代码里的 window / document / fetch ... 拿到的是 undefined，
+ * 而不是页面上的真实对象（关键词黑名单只能挡住写字面量的写法）。
+ */
+const SHADOWED_GLOBALS: string[] = [
+  'window',
+  'document',
+  'globalThis',
+  'self',
+  'parent',
+  'top',
+  'fetch',
+  'Function',
+  'localStorage',
+  'navigator',
+  'location',
 ]
 
 /** 检查用户代码是否包含危险调用 */
@@ -139,13 +185,51 @@ export function validateCode(code: string): { ok: boolean; reason?: string } {
   return { ok: true }
 }
 
+/** 生成函数（形参顺序与 SHADOWED_GLOBALS 一致，末尾两个是 inputs / params） */
+type SandboxFn = (
+  window: undefined,
+  document: undefined,
+  globalThis: undefined,
+  self: undefined,
+  parent: undefined,
+  top: undefined,
+  fetch: undefined,
+  Function: undefined,
+  localStorage: undefined,
+  navigator: undefined,
+  location: undefined,
+  inputs: Record<string, Packet | undefined>,
+  params: Record<string, string | number>,
+) => unknown
+
 /**
  * 从用户代码创建安全的求值器函数
  *
  * 用户代码是一个函数体，接收 inputs 和 params，返回 { outputs, message }
  * 签式与内置 Evaluator 完全一致，无需类型断言
+ *
+ * 安全说明：这里仍然是在页面权限下跑 new Function 的"软沙箱"——
+ * 关键词黑名单 + 形参遮蔽高风险全局，只能降低而不能消除风险；
+ * 真正的隔离需要 iframe / Worker 沙箱，本轮不做（避免推翻现有设计）。
  */
-export function createCustomEvaluator(userCode: string): Evaluator {
+export function createCustomEvaluator(userCode: string, outputs: PortDef[] = []): Evaluator {
+  // 声明的输出端口表：只转发这些端口，且数据包 type 必须与 PortDef.type 一致
+  const declaredOutputs = new Map(outputs.map((p) => [p.id, p.type]))
+
+  // 只在注册时编译一次：每次求值都 new Function 等于每帧每节点一次 JS 编译
+  let sandbox: SandboxFn | null = null
+  let compileError = ''
+  try {
+    sandbox = new Function(
+      ...SHADOWED_GLOBALS,
+      'inputs',
+      'params',
+      `"use strict";\n${userCode}`,
+    ) as SandboxFn
+  } catch (err) {
+    compileError = (err as Error).message
+  }
+
   const evalFn: Evaluator = (
     data: CircuitNodeData,
     inputs: Record<string, Packet | undefined>,
@@ -155,10 +239,30 @@ export function createCustomEvaluator(userCode: string): Evaluator {
       if (pkt === undefined) return null
     }
 
+    if (!sandbox) {
+      return {
+        outputs: {},
+        aiState: { status: 'error', message: `代码编译失败：${compileError}` },
+      }
+    }
+
     try {
-      // 创建沙箱函数：仅暴露 inputs 和 params
-      const fn = new Function('inputs', 'params', `"use strict";\n${userCode}`)
-      const result = fn(inputs, data.params)
+      // 沙箱函数：仅暴露 inputs 和 params，其余高风险全局传 undefined
+      const result = sandbox(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        inputs,
+        data.params,
+      )
 
       if (!result || typeof result !== 'object') {
         return {
@@ -167,21 +271,42 @@ export function createCustomEvaluator(userCode: string): Evaluator {
         }
       }
 
-      const outputs: Record<string, Packet> = {}
+      const returned = result as { outputs?: unknown; message?: unknown }
+      const packets: Record<string, Packet> = {}
+      const rejected: string[] = []
       const ts = Date.now()
 
-      // 将用户返回的输出转换为 Packet 格式
-      if (result.outputs && typeof result.outputs === 'object') {
-        for (const [portId, val] of Object.entries(result.outputs)) {
-          if (val && typeof val === 'object' && 'type' in val) {
-            outputs[portId] = { ...(val as Packet), ts }
+      // 校验并转换为 Packet：只放行声明的端口 + 类型匹配的数据包，其余记入消息
+      if (returned.outputs && typeof returned.outputs === 'object') {
+        for (const [portId, val] of Object.entries(
+          returned.outputs as Record<string, unknown>,
+        )) {
+          const declaredType = declaredOutputs.get(portId)
+          if (!declaredType) {
+            rejected.push(`${portId}（未声明的端口）`)
+            continue
           }
+          if (!val || typeof val !== 'object' || !('type' in val)) {
+            rejected.push(`${portId}（缺少 type 字段）`)
+            continue
+          }
+          const packet = val as Packet
+          if (packet.type !== declaredType) {
+            rejected.push(`${portId}（type=${String(packet.type)} ≠ 声明 ${declaredType}）`)
+            continue
+          }
+          packets[portId] = { ...packet, ts }
         }
       }
 
-      const message = typeof result.message === 'string' ? result.message : '执行完成'
+      const baseMessage =
+        typeof returned.message === 'string' ? returned.message : '执行完成'
+      const message =
+        rejected.length > 0
+          ? `${baseMessage}；已忽略不符合输出端口的项：${rejected.join('、')}`
+          : baseMessage
       return {
-        outputs,
+        outputs: packets,
         aiState: { status: 'ready', message },
       }
     } catch (err) {
@@ -202,7 +327,8 @@ export function createCustomEvaluator(userCode: string): Evaluator {
 /** 将自定义模块注册到运行时（moduleRegistry + evaluators） */
 function registerToRuntime(def: CustomModuleDef) {
   registerDynamicModule(toAIModule(def))
-  const evaluator = createCustomEvaluator(def.userCode)
+  // 传入声明的输出端口，用于校验用户代码返回的数据包
+  const evaluator = createCustomEvaluator(def.userCode, def.outputs)
   registerDynamicEvaluator(def.type, evaluator)
 }
 

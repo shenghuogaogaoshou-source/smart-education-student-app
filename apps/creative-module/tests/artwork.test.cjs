@@ -126,10 +126,10 @@ test('实物图提示词会按元件翻译成现实部件', () => {
   assert.match(p, /儿童/);
 });
 
-test('AI 审查结果会被规整（score 限幅、severity 兜底、非 JSON 报错）', () => {
+test('AI 审查和实物图能力存在，出图默认走智芽代理且不暴露密钥', () => {
   // normalizeAiCheck 未导出，通过 aiCheckCircuit 才能间接测；这里验证导出面向上仍可用
   assert.equal(typeof art.aiCheckCircuit, 'function');
   assert.equal(typeof art.generateProductImage, 'function');
-  assert.equal(art.IMAGE_API_DEFAULTS.endpoint, 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
-  assert.match(art.IMAGE_API_DEFAULTS.apiKey, /^ark-/);
+  assert.equal(art.IMAGE_API_DEFAULTS.endpoint, '/api/ark/images/generations');
+  assert.equal(art.IMAGE_API_DEFAULTS.apiKey, '');
 });

@@ -77,15 +77,17 @@ npm run preview
 **典型链路**：摄像头 → 感光器（亮度感知）→ IF 条件判断 → 灯泡/门/警报
 
 操作方式：
-- 从左侧模块市场**拖拽**模块到画布
+- 从模块市场**拖拽**模块到画布（也可以点市场左上角的「AI 模块市场」，点元件看说明、按「添加」放入画布）
 - 拖动节点的**输出端口**（右侧圆点）到另一节点的**输入端口**（左侧圆点）建立连线
-- 点击节点，在右侧检视器调节参数
+- **参数直接改**：每个元件底部显示最多 3 个可调参数（如 IF 的「当标签包含」、Timer 的间隔），点进去就能输入，改完立即生效
+- 参数超过 3 个时，点元件右上角的 **🔧** 打开完整检视器（全部参数 + 代码 + 说明）
+- **删除元件**：点元件右上角的 **✕**（会自动清空下游输入、复位状态），也可以选中后按 Delete / Backspace
 - 点击顶部**运行**按钮启动数据流
 - 删除连线时，下游节点状态会自动复位
 
 ### 关卡模式
 
-进入「关卡探险」选择关卡。每个关卡有：
+进入「关卡探险」选择关卡。列表按**年级板块**编排（1-2年级 / 3-4年级 / 5-6年级），每个关卡有：
 - **故事背景**：为什么要做这件事
 - **限定模块**：只提供本关需要的 AI 模块
 - **引导步骤**：逐步提示如何搭建电路
@@ -103,7 +105,7 @@ npm run preview
 - 机械臂收到信号伸出抓取
 - 通关条件：正确率 ≥ 80% 且处理 ≥ 8 张照片（约 1 分钟内完成）
 
-**关卡 2-5**（规划中）：森林防火哨兵、城市无障碍助手、智慧交通灯、AI 生态城市
+**关卡 2-5**（占位，列表可见但标注「敬请期待」，暂不可进入）：森林防火哨兵、城市无障碍助手、智慧交通灯、AI 生态城市
 
 ## 模块市场
 
@@ -117,8 +119,13 @@ npm run preview
 | IF 条件判断 | 逻辑 | 标签匹配时输出真信号 |
 | 与门 AND / 或门 OR / 非门 NOT | 逻辑 | 布尔逻辑组合 |
 | 计时器 Timer | 逻辑 | 周期性输出信号 |
+| 计数器 Counter | 逻辑 | 上升沿累计次数，达标输出信号（重置端可选） |
+| 延时器 DelayTimer | 逻辑 | 触发后延时 N 秒输出脉冲 |
+| 文本合并 TextMerge | 逻辑 | 2~3 路文本拼接/模板（第 2、3 路可选） |
 | 行动输出 Output | 输出 | 灯泡/门/警报/机器人挥手 |
-| 文本输入 / 图片输入 | 输入 | 静态数据源 |
+| 文本显示 / 蜂鸣器 / 音频播放器 / LED 指示灯 | 输出 | 文字气泡、音效、朗读、指示灯 |
+| 数值仪表 NumberGauge | 输出 | 显示数值输出（亮度% / 数量 / 计数 / 音量 / 置信度） |
+| 文本输入 / 图片输入 | 输入 | 静态数据源（文本支持 自动 / 按钮 / 信号 三种触发） |
 | 麦克风 Microphone | 输入 | 采集音频 |
 
 ### 关卡专用模块（仅关卡模式可见）
@@ -131,7 +138,31 @@ npm run preview
 
 ### 自定义模块
 
-支持用户在「自定义模块创建器」中编写 JavaScript 代码定义新模块的求值逻辑，保存到 localStorage，应用重启后自动重新注册。执行环境为沙盒模式，拦截 23 类危险 API。
+支持用户在「自定义模块创建器」中编写 JavaScript 代码定义新模块的求值逻辑，保存到 localStorage，应用重启后自动重新注册。执行环境为沙盒模式，拦截 37 类危险 API 并遮蔽全局对象。
+
+**AI 助手**：创建器顶部可以用一句话描述需求（例如「把 0~1 的置信度换算成 0~100 的百分比并输出数值」），由 DeepSeek 生成模块名称、分类、图标、输入/输出端口、可调参数和求值代码，自动填好后点「创建模块」即可。生成结果仍会经过本机安全检查与端口类型校验。
+
+- 默认接口：`https://api.deepseek.com/chat/completions`（模型 `deepseek-chat`），浏览器可直连
+- Key 可在浏览器 `localStorage['aicircuit.aiSettings']` 里覆盖 `{ apiKey, endpoint, model }`
+- ⚠️ 前端持有 API Key 等于公开：只适合本地/课堂演示，正式上线必须换成自己的后端代理
+
+### 模块详情
+
+模块市场里**点任意一个元件**即可查看它的详情：它做什么、为什么有用、输入/输出端口与类型、可调参数与默认值、**可以怎么组合**（能接在哪些元件后面 / 结果能送给哪些元件，按端口类型自动推导）、以及**代码实现**（点开看真实逻辑）。详情页里也能直接「加入画布」。
+
+### 作品检查与导出（画布右下角）
+
+点右下角的「**作品检查与导出**」，在一个面板里完成四件事：
+
+1. **结构自检（本机、立刻、免费）**：空画布、必需输入没接线（可选端口不算）、IF 目标标签为空、孤立元件、没有终端输出、连线成环。每条都给出「怎么改」。
+2. **AI 审查**：把元件与连线清单（含参数）交给大模型，返回 0~100 的可用度评分、一句话总评和问题清单（必须修 / 建议修 / 提示）。
+3. **生成实物图**：按电路里的元件翻译成现实部件（摄像头、光线传感器、控制主板、继电器+灯泡…），用火山方舟 `doubao-seedream` 文生图画一张「现实中类似物品」的示意图，可一键保存。
+4. **导出作品**：导出 JSON（元件、参数、位置、连线类型 + 一份人可读的电路说明），文件名带时间戳。
+
+接口与配置：
+- 检查：复用自定义模块助手的 DeepSeek 配置（`localStorage['aicircuit.aiSettings']`）
+- 出图：火山方舟 `https://ark.cn-beijing.volces.com/api/v3/images/generations`，默认模型 `doubao-seedream-4-0-20260415`（失败自动切 `doubao-seedream-4-0-250828`），可覆盖 `localStorage['aicircuit.imageSettings']` 的 `{ apiKey, endpoint, model }`
+- 出图走 `response_format: 'b64_json'`，图片内嵌为 data URL，导出/保存不依赖跨域
 
 ## 技术架构
 
@@ -181,11 +212,15 @@ npm run preview
 |------|------|----------|
 | image | 图像（canvas） | image |
 | label | 标签（字符串） | label |
-| confidence | 置信度（0~1） | confidence |
+| confidence | 置信度（0~1） | confidence / number |
 | signal | 布尔信号 | signal |
 | text | 文本 | text |
-| number | 数值 | number |
+| number | 数值 | number / confidence |
 | audio | 音频 | audio |
+
+> `number` 与 `confidence` 互通：两者都是数值语义（0~1 置信度、0~100 音量、计数），
+> 否则「亮度值 / 数量 / 计数值 / 音量 / 置信度」这些输出端口在市场里找不到可连的入端。
+> 端口声明 `optional: true` 时可以不接线（如计数器的重置、文本合并的第 2/3 路）。
 
 ## 项目结构
 
@@ -193,22 +228,27 @@ npm run preview
 ├── public/
 │   ├── images/ocean/        # 关卡1真实海洋图片（4鱼 + 4垃圾）
 │   ├── models/coco-ssd/     # COCO-SSD 本地模型权重（运行 fetch 脚本后生成）
-│   ├── circuit.svg          # 电路装饰图标
+│   ├── circuit.svg          # 站点图标 / 装饰
 │   └── cursor_hand.png      # 自定义手形光标
 ├── scripts/
 │   └── fetch-coco-ssd.ps1   # COCO-SSD 模型预下载脚本（Windows）
+├── tests/                   # 契约测试（node --test，不需要浏览器）
+├── _smoke/                  # 无头浏览器（CDP）端到端检查脚本，仅开发用
 ├── src/
 │   ├── components/
-│   │   ├── nodes/           # 各类节点组件（CameraNode、IfNode、OutputNode、TrashClassifierNode…）
+│   │   ├── nodes/           # 各类节点组件 + NodeChrome（元件右上角 ✕/🔧）+ NodeShell（内联参数）
 │   │   ├── edges/           # 连线组件（DataFlowEdge）
-│   │   └── workbench/       # 工作台（Canvas、ModulePalette、Inspector、Toolbar、CustomModuleCreator）
+│   │   └── workbench/       # 工作台（Canvas、ModulePalette、Inspector、Toolbar、CustomModuleCreator、WorkCheckPanel）
 │   ├── levels/
 │   │   ├── scenes/          # 关卡场景（OceanScene 传送带式真实图片滚动）
-│   │   ├── levelData.ts     # 关卡定义（电路、提示、通关条件）
+│   │   ├── levelData.ts     # 关卡定义（年级板块、电路、提示、通关条件）
 │   │   ├── LevelRunner.tsx  # 关卡运行器
-│   │   └── LevelHintPanel.tsx # 引导提示面板
+│   │   ├── LevelSelect.tsx  # 关卡列表（按 1-2 / 3-4 / 5-6 年级分板块）
+│   │   └── LevelHintPanel.tsx # 引导提示面板（按 expectValue 判定步骤完成）
 │   ├── lib/
-│   │   ├── ai/objectDetector.ts  # COCO-SSD 封装（多源加载、预缓存、80类中文翻译）
+│   │   ├── ai/objectDetector.ts  # COCO-SSD 封装（多源加载、分片预缓存 + 看门狗、80类中文翻译）
+│   │   ├── aiAssistant.ts        # 自定义模块的 AI 生成（DeepSeek）
+│   │   ├── artwork.ts            # 作品检查（结构自检 + AI 审查）、实物图、导出
 │   │   ├── moduleRegistry.ts     # 模块注册表（所有 AI 模块定义）
 │   │   └── evaluators.ts         # 求值器（每个模块的真实推理逻辑）
 │   ├── store/circuitStore.ts # 电路状态 + 流式运行时引擎（含信号复位）
@@ -218,7 +258,8 @@ npm run preview
 ├── index.html               # HTML 入口
 ├── package.json             # 依赖与脚本
 ├── tailwind.config.js       # Tailwind 配置
-├── tsconfig.json            # TypeScript 配置
+├── tsconfig.json            # TypeScript 配置（开启 noUnusedLocals/Parameters，增量缓存放 node_modules/.tmp）
+├── tsconfig.node.json       # vite.config.ts 的类型检查（产物也进 node_modules/.tmp）
 └── vite.config.ts           # Vite 配置
 ```
 
@@ -243,17 +284,74 @@ npm run preview
 - 删除连线/节点时，下游节点输入端口自动清空，状态正确复位（如灯泡熄灭、机械臂停止）
 - 自定义手形光标通过 CSS `cursor: url()` 实现，加载失败时自动回退到系统 pointer
 
-## 开发约定
+## 缺陷修复记录（2026-10）
 
-- 所有 AI 模块必须使用真实模型，不写模拟逻辑
-- 浏览器原生运行，不需要安装任何客户端
-- 数据流必须可见，每个节点的推理结果实时显示
-- 模块连线必须强制类型匹配
-- IF 条件节点使用纯标签匹配（无置信度阈值）
-- 关卡专用模块标记 `levelOnly`，仅在关卡模式显示
-- COCO-SSD 检测结果统一翻译为中文，在 detect 层完成
-- 删除连线/节点必须同步清空下游输入端口，保证状态一致性
-- 关卡场景时序需保证在 1 分钟内完成（如 L1 每张图 3.8 秒 × 8 张 ≈ 30 秒）
+排查方式是「先找根因再改一处」，每项都有对应的验证手段；完整说明见下表。
+
+### 运行时引擎（store / types / evaluators / registry）
+
+| 根因 | 用户可见后果 | 修复 |
+|------|--------------|------|
+| 求值器只能拿到 `data`，而节点 id 没放进 `data` | 所有计数器共用一份状态、音量窗口串台 | `makeNode` 写入 `data.id`，状态按 id 隔离，清空/删除时回收 |
+| 求值门禁要求**所有**声明入端都接线 | 计数器不接 reset 就永不计数、文本合并必须接满 3 路 | `PortDef.optional` + `inputsReady()` |
+| 延时器两套实现互抢同一端口 | 求值器发出的假 `false` 盖掉组件刚发的真脉冲 | 延时只由组件负责，求值器返回 `null` |
+| `reevaluate` 没有 `catch/finally` | 求值抛一次错就把节点永久锁进 `busy`（画布卡死） | 补 `catch` + `finally` 解锁 |
+| 推理中到达的数据包被直接丢弃 | 一次性信号（定时器脉冲/单次识别）那一帧永久丢失 | 记 pending，结束后补算一次（带 2 次预算防环形自激） |
+| 键盘 Delete 走 `onNodesChange`，绕过 `deleteNode` | 删元件后下游输入与状态不复位（灯泡常亮） | `remove` 分支做同样的下游清空 + 状态清理 |
+| 终端模块求值返回 `null` 没人收尾 | 节点状态永远显示「推理中」 | 求值结束统一把 `running` 收尾为 `ready` |
+| `number`/`confidence` 端口没有同类型入端 | 亮度值/数量/音量等端口拖线必被静默拒绝 | 两者互通 + 新增**数值仪表**作为消费端 |
+| 停止运行后不清脉冲 | 连线「数据流动」动画一直跑 | `setRunning(false)` 清 `lastPulse` |
+| 示例链路 IF 目标标签为空串 | 空串永不匹配 → 「光线暗时灯泡不亮」 | `loadDemoChain` 显式设 `targetLabel: '暗'`；IF 元件空标签时红字提示 |
+
+### 关卡（levels / scenes）
+
+- 机械臂信号是 latched：停止/断开/删节点后场景仍认为在抓 → 场景启动时复位 `armActiveRef`，机械臂节点在无输入与卸载时主动下发 `false`。
+- 场景 HUD 与顶部统计各持一份数据 → 统计统一由 `LevelRunner` 持有并下传（重置后两端一起归零）。
+- 引导第 5 步只判断「填了东西」→ 改为必须等于本关需要的「垃圾」（`expectValue`）。
+- 模型未就绪也能运行，每张照片都记「漏掉」（正确率封顶 50%）→ 模型未就绪时禁用运行并提示。
+- L2–L5 只有占位数据却可进入 → `comingSoon`，列表可见但不可进入。
+- 关卡市场没按 `availableModules` 过滤 → 核心分类同样按本关过滤。
+- 场景 `dt` 上限 0.05s，弱设备上时间被拉慢数倍 → 放宽到 0.2s；采样频率下限提到 1 帧/秒。
+
+### 节点组件
+
+摄像头/麦克风 `getUserMedia` 在卸载后才返回导致设备指示灯常亮 → `disposedRef` 立即停轨；麦克风 60Hz 发包 → 节流 10Hz，并改用「用户意图」判断重启；图片输入陈旧闭包导致「先运行后加载」永远不发射 → ref + `loaded` 依赖；文本输入三种触发方式落地；TTS 队列/竞态与蜂鸣器、延时器、定时器的定时器清理；语音识别阈值不再重建识别器；元件右下角/右上角的参数内联编辑与删除按钮。
+
+### 持久化 / 模型 / 自定义模块
+
+草稿丢失连线 `data`（类型徽标消失）与 `data.id`、旧草稿参数缺失 → 保留并回填注册表默认值；`saveDraft` 失败改打印告警；自定义模块保存失败改为抛出中文错误并在创建器显示；模型分片预缓存只 `fetch` 不读 body（等于没缓存）+ 加载无超时 → 读掉 body + 45 秒看门狗；自定义模块每次求值都 `new Function` 重编译、返回值不校验端口 → 编译一次 + 按声明端口与包类型校验；沙箱补关键词与参数遮蔽（并注明只能降低风险）。
+
+### 样式 / 偏好
+
+「大字」选择器写的是不存在的 `.app-viewport` → 改为 `#root`；`@container phone` 没有具名容器导致整段移动端布局不生效 → `body` 声明 `container-type/name`。
+
+### 验证方式
+
+```bash
+npm run build                              # tsc -b（含 noUnusedLocals/Parameters）+ vite build
+node --test tests/*.test.cjs               # 草稿 / 端口契约 / 关卡 / 感光链路 / AI 助手 / 作品检查
+```
+
+### 代码与文件清理（2026-10）
+
+**删除的死代码**（`tsc --noUnusedLocals --noUnusedParameters` 现在为 0，并已把这两项写入 `tsconfig.json`，以后新增未使用代码会直接编译失败）：
+
+- 未使用的导出：`CORE_MODULE_TYPES`、`getDetectorEngine`、`saveAiSettings`、`SceneObject`、`LevelRunState`
+- 未使用的局部变量/导入：`ImageClassifierNode` 的 `bright`、`LogicGateNode` 的 `computeGate`/`outActive`、`ObjectDetectionNode` 的 `ScanSearch`、`TrashClassifierNode` 的 `Recycle`、`Canvas` 的 `TYPE_COLOR`、`Inspector` 的 `isPreview` 与多余 `mod`、`ModulePalette` 的 `addModule`、`LevelHintPanel` 的 `isLastStep`、`levelStore` 的 `get`、`artwork.ts` 的 `nameOf`、`normalizePorts` 的多余参数；求值器里未使用的 `data` 形参改为 `_data`
+
+**删除的多余文件**：
+
+- `dev.log`（历史调试日志）
+- `vite.config.js`、`vite.config.d.ts`、`tsconfig.tsbuildinfo`、`tsconfig.node.tsbuildinfo`（`tsc -b` 的编译产物）——同时把两个 tsconfig 的产物/增量缓存目录改到 `node_modules/.tmp`，以后不再污染根目录
+- `public/icon-192.png`、`public/icon-512.png`（PWA 已移除、无 manifest 引用；`dist` 里也不再产出）
+- `_smoke/` 下的一次性探针与结果文件（`inventory.mjs`、`workcheck-result.json`、重复的 `verify-inline-edit.mjs`、`verify-panel-toggle.mjs`）
+- `dist/` 里残留的旧哈希产物（整体重建）
+
+`_backup/` 保留了两份 `src` 快照（原始版 + 本次恢复后的版本），用于误覆盖时回滚。
+
+`_smoke/` 下是无头浏览器（CDP）端到端脚本：`verify.mjs`（关卡 1 建链路→设置 IF→运行、定时器→计数器）、`verify-ui.mjs`（数值仪表读数、清空会停止运行、大字偏好）、`verify-workcheck.mjs`（作品检查面板 + AI 审查 + 实物图 + 导出 JSON）、`verify-inline-edit.mjs`（元件内联改参数 / ✕ 删除 / 🔧 检视器）、`verify-levels.mjs`（年级板块）、`verify-position.mjs`（右下角按钮不压小地图与提示条）。
+
+> 注意：长时间运行的 dev server 偶尔会漏掉文件变更（继续发旧模块）。改完代码后如果界面行为与源码不一致，**重启 `npm run dev`** 再验证。
 
 ## 许可证
 

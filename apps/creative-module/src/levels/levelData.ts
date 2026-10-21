@@ -12,7 +12,7 @@ export const LEVELS: Level[] = [
     subtitle: 'Ocean Cleaner',
     sceneType: 'ocean',
     difficulty: '入门',
-    grade: '小学',
+    grade: '1-2年级',
     story:
       '太平洋海域漂浮着塑料瓶、塑料杯等垃圾，同时有大量鱼群活动。' +
       '清理机器人需要 AI 帮助它分辨：是垃圾就抓取，是鱼就放过。' +
@@ -30,13 +30,13 @@ export const LEVELS: Level[] = [
     hints: [
       {
         step: 1,
-        text: '从左侧模块市场拖入「场景相机」——它是机器人的眼睛，会拍摄海面真实照片。',
+        text: '点画布左上角的「AI 模块市场」，在「本关」里点「添加」把「场景相机」放进画布——它是机器人的眼睛，会拍摄海面真实照片。',
         expect: 'addModule',
         target: 'sceneCamera',
       },
       {
         step: 2,
-        text: '拖入「垃圾分类器」——它用 COCO-SSD 目标检测模型分析画面，检测到瓶子/杯子等垃圾时输出「垃圾」标签，否则输出「鱼」标签。',
+        text: '再添加「垃圾分类器」——它用 COCO-SSD 目标检测模型分析画面，检测到瓶子/杯子等垃圾时输出「垃圾」标签，否则输出「鱼」标签。',
         expect: 'addModule',
         target: 'trashClassifier',
       },
@@ -48,15 +48,17 @@ export const LEVELS: Level[] = [
       },
       {
         step: 4,
-        text: '拖入「IF」条件判断节点——它负责把 AI 输出的标签变成行动信号：标签匹配就触发，不匹配就不触发。',
+        text: '添加「IF」条件判断节点——它负责把 AI 输出的标签变成行动信号：标签匹配就触发，不匹配就不触发。',
         expect: 'addModule',
         target: 'if',
       },
       {
         step: 5,
-        text: '在右侧检视器里，把 IF 的「当标签包含」设为「垃圾」。这样只有 AI 判定为垃圾时，IF 才会输出真信号。',
+        text: '长按 IF 元件（或点画布左上角的滑块按钮）打开检视器，把「当标签包含」设为「垃圾」。这样只有 AI 判定为垃圾时，IF 才会输出真信号。',
         expect: 'setParam',
         target: 'if',
+        expectParam: 'targetLabel',
+        expectValue: '垃圾',
       },
       {
         step: 6,
@@ -66,7 +68,7 @@ export const LEVELS: Level[] = [
       },
       {
         step: 7,
-        text: '拖入「机械臂」——它听从 IF 的命令：收到真信号就抓取，没信号就放行。',
+        text: '添加「机械臂」——它听从 IF 的命令：收到真信号就抓取，没信号就放行。',
         expect: 'addModule',
         target: 'roboticArm',
       },
@@ -96,8 +98,8 @@ export const LEVELS: Level[] = [
     subtitle: 'Forest Fire Watch',
     sceneType: 'forest',
     difficulty: '简单',
-    grade: '小学-初中',
-    story: '（开发中）森林中需要 AI 实时检测火苗并报警，同时区分动物和火源。',
+    grade: '1-2年级',
+    story: '森林中需要 AI 实时检测火苗并报警，同时区分动物和火源。',
     sceneDesc: '森林俯视图，动物和火苗从右侧出现。',
     availableModules: [],
     expectedCircuit: [],
@@ -107,6 +109,7 @@ export const LEVELS: Level[] = [
     passAccuracy: 0.8,
     passMinHandled: 8,
     guided: true,
+    comingSoon: true,
   },
   {
     id: 3,
@@ -114,8 +117,8 @@ export const LEVELS: Level[] = [
     subtitle: 'City Accessibility',
     sceneType: 'city',
     difficulty: '中等',
-    grade: '初中',
-    story: '（开发中）城市街道需要 AI 识别路牌文字，帮助视障人士出行。',
+    grade: '3-4年级',
+    story: '城市街道需要 AI 识别路牌文字，帮助视障人士出行。',
     sceneDesc: '城市街道场景，路牌和障碍物出现。',
     availableModules: [],
     expectedCircuit: [],
@@ -125,6 +128,7 @@ export const LEVELS: Level[] = [
     passAccuracy: 0.75,
     passMinHandled: 6,
     guided: true,
+    comingSoon: true,
   },
   {
     id: 4,
@@ -132,8 +136,8 @@ export const LEVELS: Level[] = [
     subtitle: 'Smart Traffic Light',
     sceneType: 'crossroad',
     difficulty: '中高',
-    grade: '初中-高中',
-    story: '（开发中）十字路口需要 AI 根据车流和行人动态控制交通灯。',
+    grade: '3-4年级',
+    story: '十字路口需要 AI 根据车流和行人动态控制交通灯。',
     sceneDesc: '十字路口场景，车辆和行人通行。',
     availableModules: [],
     expectedCircuit: [],
@@ -143,6 +147,7 @@ export const LEVELS: Level[] = [
     passAccuracy: 0.7,
     passMinHandled: 10,
     guided: false,
+    comingSoon: true,
   },
   {
     id: 5,
@@ -150,8 +155,8 @@ export const LEVELS: Level[] = [
     subtitle: 'AI Eco City',
     sceneType: 'ecocity',
     difficulty: '挑战',
-    grade: '高中',
-    story: '（开发中）用全部已学模块，设计一个能自主运转的 AI 城市系统。',
+    grade: '5-6年级',
+    story: '用全部已学模块，设计一个能自主运转的 AI 城市系统。',
     sceneDesc: '城市全景，多个子系统协同。',
     availableModules: [],
     expectedCircuit: [],
@@ -161,6 +166,7 @@ export const LEVELS: Level[] = [
     passAccuracy: 0.7,
     passMinHandled: 15,
     guided: false,
+    comingSoon: true,
   },
 ]
 

@@ -5,7 +5,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "strict": true,
+    // 编译产物放进 node_modules/.tmp，避免在项目根目录留下 vite.config.js / .d.ts
+    "outDir": "./node_modules/.tmp/tsconfig.node",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node/tsconfig.node.tsbuildinfo"
   },
   "include": ["vite.config.ts"]
 }

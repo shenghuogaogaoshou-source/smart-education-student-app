@@ -15,6 +15,9 @@ import * as cocoSsd from '@tensorflow-models/coco-ssd'
 
 export type DetectorEngine = 'coco-ssd' | 'none'
 
+/** 单次模型加载的看门狗上限：下载"卡住但既不成功也不报错"时不能无限等下去 */
+const MODEL_LOAD_TIMEOUT_MS = 45000
+
 /** 官方 GCS 模型地址（lite_mobilenet_v2 体积小、速度快） */
 const GCS_URL =
   'https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json'
@@ -23,11 +26,6 @@ const LOCAL_URL = '/models/coco-ssd/model.json'
 
 let engine: DetectorEngine = 'none'
 let modelPromise: Promise<cocoSsd.ObjectDetection> | null = null
-
-/** 当前激活的检测引擎 */
-export function getDetectorEngine(): DetectorEngine {
-  return engine
-}
 
 async function ensureBackend() {
   // WebGL 推理快；不可用则回退 CPU
@@ -46,6 +44,34 @@ function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   return fetch(url, { method: 'GET', signal: ctrl.signal, mode: 'cors' }).finally(() =>
     clearTimeout(timer),
   )
+}
+
+/**
+ * 给加载流程套一个有上限的超时看门狗
+ * 卡住（既不成功也不失败）的下载会让 initDetector() 永远 pending，
+ * UI 一直停在「加载 COCO-SSD…」且没有重试入口；超时后抛出中文错误，
+ * initDetector 的 catch 会把 modelPromise 复位，下一次调用仍可重新尝试。
+ */
+function withLoadTimeout<T>(task: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `COCO-SSD ${label}超时（${MODEL_LOAD_TIMEOUT_MS / 1000} 秒）：下载似乎卡住了，请检查网络后重试。`,
+        ),
+      )
+    }, MODEL_LOAD_TIMEOUT_MS)
+    task.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
 }
 
 /**
@@ -98,7 +124,23 @@ async function precacheShards(modelUrl: string) {
     const paths: string[] =
       manifest?.weightsManifest?.flatMap((g: { paths: string[] }) => g.paths) ?? []
     if (paths.length === 0) return
-    await Promise.all(paths.map((p) => fetch(baseUrl + p)))
+    // 必须把响应体读完（arrayBuffer）：fetch 只等响应头就 resolve，
+    // 不消费 body 的话分片不会进入 HTTP 缓存，cocoSsd.load 时又要重新下一遍
+    await Promise.all(
+      paths.map(async (p) => {
+        try {
+          const shard = await fetch(baseUrl + p)
+          if (!shard.ok) {
+            console.warn(`[COCO-SSD] shard 预缓存跳过 ${p}：HTTP ${shard.status}`)
+            return
+          }
+          await shard.arrayBuffer()
+        } catch (e) {
+          // 单个分片失败（含 404）不能中断整批，其余分片仍应进缓存
+          console.warn(`[COCO-SSD] shard 预缓存失败 ${p}:`, (e as Error).message)
+        }
+      }),
+    )
     console.log(`[COCO-SSD] shard 预缓存完成: ${paths.length} 个文件`)
   } catch (e) {
     console.warn('[COCO-SSD] shard 预缓存失败（忽略，cocoSsd.load 会自行处理）:', (e as Error).message)
@@ -211,13 +253,18 @@ export async function initDetector(): Promise<DetectorEngine> {
   }
   await ensureBackend()
 
-  const tryLoad = async (): Promise<cocoSsd.ObjectDetection> => {
-    const modelUrl = await resolveModelUrl()
-    // 预缓存 shard 文件：解析 model.json 获取权重分片路径，并行预加载
-    // 避免 cocoSsd.load 内部并发 fetch 时部分请求被浏览器中止 (ERR_ABORTED)
-    await precacheShards(modelUrl)
-    return cocoSsd.load({ base: 'lite_mobilenet_v2', modelUrl })
-  }
+  const tryLoad = async (): Promise<cocoSsd.ObjectDetection> =>
+    // 整个"探测源 → 预缓存分片 → 载入模型"流程都要有上限，否则卡住的下载会让重试入口永远出不来
+    withLoadTimeout(
+      (async () => {
+        const modelUrl = await resolveModelUrl()
+        // 预缓存 shard 文件：解析 model.json 获取权重分片路径，并行预加载
+        // 避免 cocoSsd.load 内部并发 fetch 时部分请求被浏览器中止 (ERR_ABORTED)
+        await precacheShards(modelUrl)
+        return cocoSsd.load({ base: 'lite_mobilenet_v2', modelUrl })
+      })(),
+      '模型加载',
+    )
 
   try {
     modelPromise = tryLoad()

@@ -28,7 +28,6 @@ export function LevelHintPanel({ level, hintStep, onHintStepChange }: LevelHintP
   const hints = level.hints
   const currentHint = hints[hintStep]
   const totalSteps = hints.length
-  const isLastStep = hintStep >= totalSteps - 1
   const allDone = hintStep >= totalSteps
 
   // 检测当前步骤是否完成
@@ -55,10 +54,12 @@ export function LevelHintPanel({ level, hintStep, onHintStepChange }: LevelHintP
         })
       }
       case 'setParam': {
-        // IF 节点的 targetLabel 已被设置
-        const ifNode = nodes.find((n) => n.data.moduleType === 'if')
-        if (!ifNode) return false
-        const val = String(ifNode.data.params.targetLabel ?? '').trim()
+        // 检查指定参数是否达到本关要求的值（只判断"非空"会让填错的内容也算过关）
+        const targetNode = nodes.find((n) => n.data.moduleType === (h.target ?? 'if'))
+        if (!targetNode) return false
+        const paramId = h.expectParam ?? 'targetLabel'
+        const val = String(targetNode.data.params[paramId] ?? '').trim()
+        if (h.expectValue !== undefined) return val === h.expectValue
         return val !== ''
       }
       case 'run':

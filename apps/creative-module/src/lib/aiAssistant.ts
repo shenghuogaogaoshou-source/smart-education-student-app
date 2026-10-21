@@ -1,17 +1,15 @@
 // ============================================================
 // AI 助手 —— 把"我想要一个这样的模块"变成可运行的自定义模块
 //
-// 后端：DeepSeek Chat Completions（OpenAI 兼容接口，浏览器可直连）
-// 安全提示：API Key 放在前端一定是公开的（谁都能从浏览器里看到），
-//           只适合本地 / 课堂演示；正式上线请换成自己的后端代理。
+// 后端：经智芽本地代理调用 DeepSeek；API Key 只保存在服务端。
 // ============================================================
 import type { DataType, ModuleCategory, ParamDef, PortDef } from '../types/circuit'
 import { validateCode } from './customModules'
 
 /** 默认连接配置（可在 localStorage 的 aicircuit.aiSettings 里覆盖） */
 export const AI_DEFAULTS = {
-  endpoint: 'https://api.deepseek.com/chat/completions',
-  model: 'deepseek-chat',
+  endpoint: '/api/deepseek/chat/completions',
+  model: 'deepseek-flash',
   apiKey: '',
 }
 
@@ -22,26 +20,21 @@ export interface AiSettings {
 }
 
 const SETTINGS_KEY = 'aicircuit.aiSettings'
+const LEGACY_DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions'
 
 export function loadAiSettings(): AiSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     const parsed = raw ? JSON.parse(raw) : null
     return {
-      endpoint: typeof parsed?.endpoint === 'string' && parsed.endpoint ? parsed.endpoint : AI_DEFAULTS.endpoint,
+      endpoint: typeof parsed?.endpoint === 'string' && parsed.endpoint && parsed.endpoint !== LEGACY_DEEPSEEK_ENDPOINT
+        ? parsed.endpoint
+        : AI_DEFAULTS.endpoint,
       model: typeof parsed?.model === 'string' && parsed.model ? parsed.model : AI_DEFAULTS.model,
       apiKey: typeof parsed?.apiKey === 'string' && parsed.apiKey ? parsed.apiKey : AI_DEFAULTS.apiKey,
     }
   } catch {
     return { ...AI_DEFAULTS }
-  }
-}
-
-export function saveAiSettings(next: Partial<AiSettings>) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...loadAiSettings(), ...next }))
-  } catch {
-    // 配置存不下不影响本次生成（只用默认值）
   }
 }
 
@@ -132,7 +125,7 @@ export function parseJsonPayload(text: string): unknown {
 
 const ID_RE = /^[A-Za-z_][A-Za-z0-9_]{0,23}$/
 
-function normalizePorts(raw: unknown, kind: 'inputs' | 'outputs'): PortDef[] {
+function normalizePorts(raw: unknown): PortDef[] {
   if (!Array.isArray(raw)) return []
   const used = new Set<string>()
   const ports: PortDef[] = []
@@ -200,8 +193,8 @@ export function normalizeDraft(raw: unknown): AiModuleDraft {
   const safe = validateCode(code)
   if (!safe.ok) throw new Error(`AI 生成的代码没通过安全检查（${safe.reason ?? '含危险调用'}），请换个说法重试`)
 
-  const inputs = normalizePorts(obj.inputs, 'inputs')
-  const outputs = normalizePorts(obj.outputs, 'outputs')
+  const inputs = normalizePorts(obj.inputs)
+  const outputs = normalizePorts(obj.outputs)
   if (outputs.length === 0) throw new Error('AI 生成的模块没有输出端口，请明确"它要输出什么"')
 
   return {
@@ -230,7 +223,10 @@ export async function generateModuleDraft(requirement: string, timeoutMs = 60000
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model,
         temperature: 0.3,

@@ -796,6 +796,12 @@ function renderLog() {
   el.innerHTML = G.log.slice(-60).map(e => `<div><span class="lg-t">${esc(e.t)}</span>${esc(e.txt)}</div>`).join('') ||
     '<div style="color:#b3a6dd">还没有记录。</div>';
 }
+/* 本机录制出来的片子是内存里的 blob 地址:换新片时要主动释放,不然会一直占着内存 */
+function releaseVideoUrl() {
+  if (G.videoUrl && /^blob:/i.test(G.videoUrl)) {
+    try { URL.revokeObjectURL(G.videoUrl); } catch (e) {}
+  }
+}
 function renderPlayer() {
   const box = $('#film-player'); if (!box) return;
   if (!G.videoUrl) { box.classList.add('hidden'); box.innerHTML = ''; return; }
@@ -819,7 +825,9 @@ function renderPlayer() {
     }, { once: true });
   }
 }
-/* 用浏览器自带的录制能力,把剧本 + 分镜连成一段真影片(不需要联网/不需要 API) */
+/* 用浏览器自带的录制能力,把剧本 + 分镜连成一段真影片(不需要联网/不需要 API)
+   注意:离线录制没有配音轨 —— 浏览器的 speechSynthesis 音频进不了 MediaStream,
+   以前这里"加了一条静音音轨"假装有配音,已经去掉,改成如实告诉用户。 */
 async function makeFilm(onStep) {
   const step = typeof onStep === 'function' ? onStep : () => {};
   if (!G.panels.length) throw new Error('还没有分镜,先回第 5 步画画');
@@ -830,10 +838,11 @@ async function makeFilm(onStep) {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d');
   step('① 正在准备画面…');
-  const pages = [{ kind: 'cover', dur: 2.6, speak: G.title + '。导演' + G.director + '。' + synopsisText() }]
-    .concat(G.panels.map((p, i) => ({ kind: 'panel', dur: 3.2, cap: (p.cap || '').trim(), svg: p.svg, speak: (p.cap || '').trim(), idx: i })));
+  const pages = [{ kind: 'cover', dur: 2.6, speak: (G.title || '我的电影') + '。导演' + G.director + '。' + synopsisText() }]
+    .concat(G.panels.map((p, i) => ({ kind: 'panel', dur: 3.2, cap: (p.cap || '').trim(), svg: p.svg, img: p.img, speak: (p.cap || '').trim(), idx: i })));
   const imgs = [];
   for (const pg of pages) {
+    if (pg.img) { imgs.push(await imgOf(pg.img)); continue; }     /* 有 AI 图就用 AI 图,别退回程序插画 */
     if (!pg.svg) { imgs.push(null); continue; }
     const sized = pg.svg.replace('<svg ', '<svg width="640" height="400" ');
     imgs.push(await new Promise(res => {
@@ -844,20 +853,7 @@ async function makeFilm(onStep) {
       im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(sized);
     }));
   }
-  /* 浏览器朗读当配音轨(免费);不支持就录成无声 */
-  let audioCtx = null, dest = null, bufs = [];
-  try {
-    if (window.speechSynthesis) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && AC.prototype.createMediaStreamDestination) {
-        audioCtx = new AC(); dest = audioCtx.createMediaStreamDestination();
-        await Promise.race([audioCtx.resume ? audioCtx.resume() : Promise.resolve(), new Promise(r => setTimeout(r, 400))]);
-        bufs = pages.map(() => null);
-      }
-    }
-  } catch (e) { audioCtx = null; dest = null; }
   const stream = cv.captureStream(24);
-  if (dest && dest.stream.getAudioTracks) dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
   const rec = new MediaRecorder(stream, MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? { mimeType: 'video/webm;codecs=vp9,opus' } : undefined);
   const chunks = [];
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -868,13 +864,6 @@ async function makeFilm(onStep) {
   for (let i = 0; i < pages.length; i++) {
     const pg = pages[i];
     step('② 正在录第 ' + (i + 1) + '/' + pages.length + ' 页…');
-    if (dest && pg.speak && window.speechSynthesis) {
-      try {
-        const u = new SpeechSynthesisUtterance(pg.speak);
-        u.lang = 'zh-CN'; u.rate = 0.95;
-        window.speechSynthesis.speak(u);
-      } catch (e) {}
-    }
     const dur = pg.dur * 1000;
     const s0 = Date.now();
     while (true) {
@@ -885,14 +874,15 @@ async function makeFilm(onStep) {
     }
   }
   await sleep(200);
-  try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
   rec.stop(); await stopped;
-  if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
   const blob = new Blob(chunks, { type: 'video/webm' });
   const url = URL.createObjectURL(blob);
+  releaseVideoUrl();
   G.videoUrl = url; G.filmMs = Date.now() - t0;
+  G.videoModel = '本机录制(无配音)';
+  G.videoCost = 0;
   G.filmSeconds = Math.round(pages.reduce((s, p) => s + (p.dur || 0), 0));
-  return { url, ms: G.filmMs, pages: pages.length, size: blob.size, blob };
+  return { url, ms: G.filmMs, pages: pages.length, size: blob.size, blob, silent: true };
 }
 function drawPage(ctx, pg, img, prog, W, H) {
   ctx.save();
@@ -985,6 +975,9 @@ async function saveFilm() {
   let dropped = 0;
   while (list.length > 1 && archiveBytes(list) > 4 * 1024 * 1024) { list.pop(); dropped++; }   /* 本机存储有上限,先把最旧的挤出去 */
   store.set('bh_archive', list);
+  backupArchiveWork(item).catch(() => {
+    toast('作品已存在这台浏览器；本机备份服务暂时连不上，稍后打开作品库会再试一次。');
+  });
   G.replayId = item.id;
   clearDraft();
   renderArchive();
@@ -1032,6 +1025,7 @@ function openArchiveItem(id) {
   G.panels = (it.panels || []).map(p => ({ cap: p.cap, prm: p.prm, svg: p.svg, img: p.thumb || '', thumb: p.thumb || '', version: 1, accepted: true, wrong: null, note: '', fix: '' }));
   G.panelsFrom = G.story || '';          /* 重看的作品不要被 initPanels 重新生成掉 */
   G.log = it.log || []; G.filmIdx = 0;
+  releaseVideoUrl();                     /* 上一部如果是本机录制,先把 blob 放掉 */
   G.videoUrl = it.videoUrl || ''; G.videoModel = it.videoModel || ''; G.filmSeconds = it.filmSeconds || 0;
   G.filmMs = it.filmMs || 0;
   show('prem'); renderPrem();
@@ -1040,8 +1034,10 @@ function openArchiveItem(id) {
 function downloadText(name, text) {
   const blob = new Blob([text], { type: 'application/json' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
+  const url = URL.createObjectURL(blob);
+  a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 1000);   /* 别把 blob 一直挂在内存里 */
 }
 async function printFilm(item) {
   const it = item || await withThumbs(filmItem(), G.panels);
@@ -1089,6 +1085,12 @@ function tryRestoreDraft() {
     if (!d || d.v !== 3 || !d.stage || d.stage === 'title') return false;
     Object.assign(G, d);
     G.videoSegments = (G.videoSegments && typeof G.videoSegments === 'object' && !Array.isArray(G.videoSegments)) ? G.videoSegments : {};
+    /* 本机录制的片子是内存 blob 地址,刷新后一定失效 —— 别让播放器挂个死链接 */
+    if (G.videoUrl && /^blob:/i.test(G.videoUrl)) {
+      G.videoUrl = ''; G.videoModel = ''; G.filmSeconds = 0;
+      lg('video', '上次本机录制的片子刷新后失效,需要重新录或改用「逐格拍片」');
+      setTimeout(() => toast('ℹ️ 上次的「本机录制」片子存在内存里,刷新后失效了;分镜和剧本都在,可以重录', 4000), 800);
+    }
     if (!Array.isArray(G.slots) || !G.slots.length) initSlots();
     G.log = d.log || [];
     $$('.screen').forEach(s => s.classList.toggle('active', s.id === screenId(G.stage)));
@@ -1153,7 +1155,11 @@ function bindEvents() {
         if (act === 'print') return printFilm(it);
         if (act === 'del') {
           if (!confirm('删掉《' + (it.title || '无题') + '》?删了就找不回来了')) return;
-          store.set('bh_archive', list.filter(x => x.id !== id)); renderArchive(); toast('已删除');
+          store.set('bh_archive', list.filter(x => x.id !== id)); renderArchive();
+          deleteArchiveWork(id).catch(() => {
+            toast('这台浏览器已删除；本机备份服务暂时连不上，稍后打开作品库会再试一次。');
+          });
+          toast('已删除');
           return;
         }
       }
@@ -1365,12 +1371,23 @@ function bindEvents() {
     initSlots(); renderSlots(); navReason = 'new-film'; show('card');
     toast('🎬 开拍!先抽三张必抽的卡');
   };
-  $('#btn-archive').onclick = () => { const w = $('#arch-list'); const opening = G.stage !== 'title' || w.classList.contains('hidden'); show('title'); w.classList.toggle('hidden', !opening); renderArchive(); };
+  $('#btn-archive').onclick = () => {
+    const w = $('#arch-list'); const opening = G.stage !== 'title' || w.classList.contains('hidden');
+    show('title'); w.classList.toggle('hidden', !opening); renderArchive();
+    if (opening) syncArchiveFromServer();
+  };
   $('#btn-settings').onclick = () => { openSettings(); $('#m-settings').classList.remove('hidden'); };
   $('#btn-help').onclick = () => $('#m-help').classList.remove('hidden');
   $('#btn-help-close').onclick = () => $('#m-help').classList.add('hidden');
   $('#btn-settings-close').onclick = () => $('#m-settings').classList.add('hidden');
   $$('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.add('hidden'); }));
+  /* Esc 关弹窗:键盘用户以前只能靠点"完成" */
+  nativeDocument.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = $$('.overlay').filter(o => !o.classList.contains('hidden'));
+    if (!open.length) return;
+    open.forEach(o => o.classList.add('hidden'));
+  }, { signal: controller.signal });
 
   /* 设置 */
   $('#wrong-on').onclick = () => { G.wrongOn = true; openSettings(); toast('☠️ 翻车时刻已开:提示词写糊了小映就会画错——这正是教学点'); };
@@ -1395,7 +1412,11 @@ function bindEvents() {
   $('#btn-clear-draft').onclick = () => { clearDraft(); $('#data-msg').textContent = '草稿已清掉。'; };
   $('#btn-clear-all').onclick = () => {
     if (!confirm('清空本机所有数据(作品库、草稿、设置)?清了就找不回来了')) return;
+    const workIds = (store.get('bh_archive') || []).map(w => w && w.id).filter(Boolean);
     try { localStorage.clear(); } catch (e) {}
+    Promise.all(workIds.map(id => deleteArchiveWork(id))).catch(() => {
+      $('#data-msg').textContent = '浏览器数据已清空；本机备份删除失败，稍后打开作品库会再试一次。';
+    });
     $('#data-msg').textContent = '已清空,刷新页面就回到全新状态。';
   };
 }
@@ -1418,6 +1439,7 @@ function renderBackstage() {
 function boot() {
   const prof = store.get('bh_profile');
   if (prof && prof.director) $('#in-director').value = prof.director;
+  if (prof && prof.intern) $('#in-intern').value = prof.intern;    /* 以前只恢复导演名,实习生名每次都被重置 */
   initSlots();
   if (!tryRestoreDraft()) { show('title'); }
   renderArchive();
@@ -1446,9 +1468,9 @@ const BK = {
   lastErr: '',
 };
 
-async function bkFetch(path, body, ms) {
+async function bkFetch(path, body, ms, method) {
   const r = await fetch(path, {
-    method: body ? 'POST' : 'GET',
+    method: method || (body ? 'POST' : 'GET'),
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     signal: (window.AbortSignal && AbortSignal.timeout) ? AbortSignal.timeout(ms || 180000) : undefined,
@@ -1463,6 +1485,57 @@ async function bkFetch(path, body, ms) {
 }
 const bkGet = (p, ms) => bkFetch(p, null, ms);
 const bkPost = (p, b, ms) => bkFetch(p, b, ms);
+const bkDelete = (p, ms) => bkFetch(p, null, ms, 'DELETE');
+
+/* ---------- 作品库:浏览器缓存 + 本机 SQLite 备份 ---------- */
+const ARCHIVE_MAX = 24;
+function archiveTime(work) {
+  const t = Date.parse((work && work.savedAt) || '');
+  return Number.isFinite(t) ? t : 0;
+}
+function mergeArchiveWorks(local, backedUp) {
+  const byId = new Map();
+  [...(backedUp || []), ...(local || [])].forEach(work => {
+    if (!work || typeof work !== 'object' || !work.id) return;
+    const old = byId.get(work.id);
+    if (!old || archiveTime(work) >= archiveTime(old)) byId.set(work.id, work);
+  });
+  return Array.from(byId.values())
+    .sort((a, b) => archiveTime(b) - archiveTime(a))
+    .slice(0, ARCHIVE_MAX);
+}
+async function backupArchiveWork(work) {
+  if (!BK.enabled || !work || !work.id) return;
+  await bkPost('/api/works', { work }, 30000);
+}
+async function deleteArchiveWork(id) {
+  if (!BK.enabled || !id) return;
+  await bkDelete('/api/works/' + encodeURIComponent(id), 15000);
+}
+async function syncArchiveFromServer() {
+  if (!BK.enabled) return;
+  try {
+    const listing = await bkGet('/api/works?limit=100', 20000);
+    const summaries = Array.isArray(listing.works) ? listing.works : [];
+    const backedUp = [];
+    for (const summary of summaries) {
+      if (!summary || !summary.id) continue;
+      const item = await bkGet('/api/works/' + encodeURIComponent(summary.id), 20000);
+      if (item && item.work && typeof item.work === 'object') backedUp.push(item.work);
+    }
+    const local = store.get('bh_archive') || [];
+    const merged = mergeArchiveWorks(local, backedUp);
+    store.set('bh_archive', merged);
+    renderArchive();
+
+    const remoteById = new Map(backedUp.map(work => [work.id, work]));
+    await Promise.all(merged
+      .filter(work => !remoteById.has(work.id) || archiveTime(work) > archiveTime(remoteById.get(work.id)))
+      .map(backupArchiveWork));
+  } catch (e) {
+    /* 无后端、断网、服务重启时保留浏览器里的作品，不打断孩子继续创作。 */
+  }
+}
 
 async function bkBoot() {
   try {
@@ -1946,6 +2019,7 @@ async function aiMakeFilm() {          /* 一条龙:每格一段镜头 → 按�
     if (!m || !m.url) throw new Error('拼接没有返回片子');
     lg('video', '成片拼好了:' + m.segments + ' 段 · ' + m.seconds + ' 秒');
 
+    releaseVideoUrl();                     /* 换成服务端成片前,先放掉本机录制的 blob */
     G.videoUrl = m.url;
     G.videoModel = '逐格拍片 ' + got.length + '/' + segments.length + ' 段 AI 镜头 + ' + modelOf('tts') + ' 配音';
     G.filmMs = Date.now() - started;
@@ -1983,7 +2057,7 @@ function ensurePremUI() {
         toast('离线模式:用浏览器自带朗读');
         try {
           const r = await makeFilm(x => { if (msg) msg.textContent = '⏳ ' + x; });
-          if (msg) msg.textContent = '✅ 影片好了(' + r.pages + ' 页 · ' + Math.round(r.ms / 1000) + ' 秒)';
+          if (msg) msg.textContent = '✅ 影片好了(' + r.pages + ' 页 · ' + G.filmSeconds + ' 秒 · 免费录制没有配音轨;想要旁白就用「🎬 逐格拍片」)';
           renderPlayer();
         } catch (e) { if (msg) msg.textContent = '❌ 本机录制暂时没有完成，稍等后再试；你的草稿还在。'; }
         return;
@@ -2049,11 +2123,13 @@ async function makeFilmAI(onStep) {        // 用 GLM-TTS 当配音轨录一部�
   rec.start(250);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const t0 = Date.now();
+  let recordedMs = 0;
   for (let i = 0; i < pages.length; i++) {
     const pg = pages[i];
     step('② 录像中 ' + (i + 1) + '/' + pages.length + '…');
     const ab = bufs[i];
     const dur = Math.max(pg.dur * 1000, ab ? ab.duration * 1000 + 400 : 0);
+    recordedMs += dur;
     if (ab) { const src = ac.createBufferSource(); src.buffer = ab; src.connect(dest); src.connect(ac.destination); src.start(); }
     const s0 = Date.now();
     while (true) {
@@ -2068,13 +2144,18 @@ async function makeFilmAI(onStep) {        // 用 GLM-TTS 当配音轨录一部�
   try { ac.close(); } catch (e) {}
   const blob = new Blob(chunks, { type: 'video/webm' });
   const url = URL.createObjectURL(blob);
+  releaseVideoUrl();
   G.videoUrl = url; G.filmMs = Date.now() - t0; G.videoModel = '本机录制 + ' + modelOf('tts') + ' 配音'; G.videoCost = 0;
-  G.filmSeconds = Math.round(pages.reduce((s, p) => s + (p.dur || 0), 0));
+  G.filmSeconds = Math.round(recordedMs / 1000);      /* 用实际录到的长度,旁白比画面长时也不会报短 */
   return { url, ms: G.filmMs, pages: pages.length, size: blob.size, blob };
 }
 const _imgCache = {};
+const IMG_CACHE_MAX = 24;
 function imgOf(src) {
   if (_imgCache[src]) return Promise.resolve(_imgCache[src]);
+  if (Object.keys(_imgCache).length >= IMG_CACHE_MAX) {      /* 别让缓存无限长下去 */
+    Object.keys(_imgCache).forEach(k => { delete _imgCache[k]; });
+  }
   return new Promise(res => {
     const im = new Image();
     let done = false; const fin = v => { if (!done) { done = true; if (v) _imgCache[src] = v; res(v); } };
@@ -2124,7 +2205,10 @@ document.addEventListener('click', e => {
   if (go && go.getAttribute('data-go') === 'sc-idea') setTimeout(autoSynopsis, 60);   // 进"讲想法"就自动写通顺
 }, true);
 
-bkBoot().then(() => { if (BK.ok && ready('synopsis')) setTimeout(autoSynopsis, 300); });
+bkBoot().then(() => {
+  syncArchiveFromServer();
+  if (BK.ok && ready('synopsis')) setTimeout(autoSynopsis, 300);
+});
 /* 关页面前把还没落盘的草稿写掉,免得最后一次输入丢掉 */
 nativeDocument.addEventListener('visibilitychange', () => {
   if (nativeDocument.visibilityState === 'hidden' && draftTimer) saveDraft();

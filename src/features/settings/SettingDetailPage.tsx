@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, Camera, CheckCircle2, Database, Eye, EyeOff, FileText, HelpCircle, Headphones, LayoutDashboard, LogOut, Mic, MessageSquare, RotateCcw, ShieldCheck, ShieldOff, Smartphone, Sparkles, Trash2, UserRound, Volume2 } from 'lucide-react'
+import { ArrowLeft, Bell, Camera, CheckCircle2, Database, Eye, EyeOff, HelpCircle, Headphones, LayoutDashboard, Mic, MessageSquare, RotateCcw, ShieldCheck, ShieldOff, Smartphone, Sparkles, Trash2, UserRound, Volume2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_LABELS, PRIMARY_GRADES, type PrimaryGrade } from '../../app/learning'
@@ -16,7 +16,7 @@ const RELATIONSHIP_LABEL: Record<GuardianInfo['relationship'], string> = {
 
 export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: string; onBack: () => void; onOpenMall: () => void }) {
   const app = useAppState()
-  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, removeDevice, resetAiPosition, setAiName, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
+  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, resetAiPosition, setAiName, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
   const [notice, setNotice] = useState('')
   const item = settingGroups.flatMap((group) => group.items).find((entry) => entry.id === itemId)
   if (!item) return null

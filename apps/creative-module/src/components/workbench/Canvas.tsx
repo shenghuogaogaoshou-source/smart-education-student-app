@@ -3,10 +3,11 @@
 // 支持从模块市场拖入、连线类型校验、选中/删除
 // ============================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, SlidersHorizontal } from 'lucide-react'
+import { Plus, SlidersHorizontal, ShieldCheck } from 'lucide-react'
 import { ModulePalette } from './ModulePalette'
 import { Inspector } from './Inspector'
 import { AppPanel } from './AppPanel'
+import { WorkCheckPanel } from './WorkCheckPanel'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -19,7 +20,6 @@ import { nodeTypes } from '../nodes'
 import { DataFlowEdge } from '../edges/DataFlowEdge'
 import { useCircuit } from '../../store/circuitStore'
 import { getModule } from '../../lib/moduleRegistry'
-import { TYPE_COLOR } from '../../types/circuit'
 
 const edgeTypes = { dataflow: DataFlowEdge }
 
@@ -28,6 +28,7 @@ export function Canvas() {
   const rfInstance = useRef<ReactFlowInstance | null>(null)
   const [marketOpen, setMarketOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [workCheckOpen, setWorkCheckOpen] = useState(false)
   const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
   const cancelPress = useCallback(() => {
     if (press.current) clearTimeout(press.current.timer)
@@ -170,6 +171,20 @@ export function Canvas() {
         {selectedExists && <button className="app-button" aria-label="查看选中元件" onClick={() => setInspectorOpen(true)}><SlidersHorizontal size={18} /></button>}
       </div>
       <p className="canvas-touch-hint">长按元件查看详情 · 点击两端接口连线</p>
+
+      {/* 右下角：作品检查与导出（面板打开时收起按钮，避免被面板盖住） */}
+      {!workCheckOpen && (
+        <button
+          className="app-button workcheck-entry"
+          onClick={() => setWorkCheckOpen(true)}
+          aria-label="作品检查与导出"
+          title="检查电路有没有 bug，AI 审查，生成实物图，导出作品"
+        >
+          <ShieldCheck size={17} />作品检查与导出
+        </button>
+      )}
+      {workCheckOpen && <WorkCheckPanel onClose={() => setWorkCheckOpen(false)} />}
+
       {marketOpen && <AppPanel label="AI 模块市场" onClose={() => setMarketOpen(false)}>
         <ModulePalette onAdd={addFromMarket} onClose={() => setMarketOpen(false)} />
       </AppPanel>}
@@ -202,7 +217,10 @@ function EmptyHint() {
           点击 AI 模块市场添加 <span className="text-cyan-sig">摄像头</span> →{' '}
           <span className="text-amber">感光器</span> →{' '}
           <span className="text-green-sig">IF</span> →{' '}
-          <span className="text-orange-sig">灯泡</span>，或点击"加载示例链路"一键开始。
+          <span className="text-orange-sig">灯泡</span>，或者点「加载示例链路」一键开始。
+        </p>
+        <p className="mx-auto mt-1 max-w-[280px] text-[11px] leading-relaxed text-text-faint">
+          别忘了在 IF 元件底部的输入框里填目标标签（示例链路已设为「暗」）：光线暗 → 灯泡亮。
         </p>
         <p className="mt-3 text-[10px] text-text-faint">
           真实感光算法：像素级亮度采样 · 数据不离开设备

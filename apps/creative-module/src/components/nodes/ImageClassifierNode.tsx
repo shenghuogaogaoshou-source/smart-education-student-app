@@ -20,8 +20,7 @@ function PhotosensorNodeComp({ data, selected }: NodeProps<CircuitNodeData>) {
   const rgb = data.aiState?.rgb as { r: number; g: number; b: number } | undefined
   const message = data.aiState?.message as string | undefined
 
-  // 显示色：根据亮度从暗（深靛蓝）渐变到亮（姜黄）
-  const bright = brightnessPct / 100
+  // 显示色：亮/暗用不同蜡笔色
   const barColor = label === '亮' ? '#d4a04a' : '#6ba3c3'
 
   return (

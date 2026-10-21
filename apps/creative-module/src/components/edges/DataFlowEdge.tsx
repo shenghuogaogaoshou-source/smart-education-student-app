@@ -3,6 +3,7 @@
 // 源节点刚"脉冲"过 → 亮色流动虚线；否则暗色静态
 // 悬停时显示 × 删除按钮
 // ============================================================
+import { useEffect, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow'
 import { X } from 'lucide-react'
 import { useCircuit } from '../../store/circuitStore'
@@ -38,6 +39,17 @@ export function DataFlowEdge({
   const lastPulse = sourceNode?.data.lastPulse ?? 0
   const active =
     running && Date.now() - lastPulse < 900 && !!sourceNode?.data.outputs[sourceHandleId ?? '']
+
+  // active 是渲染时按 Date.now() 算出来的：上游停发后没有新状态进来，
+  // 这里在本次脉冲到期（lastPulse + 950ms）时补一次渲染，让流动动画自己停下
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!running) return
+    const remain = lastPulse + 950 - Date.now()
+    if (remain <= 0) return
+    const timer = setTimeout(() => forceTick((t) => t + 1), remain)
+    return () => clearTimeout(timer)
+  }, [running, lastPulse])
 
   return (
     <>
@@ -116,4 +128,5 @@ const TYPE_LABEL_SHORT: Record<string, string> = {
   signal: 'SIG',
   text: 'TXT',
   number: 'NUM',
+  audio: 'AUD',
 }

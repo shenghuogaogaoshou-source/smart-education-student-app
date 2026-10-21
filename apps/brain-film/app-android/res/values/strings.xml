@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">脑洞放映厅</string>
-    <string name="server_hint">教室服务器地址(电脑上启动服务器后打印的那个)</string>
-</resources>

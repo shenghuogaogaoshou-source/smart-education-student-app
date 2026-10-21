@@ -100,6 +100,41 @@ describe('browser speech capture', () => {
     expect(onError).toHaveBeenCalledWith('no-speech')
   })
 
+  it('uses the latest interim transcript when recognition ends without finalizing it', () => {
+    window.SpeechRecognition = FakeRecognition as unknown as typeof window.SpeechRecognition
+    const onComplete = vi.fn()
+    const onError = vi.fn()
+    startSpeechCapture({ onComplete, onError })
+    const recognition = FakeRecognition.latest!
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: [{ 0: { transcript: '为什么天空是蓝色的' }, isFinal: false }],
+    })
+    recognition.onend?.()
+
+    expect(onComplete).toHaveBeenCalledWith('为什么天空是蓝色的')
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('keeps a captured sentence when the browser aborts only to finish the session', () => {
+    window.SpeechRecognition = FakeRecognition as unknown as typeof window.SpeechRecognition
+    const onComplete = vi.fn()
+    const onError = vi.fn()
+    startSpeechCapture({ onComplete, onError })
+    const recognition = FakeRecognition.latest!
+
+    recognition.onresult?.({
+      resultIndex: 0,
+      results: [{ 0: { transcript: '雨滴为什么从云里落下来' }, isFinal: false }],
+    })
+    recognition.onerror?.({ error: 'aborted' })
+    recognition.onend?.()
+
+    expect(onComplete).toHaveBeenCalledWith('雨滴为什么从云里落下来')
+    expect(onError).not.toHaveBeenCalled()
+  })
+
   it('preserves the browser no-speech reason when recognition reports it directly', () => {
     window.SpeechRecognition = FakeRecognition as unknown as typeof window.SpeechRecognition
     const onError = vi.fn()
