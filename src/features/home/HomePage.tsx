@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HomeSearch } from './HomeSearch'
 import { AchievementShowcase } from './AchievementShowcase'
 import { CameraToolSheet } from './CameraToolSheet'
+import type { GameId } from '../games/gameRegistry'
 import { games, homeCopy } from './homeData'
 import './home.css'
 
@@ -14,7 +15,7 @@ const carouselDecorations = [
   { size: 50, icon: Sparkles },
 ]
 
-export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavigateToKnowledge, onOpenContent }: { onOpenContent?: (courseId: string, chapterNum: number) => void; onWorkClick?: (workId: string) => void; onMoreWorks?: () => void; onOpenNotifications?: () => void; onNavigateToKnowledge?: () => void }) {
+export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavigateToKnowledge, onOpenContent, onOpenGame }: { onOpenContent?: (courseId: string, chapterNum: number) => void; onWorkClick?: (workId: string) => void; onMoreWorks?: () => void; onOpenNotifications?: () => void; onNavigateToKnowledge?: () => void; onOpenGame?: (gameId: GameId) => void }) {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0)
@@ -100,7 +101,20 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
       <section className="games-section section-block" aria-label="创意 AI 游戏">
         <div className="section-heading-row"><div><p className="section-kicker">动手创造</p><h2>精选 AI 创意游戏</h2></div><span className="tiny-status">5 个精选</span></div>
         <div className="games-grid">
-          {games.map(({ id, title, note, icon }) => <button key={id} type="button" onClick={() => setNotice(`${title}内容正在准备中`)}><span className="game-icon"><img src={`/games/elementary/${icon}.png`} alt="" aria-hidden="true" /></span><strong>{title}</strong><small>{note}</small></button>)}
+          {games.map(({ id, title, note, icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                if (id === 'brain-film' || id === 'creative-module') onOpenGame?.(id)
+                else setNotice(`${title}内容正在准备中`)
+              }}
+            >
+              <span className="game-icon"><img src={`/games/elementary/${icon}.png`} alt="" aria-hidden="true" /></span>
+              <strong>{title}</strong>
+              <small>{note}</small>
+            </button>
+          ))}
           <button className="all-games" type="button" onClick={() => setNotice('全部游戏页面正在准备中')}><span className="game-icon"><img src="/games/elementary/all.png" alt="" aria-hidden="true" /></span><strong>全部游戏</strong><small>看看更多创意玩法</small></button>
         </div>
       </section>

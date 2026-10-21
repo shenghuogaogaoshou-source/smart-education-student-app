@@ -78,12 +78,16 @@ export function buildDeepSeekPayload({ companionId, question }) {
 }
 
 export function prepareStudentReply(reply) {
-  const text = typeof reply === 'string' ? reply.trim().replace(/\s+/g, ' ') : ''
+  let text = typeof reply === 'string' ? reply.trim().replace(/\s+/g, ' ') : ''
   if (!text || SEXUAL_CONTENT.test(text) || VIOLENT_OR_ILLEGAL_CONTENT.test(text) || RUDE_CONTENT.test(text) || PRIVACY_CONTENT.test(text)) {
     return '这个话题我不适合这样回答。我们换个方式，一起安全地学习，好吗？'
   }
   if (CRISIS_CONTENT.test(text)) {
     return '如果你正想伤害自己，请马上告诉身边可信任的成年人、家长或老师；有立即危险时请联系当地紧急服务。'
+  }
+  const completedSentences = text.match(/[^。！？!?]*[。！？!?]+/g)
+  if (completedSentences && completedSentences.length >= 2) {
+    text = completedSentences.slice(0, 2).join('').trim()
   }
   if (text.length <= MAX_REPLY_LENGTH) return text
 

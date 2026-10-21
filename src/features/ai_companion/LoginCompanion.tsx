@@ -1,28 +1,48 @@
 import { MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useAppState } from '../../app/AppState'
-import { startSpeechCapture, speakCompanionReply, type SpeechCapture } from './browserSpeech'
+import type { CompanionLoadout } from '../../app/model'
+import { startSpeechCapture, speakCompanionReply } from './browserSpeech'
 import { requestCompanionReply } from './companionChat'
 import { getCompanionItem } from './companionCatalog'
+import { CompanionBubble } from './CompanionBubble'
+import { createConversationController, motionForConversationStatus } from './conversation/conversationMachine'
+import { selectCompanionAction } from './interaction/actionSelector'
+import { createGestureMachine } from './interaction/gestureMachine'
 import { PartnerAppearance } from './PartnerAppearance'
+import type { CompanionMotion } from './render2d/types'
 
 type LoginCompanionProps = {
+  loadout?: CompanionLoadout
   onBoundsChange: (rect: DOMRect) => void
 }
 
 export const LOGIN_COMPANION_HANDOFF_KEY = 'student-app-login-companion-bounds'
 
-const WELCOME_COPY = '嗨！今天想先去哪里冒险？'
-
-export function LoginCompanion({ onBoundsChange }: LoginCompanionProps) {
+export function LoginCompanion({ loadout: presentedLoadout, onBoundsChange }: LoginCompanionProps) {
   const { state } = useAppState()
-  const loadout = state.companion
+  const loadout = presentedLoadout ?? state.companion
   const appearance = getCompanionItem(loadout.equipped.appearance)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
-  const voiceCaptureRef = useRef<SpeechCapture | null>(null)
-  const longPressTriggeredRef = useRef(false)
-  const [message, setMessage] = useState('')
+  const gestureRef = useRef(createGestureMachine({ longPressMs: 600, moveThreshold: 8 }))
+  const recentActionsRef = useRef<string[]>([])
+  const suppressClickRef = useRef(false)
+  const companionIdRef = useRef(loadout.equipped.appearance ?? 'momo')
+  const voiceEnabledRef = useRef(state.voiceEnabled)
+  companionIdRef.current = loadout.equipped.appearance ?? 'momo'
+  voiceEnabledRef.current = state.voiceEnabled
+
+  const [conversationController] = useState(() => createConversationController({
+    startCapture: startSpeechCapture,
+    requestReply: requestCompanionReply,
+    speakReply: speakCompanionReply,
+    getCompanionId: () => companionIdRef.current,
+    getVoiceEnabled: () => voiceEnabledRef.current,
+  }))
+  const [conversation, setConversation] = useState(conversationController.getSnapshot())
+  const [reactionMessage, setReactionMessage] = useState('')
+  const [reactionMotion, setReactionMotion] = useState<CompanionMotion>('idle')
   const [isInteracting, setIsInteracting] = useState(false)
 
   const measure = useCallback(() => {
@@ -35,55 +55,43 @@ export function LoginCompanion({ onBoundsChange }: LoginCompanionProps) {
     return () => window.removeEventListener('resize', measure)
   }, [measure, loadout.equipped.appearance, loadout.equipped.outfit, loadout.equipped.decoration])
 
-  useEffect(() => () => {
-    voiceCaptureRef.current?.cancel()
-  }, [])
-
-  const answerVoiceQuestion = useCallback(async (question: string) => {
-    if (!question) {
-      setMessage('我没有听清，可以再说一遍吗？')
-      return
+  useEffect(() => {
+    const unsubscribe = conversationController.subscribe(setConversation)
+    return () => {
+      unsubscribe()
+      conversationController.cancel()
+      if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
     }
+  }, [conversationController])
 
-    setMessage('我想一想，马上回答你。')
-    try {
-      const reply = await requestCompanionReply({
-        companionId: loadout.equipped.appearance ?? 'unknown',
-        question,
-      })
-      setMessage(reply)
-      speakCompanionReply(reply, state.voiceEnabled)
-    } catch {
-      setMessage('伙伴暂时没听清，我们换个简单的问题试试。')
-    }
-  }, [loadout.equipped.appearance, state.voiceEnabled])
-
-  const startVoiceQuestion = useCallback(() => {
-    voiceCaptureRef.current?.cancel()
-    setMessage('请说，我在听。')
-    voiceCaptureRef.current = startSpeechCapture({
-      onComplete: (question) => {
-        voiceCaptureRef.current = null
-        void answerVoiceQuestion(question)
-      },
-      onError: () => {
-        voiceCaptureRef.current = null
-        setMessage('这次没有听清，可以再试一次。')
-      },
+  const showLoginReaction = useCallback(() => {
+    conversationController.cancel()
+    const reaction = selectCompanionAction({
+      scene: 'login',
+      recentActions: recentActionsRef.current,
+      progress: 0,
     })
+    recentActionsRef.current = [reaction.reactionId]
+    setReactionMessage(reaction.message)
+    setReactionMotion(reaction.motion)
+    setIsInteracting(true)
+    window.setTimeout(() => setIsInteracting(false), 420)
+  }, [conversationController])
 
-    if (!voiceCaptureRef.current) setMessage('请在支持语音识别的浏览器中使用长按语音。')
-  }, [answerVoiceQuestion])
-
-  const finishLongPress = (event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
+  const finishGesture = (event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
     if (longPressTimerRef.current !== null) {
       window.clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = null
     }
     setIsInteracting(false)
-    if (longPressTriggeredRef.current) {
-      if (cancelled) voiceCaptureRef.current?.cancel()
-      else voiceCaptureRef.current?.stop()
+    const result = cancelled
+      ? gestureRef.current.send({ type: 'cancel', at: Date.now() })
+      : gestureRef.current.send({ type: 'up', x: event.clientX, y: event.clientY, at: Date.now() })
+    if (result?.kind === 'cancel') conversationController.cancel()
+    else if (result?.kind === 'long-press-end') conversationController.stop()
+    else if (result?.kind === 'tap') {
+      suppressClickRef.current = true
+      showLoginReaction()
     }
     try {
       if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
@@ -92,51 +100,72 @@ export function LoginCompanion({ onBoundsChange }: LoginCompanionProps) {
     }
   }
 
-  const startLongPress = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const startGesture = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     try {
       event.currentTarget.setPointerCapture?.(event.pointerId)
     } catch {
       // The long-press still works when pointer capture is unavailable.
     }
-    longPressTriggeredRef.current = false
+    gestureRef.current.send({ type: 'down', x: event.clientX, y: event.clientY, at: Date.now() })
     setIsInteracting(true)
     longPressTimerRef.current = window.setTimeout(() => {
-      longPressTriggeredRef.current = true
-      setIsInteracting(false)
-      startVoiceQuestion()
+      const result = gestureRef.current.send({ type: 'tick', at: Date.now() })
+      if (result?.kind === 'long-press') {
+        suppressClickRef.current = true
+        setIsInteracting(false)
+        setReactionMessage('')
+        conversationController.start()
+      }
     }, 600)
   }
 
-  const handleShortInteraction = () => {
-    if (longPressTriggeredRef.current) {
-      longPressTriggeredRef.current = false
+  const moveGesture = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const result = gestureRef.current.send({ type: 'move', x: event.clientX, y: event.clientY, at: Date.now() })
+    if (result?.kind === 'drag-start' && longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+      setIsInteracting(false)
+      suppressClickRef.current = true
+    }
+  }
+
+  const handleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
       return
     }
-    setMessage(WELCOME_COPY)
-    setIsInteracting(true)
-    window.setTimeout(() => setIsInteracting(false), 420)
+    showLoginReaction()
   }
+
+  const bubbleMessage = conversation.status === 'transcribing'
+    ? conversation.interimText
+    : conversation.reply || reactionMessage
+  const bubbleState = conversation.status === 'idle' && !conversation.reply ? 'idle' : conversation.status
+  const motion = conversation.status === 'idle'
+    ? reactionMotion
+    : motionForConversationStatus(conversation.status)
 
   return (
     <section className="login-companion" aria-label="登录页 AI 伙伴">
-      {message && <p className="login-companion__bubble" role="status">{message}</p>}
+      <CompanionBubble state={bubbleState} message={bubbleMessage} className="login-companion__bubble" />
       <button
         ref={buttonRef}
         className={`login-companion__target ${isInteracting ? 'is-interacting' : ''}`}
         type="button"
         aria-label={`和${appearance?.name ?? 'AI 伙伴'}互动`}
-        onClick={handleShortInteraction}
-        onPointerDown={startLongPress}
-        onPointerUp={(event) => finishLongPress(event)}
-        onPointerCancel={(event) => finishLongPress(event, true)}
+        onClick={handleClick}
+        onPointerDown={startGesture}
+        onPointerMove={moveGesture}
+        onPointerUp={(event) => finishGesture(event)}
+        onPointerCancel={(event) => finishGesture(event, true)}
         onContextMenu={(event) => event.preventDefault()}
       >
         <span className="login-companion__frame" data-testid="login-companion-frame">
-          <PartnerAppearance loadout={loadout} size="login" />
+          <PartnerAppearance loadout={loadout} size="login" motion={motion} />
         </span>
       </button>
-      <p className="login-companion__hint"><MessageCircle aria-hidden="true" size={13} />轻点打招呼 · 长按直接说话</p>
+      <p className="login-companion__hint"><MessageCircle aria-hidden="true" size={13} />轻点互动 · 长按直接说话</p>
     </section>
   )
 }

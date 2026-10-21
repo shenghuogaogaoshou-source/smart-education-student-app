@@ -3,14 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "node server/dev.mjs",
     "dev:web": "vite",
-    "build": "tsc -b && vite build",
+    "build:web": "tsc -b && vite build",
+    "build:games": "node scripts/build-embedded-games.mjs",
+    "build": "npm run build:web && npm run build:games",
     "preview": "vite preview",
     "ai:server": "node server/ai-proxy.mjs",
     "test": "vitest",
-    "test:server": "vitest run --config vitest.server.config.ts && node --test server/recognition.test.mjs",
+    "test:server": "vitest run --config vitest.server.config.ts && node --test server/devProcesses.test.mjs server/recognition.test.mjs",
     "test:all": "npm test -- --run && npm run test:server"
   },
   "dependencies": {
@@ -19,8 +25,8 @@
     "jsqr": "^1.4.0",
     "lucide-react": "latest",
     "msedge-tts": "^2.1.0",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-router-dom": "latest",
     "recharts": "^3.10.1"
   },
@@ -30,6 +36,7 @@
     "@testing-library/user-event": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "fake-indexeddb": "^6.2.6",
     "jsdom": "latest",
     "sucrase": "^3.35.1",
     "typescript": "latest",

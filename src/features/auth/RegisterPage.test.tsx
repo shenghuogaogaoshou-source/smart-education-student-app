@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
+import { defaultState } from '../../app/model'
 import { RegisterPage } from './RegisterPage'
 
 function renderRegisterPage() {
@@ -74,7 +76,7 @@ describe('registration birth date', () => {
     await user.click(screen.getByRole('button', { name: '检查并继续' }))
 
     expect(onGuardianRequired).toHaveBeenCalledOnce()
-    await waitFor(() => expect(localStorage.getItem('student-app-state')).toContain('"grade":"grade1"'))
+    await waitFor(() => expect(loadAccountState(defaultState.accountId).grade).toBe('grade1'))
   })
 
   it('synchronizes a date picked in the calendar into the numeric fields', async () => {

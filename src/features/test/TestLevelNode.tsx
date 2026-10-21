@@ -1,4 +1,5 @@
 import { Check, Lock, Play, Sparkles } from 'lucide-react'
+import type { Ref } from 'react'
 import type { CoursePart } from '../knowledge/courseCatalog'
 import type { MapNode } from './testMapData'
 
@@ -16,9 +17,10 @@ type Props = {
   part: CoursePart
   status: TestLevelStatus
   onSelect: (part: CoursePart) => void
+  buttonRef?: Ref<HTMLButtonElement>
 }
 
-export function TestLevelNode({ node, part, status, onSelect }: Props) {
+export function TestLevelNode({ node, part, status, onSelect, buttonRef }: Props) {
   return (
     <article
       className={`test-level-node test-level-node--${status}`}
@@ -26,8 +28,10 @@ export function TestLevelNode({ node, part, status, onSelect }: Props) {
       data-node-id={node.id}
     >
       <button
+        ref={buttonRef}
         type="button"
         className="test-level-node__button"
+        data-node-anchor={node.id}
         aria-label={`${part.title} · ${statusLabel[status]}`}
         aria-current={status === 'current' ? 'step' : undefined}
         onClick={() => onSelect(part)}

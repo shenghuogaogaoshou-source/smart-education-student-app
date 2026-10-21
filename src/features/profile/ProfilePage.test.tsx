@@ -47,8 +47,7 @@ describe('profile dashboard', () => {
     for (const status of ['草稿', '审核中', '已发布', '仅自己']) {
       expect(screen.getByText(status)).toBeInTheDocument()
     }
-    expect(screen.getByText('会分类的照相机')).toBeInTheDocument()
-    expect(screen.getByText('未来校园小设计')).toBeInTheDocument()
+    expect(screen.getByText('第一件作品正在等你')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '进入设置' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '成长画像' }))

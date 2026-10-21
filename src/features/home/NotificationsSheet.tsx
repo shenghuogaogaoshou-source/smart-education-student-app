@@ -9,11 +9,11 @@ type NotificationItem = {
 }
 
 const notifications: NotificationItem[] = [
-  { id: 1, type: 'like', icon: Heart, text: '星河同学点赞了你的作品《会分类的照相机》', time: '5分钟前' },
-  { id: 2, type: 'comment', icon: MessageCircle, text: '小明同学评论了你的作品《未来图书馆》', time: '20分钟前' },
+  { id: 1, type: 'like', icon: Heart, text: '有同学赞了你的公开作品', time: '5分钟前' },
+  { id: 2, type: 'comment', icon: MessageCircle, text: '你的公开作品收到了一条友好留言', time: '20分钟前' },
   { id: 3, type: 'badge', icon: Award, text: '恭喜获得新徽章「灵感探索者」', time: '1小时前' },
-  { id: 4, type: 'like', icon: Heart, text: '林川同学、清禾同学点赞了你的作品《未来校园小设计》', time: '2小时前' },
-  { id: 5, type: 'comment', icon: MessageCircle, text: '远帆同学评论了你的作品《声音地图》', time: '昨天' },
+  { id: 4, type: 'like', icon: Heart, text: '你的创意作品又被两位同学收藏了', time: '2小时前' },
+  { id: 5, type: 'comment', icon: MessageCircle, text: '你的作品收到了一条新的鼓励', time: '昨天' },
   { id: 6, type: 'badge', icon: Award, text: '本周学习达成 5 天，获得「坚持之星」徽章', time: '昨天' },
 ]
 

@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, FolderKanban, Save, Sparkles } from 'lucide-react'
 import { useState } from 'react'
+import { useOptionalWorks } from '../works/WorksProvider'
 import './profile.css'
 
 const steps = [
@@ -13,6 +14,7 @@ const steps = [
 export function ContinueCreatePage({ onBack }: { onBack: () => void }) {
   const [currentStep, setCurrentStep] = useState(3)
   const step = steps.find((s) => s.id === currentStep)!
+  const draft = useOptionalWorks()?.works.find((work) => work.status === 'draft')
 
   return (
     <div className="rewards-page continue-create-page">
@@ -28,8 +30,8 @@ export function ContinueCreatePage({ onBack }: { onBack: () => void }) {
           <Sparkles size={26} color="#fff" />
         </div>
         <div className="cc-project-copy">
-          <strong>会分类的照相机</strong>
-          <small>AI 创意实验室 · 今天 16:20 继续编辑</small>
+          <strong>{draft?.title || '我的新作品'}</strong>
+          <small>{draft ? `${draft.aiTools.join(' · ')} · 继续编辑` : '从一个小灵感开始，慢慢完成它'}</small>
         </div>
         <div className="cc-progress-circle">
           <svg viewBox="0 0 44 44">

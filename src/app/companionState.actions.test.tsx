@@ -5,6 +5,7 @@ import { AppStateProvider, useAppState } from './AppState'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
 import { saveState } from './storage'
+import { accountStorageKey } from './companionAccountRepository'
 
 function CompanionStateHarness() {
   const context = useAppState()
@@ -32,6 +33,8 @@ function CompanionStateHarness() {
       <button type="button" onClick={() => context.equipCompanionItem('outfit', 'not-owned')}>装备未拥有服饰</button>
       <button type="button" onClick={() => context.setAiPosition({ x: 0.2, y: 0.3 })}>移动伙伴</button>
       <button type="button" onClick={() => context.resetAiPosition()}>重置伙伴位置</button>
+      <button type="button" onClick={() => context.login('luna_2026')}>切换露娜账号</button>
+      <button type="button" onClick={() => context.login('chenxi_2026')}>切换晨曦账号</button>
     </div>
   )
 }
@@ -125,8 +128,27 @@ describe('companion loadout actions', () => {
 
     expect(screen.getByLabelText('ai position')).toHaveTextContent('0.88,0.84')
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+      const saved = JSON.parse(localStorage.getItem(accountStorageKey('chenxi_2026')) ?? '{}')
       expect(saved.aiPosition).toEqual({ x: 0.88, y: 0.84 })
     })
+  })
+
+  it('keeps purchases and equipped companions isolated by learning account', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><CompanionStateHarness /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '购买云朵' }))
+    await user.click(screen.getByRole('button', { name: '装备云朵' }))
+    expect(screen.getByLabelText('equipped appearance')).toHaveTextContent('yunduo')
+
+    await user.click(screen.getByRole('button', { name: '切换露娜账号' }))
+    expect(screen.getByLabelText('equipped appearance')).toHaveTextContent('momo')
+    expect(screen.getByLabelText('owned appearances')).toHaveTextContent('momo')
+    expect(screen.getByLabelText('owned appearances')).not.toHaveTextContent('yunduo')
+    expect(screen.getByLabelText('balance')).toHaveTextContent('2000')
+
+    await user.click(screen.getByRole('button', { name: '切换晨曦账号' }))
+    expect(screen.getByLabelText('equipped appearance')).toHaveTextContent('yunduo')
+    expect(screen.getByLabelText('balance')).toHaveTextContent('1640')
   })
 })

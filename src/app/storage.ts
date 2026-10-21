@@ -1,10 +1,10 @@
 import { COMPANION_CATALOG } from '../features/ai_companion/companionCatalog'
 import { createEmptyLearningProgress, getPartIdsForBand, PRIMARY_GRADES, type CoursePartId } from './learning'
-import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type DeviceInfo, type GuardianInfo } from './model'
+import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type ConversationSummary, type DeviceInfo, type GuardianInfo } from './model'
 import type { PointTransaction, RewardKind } from './points'
 
-const STORAGE_KEY = 'student-app-state'
-const MIGRATION_KEY = 'student-app-primary-v2-migrated'
+export const LEGACY_STORAGE_KEY = 'student-app-state'
+const MIGRATION_KEY = 'student-app-primary-v3-migrated'
 
 type PersistedAppState = AppState
 
@@ -13,7 +13,8 @@ const PERSISTED_KEYS: Array<keyof PersistedAppState> = [
   'aiPosition', 'companion', 'fontScale', 'nickname', 'avatar', 'likes', 'favorites', 'notifications',
   'accountId', 'passwordHint', 'lastPasswordChange', 'twoFactorEnabled', 'guardian', 'familyName',
   'devices', 'aiName', 'aiPersonality', 'aiSkin', 'voiceEnabled', 'autoListenEnabled', 'voiceMode',
-  'saveHistory', 'aiMemoryEnabled', 'historyCount', 'confirmDangerous', 'guardianApprove', 'safeMode',
+  'voiceReplyMode', 'reduceMotion', 'saveHistory', 'aiMemoryEnabled', 'historyCount', 'conversationSummaries',
+  'confirmDangerous', 'guardianApprove', 'safeMode',
   'soundEnabled', 'soundVolume', 'hapticEnabled', 'showLearningStats', 'allowFriendFind', 'dataCollection',
   'cameraPermission', 'micPermission', 'albumPermission', 'contentLevel', 'personalizedRec', 'storageUsed',
   'storageTotal', 'autoCleanDays',
@@ -22,28 +23,30 @@ const PERSISTED_KEYS: Array<keyof PersistedAppState> = [
 export function loadState(): AppState {
   const fresh = createDefaultState()
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return fresh
 
     const parsed = JSON.parse(raw) as unknown
-    if (!isRecord(parsed) || parsed.stateVersion !== APP_STATE_VERSION) {
+    if (!isRecord(parsed) || (parsed.stateVersion !== 2 && parsed.stateVersion !== APP_STATE_VERSION)) {
       return migrateToPrimaryState(fresh)
     }
 
-    return normalizePrimaryState(parsed, fresh)
+    const normalized = normalizePersistedState(parsed, fresh)
+    if (parsed.stateVersion !== APP_STATE_VERSION) saveState(normalized)
+    return normalized
   } catch {
     return migrateToPrimaryState(fresh)
   }
 }
 
 function migrateToPrimaryState(fresh: AppState) {
-  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(LEGACY_STORAGE_KEY)
   localStorage.setItem(MIGRATION_KEY, '1')
   saveState(fresh)
   return fresh
 }
 
-function normalizePrimaryState(parsed: Record<string, unknown>, fresh: AppState): AppState {
+export function normalizePersistedState(parsed: Record<string, unknown>, fresh: AppState = createDefaultState()): AppState {
   return {
     stateVersion: APP_STATE_VERSION,
     grade: oneOf(parsed.grade, PRIMARY_GRADES, fresh.grade),
@@ -72,9 +75,12 @@ function normalizePrimaryState(parsed: Record<string, unknown>, fresh: AppState)
     voiceEnabled: booleanValue(parsed.voiceEnabled, fresh.voiceEnabled),
     autoListenEnabled: booleanValue(parsed.autoListenEnabled, fresh.autoListenEnabled),
     voiceMode: oneOf(parsed.voiceMode, VOICE_MODES, fresh.voiceMode),
+    voiceReplyMode: oneOf(parsed.voiceReplyMode, VOICE_REPLY_MODES, fresh.voiceReplyMode),
+    reduceMotion: booleanValue(parsed.reduceMotion, fresh.reduceMotion),
     saveHistory: booleanValue(parsed.saveHistory, fresh.saveHistory),
     aiMemoryEnabled: booleanValue(parsed.aiMemoryEnabled, fresh.aiMemoryEnabled),
     historyCount: nonNegativeInteger(parsed.historyCount, fresh.historyCount),
+    conversationSummaries: normalizeConversationSummaries(parsed.conversationSummaries, fresh.conversationSummaries),
     confirmDangerous: booleanValue(parsed.confirmDangerous, fresh.confirmDangerous),
     guardianApprove: booleanValue(parsed.guardianApprove, fresh.guardianApprove),
     safeMode: oneOf(parsed.safeMode, SAFE_MODES, fresh.safeMode),
@@ -100,6 +106,7 @@ const NOTIFICATION_OPTIONS = ['important', 'all', 'off'] as const
 const GUARDIAN_RELATIONSHIPS = ['father', 'mother', 'grandparent', 'other'] as const
 const AI_PERSONALITIES = ['gentle', 'playful', 'serious', 'encouraging'] as const
 const VOICE_MODES = ['warm', 'bright', 'calm'] as const
+const VOICE_REPLY_MODES = ['always', 'voice-only', 'silent'] as const
 const SAFE_MODES = ['strict', 'standard', 'relaxed'] as const
 const PERMISSION_STATUSES = ['granted', 'denied', 'prompt'] as const
 const CONTENT_LEVELS = ['general', 'teen', 'child'] as const
@@ -233,6 +240,22 @@ function isDeviceInfo(value: unknown): value is DeviceInfo {
     && typeof value.current === 'boolean'
 }
 
+function normalizeConversationSummaries(value: unknown, fallback: ConversationSummary[]): ConversationSummary[] {
+  const source = Array.isArray(value) ? value : fallback
+  return source
+    .filter(isConversationSummary)
+    .map(({ id, topic, summary, occurredAt }) => ({ id, topic, summary, occurredAt }))
+    .slice(-20)
+}
+
+function isConversationSummary(value: unknown): value is ConversationSummary {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.topic === 'string'
+    && typeof value.summary === 'string'
+    && typeof value.occurredAt === 'string'
+}
+
 function normalizePrimaryLoadout(value: unknown, fallback: CompanionLoadout): CompanionLoadout {
   const stored = isRecord(value) ? value : {}
   const storedOwned = isRecord(stored.owned) ? stored.owned : {}
@@ -245,12 +268,18 @@ function normalizePrimaryLoadout(value: unknown, fallback: CompanionLoadout): Co
       .map((item) => item.id)),
   ])) as Record<CompanionCategory, Set<string>>
 
-  const owned = Object.fromEntries(COMPANION_CATEGORIES.map((category) => {
+  const storedPurchasedIds = COMPANION_CATEGORIES.flatMap((category) => {
     const candidate = storedOwned[category]
-    const source = Array.isArray(candidate)
+    return Array.isArray(candidate)
       ? candidate.filter((id): id is string => typeof id === 'string')
+      : []
+  })
+
+  const owned = Object.fromEntries(COMPANION_CATEGORIES.map((category) => {
+    const source = storedPurchasedIds.length > 0
+      ? storedPurchasedIds
       : fallback.owned[category]
-    const valid = source.filter((id) => primaryIds[category].has(id))
+    const valid = [...new Set(source.filter((id) => primaryIds[category].has(id)))]
     return [category, category === 'appearance' ? ['momo', ...valid.filter((id) => id !== 'momo')] : valid]
   })) as CompanionLoadout['owned']
 
@@ -267,10 +296,10 @@ function normalizePrimaryLoadout(value: unknown, fallback: CompanionLoadout): Co
   return { owned, equipped, version: 1 }
 }
 
-function toPersistedState(state: AppState): PersistedAppState {
+export function toPersistedState(state: AppState): PersistedAppState {
   return Object.fromEntries(PERSISTED_KEYS.map((key) => [key, state[key]])) as PersistedAppState
 }
 
 export function saveState(state: AppState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(toPersistedState(state)))
+  localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(toPersistedState(state)))
 }

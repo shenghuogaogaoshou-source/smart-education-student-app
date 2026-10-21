@@ -8,6 +8,6 @@ AI 伙伴使用 `deepseek-flash` 的非思考模式，适合短问短答。语�
 
 如果只想单独调试其中一部分，可以分别运行 `npm run ai:server` 和 `npm run dev:web`。
 
-开发环境中，Vite 会将 `/api/companion/reply` 转发到只监听本机的 AI 代理。部署时应使用同样的服务端路由，并把密钥设置为部署平台的私密环境变量。
+开发环境中，Vite 会将 `/api/companion/reply` 和 `/api/companion/interpret` 转发到只监听本机的 AI 代理。前者回答普通学习问题，后者把自然语言转换为经过本地白名单复核的应用命令。部署时应使用同样的服务端路由，并把密钥设置为部署平台的私密环境变量。
 
 浏览器需要允许麦克风，并支持 Web Speech API。若浏览器没有语音识别能力，页面会显示提示但不会录音或上传音频。

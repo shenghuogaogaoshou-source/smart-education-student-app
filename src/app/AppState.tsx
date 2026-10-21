@@ -7,15 +7,16 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { getGradeBand, getPartIdsForBand, type CoursePartId, type PrimaryGrade } from './learning'
-import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode } from './model'
+import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type CompanionLoadout, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from './model'
 import { applyTransactionOnce, buildProgressRewardTransactions, getPointsBalance } from './points'
-import { loadState, saveState } from './storage'
+import { loadAccountState, peekAccountCompanion, saveAccountState } from './companionAccountRepository'
+import { useOptionalSessionCredential } from '../features/auth/sessionCredential'
 
 type Action =
   | { type: 'set-grade'; grade: PrimaryGrade }
   | { type: 'complete-knowledge'; partId: CoursePartId; title: string; occurredAt: string }
   | { type: 'pass-test'; partId: CoursePartId; title: string; occurredAt: string }
-  | { type: 'login' }
+  | { type: 'replace-account'; state: AppState }
   | { type: 'logout' }
   | { type: 'set-font-scale'; scale: FontScale }
   | { type: 'set-profile'; nickname: string; avatar: number }
@@ -39,6 +40,7 @@ type Action =
   | { type: 'set-voice-enabled'; enabled: boolean }
   | { type: 'set-auto-listen'; enabled: boolean }
   | { type: 'set-voice-mode'; mode: VoiceMode }
+  | { type: 'set-voice-reply-mode'; mode: VoiceReplyMode }
   | { type: 'set-save-history'; enabled: boolean }
   | { type: 'set-ai-memory'; enabled: boolean }
   | { type: 'clear-history' }
@@ -137,7 +139,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'set-grade': return { ...state, grade: action.grade }
     case 'complete-knowledge':
     case 'pass-test': return updateProgress(state, action)
-    case 'login': return { ...state, isLoggedIn: true }
+    case 'replace-account': return action.state
     case 'logout': return { ...state, isLoggedIn: false }
     case 'set-font-scale': return { ...state, fontScale: action.scale }
     case 'set-profile': return { ...state, nickname: action.nickname, avatar: action.avatar }
@@ -185,6 +187,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'set-voice-enabled': return { ...state, voiceEnabled: action.enabled }
     case 'set-auto-listen': return { ...state, autoListenEnabled: action.enabled }
     case 'set-voice-mode': return { ...state, voiceMode: action.mode }
+    case 'set-voice-reply-mode': return { ...state, voiceReplyMode: action.mode }
     case 'set-save-history': return { ...state, saveHistory: action.enabled }
     case 'set-ai-memory': return { ...state, aiMemoryEnabled: action.enabled }
     case 'clear-history': return { ...state, historyCount: 0 }
@@ -213,8 +216,9 @@ type AppStateContextValue = {
   setGrade: (grade: PrimaryGrade) => void
   completeKnowledge: (partId: CoursePartId, title: string) => void
   passTest: (partId: CoursePartId, title: string) => void
-  login: () => void
+  login: (accountId: string) => void
   logout: () => void
+  previewCompanion: (accountId: string) => CompanionLoadout
   setFontScale: (scale: FontScale) => void
   setProfile: (profile: { nickname: string; avatar: number }) => void
   toggleLike: (id: string) => void
@@ -236,6 +240,7 @@ type AppStateContextValue = {
   setVoiceEnabled: (enabled: boolean) => void
   setAutoListen: (enabled: boolean) => void
   setVoiceMode: (mode: VoiceMode) => void
+  setVoiceReplyMode: (mode: VoiceReplyMode) => void
   setSaveHistory: (enabled: boolean) => void
   setAiMemory: (enabled: boolean) => void
   clearHistory: () => void
@@ -260,11 +265,16 @@ type AppStateContextValue = {
 const AppStateContext = createContext<AppStateContextValue | null>(null)
 
 export function AppStateProvider({ children }: PropsWithChildren) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState)
+  const sessionCredential = useOptionalSessionCredential()
+  const [state, dispatch] = useReducer(
+    reducer,
+    undefined,
+    () => loadAccountState(defaultState.accountId),
+  )
 
   useEffect(() => {
     document.documentElement.dataset.fontScale = state.fontScale
-    saveState(state)
+    saveAccountState(state.accountId, state)
   }, [state])
 
   const value = useMemo<AppStateContextValue>(() => ({
@@ -272,8 +282,16 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setGrade: (grade) => dispatch({ type: 'set-grade', grade }),
     completeKnowledge: (partId, title) => dispatch({ type: 'complete-knowledge', partId, title, occurredAt: new Date().toISOString() }),
     passTest: (partId, title) => dispatch({ type: 'pass-test', partId, title, occurredAt: new Date().toISOString() }),
-    login: () => dispatch({ type: 'login' }),
-    logout: () => dispatch({ type: 'logout' }),
+    login: (accountId) => {
+      const next = { ...loadAccountState(accountId), isLoggedIn: true }
+      saveAccountState(accountId, next)
+      dispatch({ type: 'replace-account', state: next })
+    },
+    logout: () => {
+      sessionCredential?.clear()
+      dispatch({ type: 'logout' })
+    },
+    previewCompanion: (accountId) => peekAccountCompanion(accountId),
     setFontScale: (scale) => dispatch({ type: 'set-font-scale', scale }),
     setProfile: (profile) => dispatch({ type: 'set-profile', nickname: profile.nickname, avatar: profile.avatar }),
     toggleLike: (id) => dispatch({ type: 'toggle-like', id }),
@@ -295,6 +313,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setVoiceEnabled: (enabled) => dispatch({ type: 'set-voice-enabled', enabled }),
     setAutoListen: (enabled) => dispatch({ type: 'set-auto-listen', enabled }),
     setVoiceMode: (mode) => dispatch({ type: 'set-voice-mode', mode }),
+    setVoiceReplyMode: (mode) => dispatch({ type: 'set-voice-reply-mode', mode }),
     setSaveHistory: (enabled) => dispatch({ type: 'set-save-history', enabled }),
     setAiMemory: (enabled) => dispatch({ type: 'set-ai-memory', enabled }),
     clearHistory: () => dispatch({ type: 'clear-history' }),
@@ -314,7 +333,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setPersonalizedRec: (enabled) => dispatch({ type: 'set-personalized-rec', enabled }),
     setAutoClean: (days) => dispatch({ type: 'set-auto-clean', days }),
     clearCache: () => dispatch({ type: 'clear-cache' }),
-  }), [state])
+  }), [sessionCredential, state])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }

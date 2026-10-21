@@ -6,9 +6,17 @@ import { SettingDetailPage } from './SettingDetailPage'
 import { settingGroups } from './settingsData'
 import './settings.css'
 
-export function SettingsPage({ onBack, onOpenMall = () => undefined }: { onBack: () => void; onOpenMall?: () => void }) {
+export function SettingsPage({
+  onBack,
+  onOpenMall = () => undefined,
+  initialDetail = null,
+}: {
+  onBack: () => void
+  onOpenMall?: () => void
+  initialDetail?: string | null
+}) {
   const { state, logout } = useAppState()
-  const [detail, setDetail] = useState<string | null>(null)
+  const [detail, setDetail] = useState<string | null>(initialDetail)
   const [logoutOpen, setLogoutOpen] = useState(false)
   // 保存设置列表页的滚动位置，进入详情前记录，返回时恢复
   const listScrollY = useRef(0)

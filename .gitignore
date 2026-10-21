@@ -23,3 +23,12 @@ Thumbs.db
 
 # Local agent planning and run artifacts
 .superpowers/
+assets/review/
+
+# Embedded game workspaces
+apps/*/dist/
+apps/*/.env
+apps/*/.env.*
+apps/*/node_modules/
+apps/*/vite.config.js
+apps/*/vite.config.d.ts

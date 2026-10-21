@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
+import { defaultState } from '../../app/model'
 import { SettingsPage } from './SettingsPage'
 
 describe('settings page', () => {
@@ -41,7 +43,7 @@ describe('settings page', () => {
     await user.click(screen.getByRole('button', { name: '退出当前账号' }))
     expect(screen.getByRole('dialog', { name: '确认退出登录' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '确认退出' }))
-    expect(localStorage.getItem('student-app-state')).toContain('"isLoggedIn":false')
+    expect(loadAccountState(defaultState.accountId).isLoggedIn).toBe(false)
   })
 
   it('shows the equipped companion and sends appearance changes to the points mall', async () => {
@@ -55,5 +57,15 @@ describe('settings page', () => {
     expect(screen.queryByText('🤖')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '前往积分商城调整伙伴' }))
     expect(onOpenMall).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves when the companion should speak text answers', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: /语音与应用控制/ }))
+    await user.click(screen.getByRole('button', { name: '始终朗读' }))
+
+    expect(loadAccountState(defaultState.accountId).voiceReplyMode).toBe('always')
   })
 })

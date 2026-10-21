@@ -1,7 +1,8 @@
 import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { interpretCompanionIntent } from './companionIntent.mjs'
 import { buildDeepSeekPayload, prepareStudentQuestion, prepareStudentReply } from './companionPolicy.mjs'
 import { recognize } from './recognition.mjs'
 import { synthesizeSpeech } from './tts.mjs'
@@ -54,14 +55,14 @@ function readJson(request, limit = MAX_BODY_BYTES) {
   })
 }
 
-async function createReply(body) {
+async function createReply(body, { apiKey = process.env.DEEPSEEK_API_KEY, fetchImpl = fetch } = {}) {
   const question = prepareStudentQuestion(body?.question, body?.companionId)
   if (question.directReply) return question.directReply
-  if (!process.env.DEEPSEEK_API_KEY) throw new Error('missing_api_key')
-  const upstream = await fetch('https://api.deepseek.com/chat/completions', {
+  if (!apiKey) throw new Error('missing_api_key')
+  const upstream = await fetchImpl('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify(buildDeepSeekPayload(question)),
@@ -73,51 +74,95 @@ async function createReply(body) {
   return prepareStudentReply(content)
 }
 
-const server = createServer(async (request, response) => {
-  if (request.method === 'POST' && request.url?.split('?')[0] === '/api/companion/recognize') {
+export async function handleCompanionApiRequest(
+  { method, path, body },
+  {
+    apiKey = process.env.DEEPSEEK_API_KEY,
+    fetchImpl = fetch,
+    interpretIntent = interpretCompanionIntent,
+    recognizeImage = recognize,
+  } = {},
+) {
+  if (method !== 'POST') return { status: 404, body: { error: 'not_found' } }
+  if (path === '/api/companion/recognize') {
     try {
-      const body = await readJson(request, 7 * 1024 * 1024)
-      sendJson(response, 200, { result: await recognize(body) })
+      return { status: 200, body: { result: await recognizeImage(body) } }
     } catch (error) {
       const code = error instanceof Error ? error.message : 'provider_error'
       const known = ['invalid_input', 'invalid_json', 'body_too_large', 'vision_not_configured', 'text_not_configured', 'invalid_result', 'result_too_long', 'provider_error']
-      sendJson(response, code.includes('not_configured') ? 503 : code.startsWith('invalid_') ? 400 : 502, { error: known.includes(code) ? code : 'provider_error' })
+      return {
+        status: code.includes('not_configured') ? 503 : code.startsWith('invalid_') ? 400 : 502,
+        body: { error: known.includes(code) ? code : 'provider_error' },
+      }
     }
-    return
   }
-  if (request.method === 'POST' && request.url?.split('?')[0] === '/api/tts') {
+  if (path === '/api/companion/interpret') {
     try {
-      const body = await readJson(request)
-      const audio = await synthesizeSpeech(body?.text, body?.voice)
-      response.writeHead(200, {
-        'content-type': 'audio/mpeg',
-        'cache-control': 'no-store',
+      const result = await interpretIntent({
+        companionId: body?.companionId,
+        text: body?.text,
+        apiKey,
+        fetchImpl,
       })
-      response.end(audio)
+      return { status: 200, body: result }
     } catch (error) {
-      const code = error instanceof Error ? error.message : 'tts_failed'
-      sendJson(response, code === 'invalid_input' || code === 'text_too_long' ? 400 : 502, {
-        error: code === 'invalid_input' || code === 'text_too_long' ? code : 'tts_failed',
-      })
+      const code = error instanceof Error ? error.message : 'provider_error'
+      const known = ['missing_api_key', 'invalid_intent', 'provider_error']
+      return {
+        status: code === 'missing_api_key' ? 503 : code === 'invalid_intent' ? 400 : 502,
+        body: { error: known.includes(code) ? code : 'provider_error' },
+      }
     }
-    return
   }
-  if (request.method !== 'POST' || request.url?.split('?')[0] !== '/api/companion/reply') {
-    sendJson(response, 404, { error: 'not_found' })
-    return
-  }
+  if (path !== '/api/companion/reply') return { status: 404, body: { error: 'not_found' } }
 
   try {
-    const body = await readJson(request)
-    const reply = await createReply(body)
-    sendJson(response, 200, { reply })
+    const reply = await createReply(body, { apiKey, fetchImpl })
+    return { status: 200, body: { reply } }
   } catch (error) {
     const code = error instanceof Error ? error.message : 'unknown_error'
     const status = code === 'missing_api_key' ? 503 : code === 'invalid_question' || code === 'unsafe_question' ? 400 : 502
-    sendJson(response, status, { error: code })
+    return { status, body: { error: code } }
   }
-})
+}
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`AI companion proxy running at http://127.0.0.1:${PORT}`)
-})
+export function startProxyServer(port = PORT) {
+  const server = createServer(async (request, response) => {
+    const path = request.url?.split('?')[0] ?? ''
+    if (request.method === 'POST' && path === '/api/tts') {
+      try {
+        const body = await readJson(request)
+        const audio = await synthesizeSpeech(body?.text, body?.voice)
+        response.writeHead(200, {
+          'content-type': 'audio/mpeg',
+          'cache-control': 'no-store',
+        })
+        response.end(audio)
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'tts_failed'
+        sendJson(response, code === 'invalid_input' || code === 'text_too_long' ? 400 : 502, {
+          error: code === 'invalid_input' || code === 'text_too_long' ? code : 'tts_failed',
+        })
+      }
+      return
+    }
+    const limit = path === '/api/companion/recognize' ? 7 * 1024 * 1024 : MAX_BODY_BYTES
+    let body = {}
+    try {
+      body = await readJson(request, limit)
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'invalid_json'
+      sendJson(response, code === 'body_too_large' ? 413 : 400, { error: code })
+      return
+    }
+    const result = await handleCompanionApiRequest({ method: request.method, path, body })
+    sendJson(response, result.status, result.body)
+  })
+
+  server.listen(port, '127.0.0.1', () => {
+    console.log(`AI companion proxy running at http://127.0.0.1:${port}`)
+  })
+  return server
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) startProxyServer()

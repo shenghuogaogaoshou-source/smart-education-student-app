@@ -2,7 +2,7 @@ import { ArrowLeft, Bell, Camera, CheckCircle2, Database, Eye, EyeOff, FileText,
 import { useState, type FormEvent } from 'react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_LABELS, PRIMARY_GRADES, type PrimaryGrade } from '../../app/learning'
-import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode } from '../../app/model'
+import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from '../../app/model'
 import { getCompanionItem } from '../ai_companion/companionCatalog'
 import { PartnerAppearance } from '../ai_companion/PartnerAppearance'
 import { settingGroups } from './settingsData'
@@ -16,7 +16,7 @@ const RELATIONSHIP_LABEL: Record<GuardianInfo['relationship'], string> = {
 
 export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: string; onBack: () => void; onOpenMall: () => void }) {
   const app = useAppState()
-  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, removeDevice, resetAiPosition, setAiName, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
+  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, removeDevice, resetAiPosition, setAiName, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
   const [notice, setNotice] = useState('')
   const item = settingGroups.flatMap((group) => group.items).find((entry) => entry.id === itemId)
   if (!item) return null
@@ -29,7 +29,7 @@ export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: stri
       {itemId === 'guardian' && <GuardianSection state={state} setGuardian={setGuardian} setFamilyName={setFamilyName} setNotice={setNotice} />}
       {itemId === 'grade' && <GradeSection state={state} setGrade={setGrade} setNotice={setNotice} />}
       {itemId === 'companion' && <CompanionSection state={state} setAiName={setAiName} setAiPersonality={setAiPersonality} resetAiPosition={resetAiPosition} setNotice={setNotice} onOpenMall={onOpenMall} />}
-      {itemId === 'voice' && <VoiceSection state={state} setVoiceEnabled={setVoiceEnabled} setAutoListen={setAutoListen} setVoiceMode={setVoiceMode} setNotice={setNotice} />}
+      {itemId === 'voice' && <VoiceSection state={state} setVoiceEnabled={setVoiceEnabled} setAutoListen={setAutoListen} setVoiceMode={setVoiceMode} setVoiceReplyMode={setVoiceReplyMode} setNotice={setNotice} />}
       {itemId === 'memory' && <MemorySection state={state} setSaveHistory={setSaveHistory} setAiMemory={setAiMemory} clearHistory={clearHistory} setNotice={setNotice} />}
       {itemId === 'operation' && <OperationSection state={state} setConfirmDangerous={setConfirmDangerous} setGuardianApprove={setGuardianApprove} setSafeMode={setSafeMode} setNotice={setNotice} />}
       {itemId === 'sound' && <SoundSection state={state} setSoundEnabled={setSoundEnabled} setSoundVolume={setSoundVolume} setHapticEnabled={setHapticEnabled} setNotice={setNotice} />}
@@ -356,11 +356,12 @@ function CompanionSection({ state, setAiName, setAiPersonality, resetAiPosition,
 /* ---------- AI 伙伴：语音与应用控制 ---------- */
 const VOICE_MODE_LABEL: Record<VoiceMode, string> = { warm: '温暖', bright: '明亮', calm: '沉稳' }
 
-function VoiceSection({ state, setVoiceEnabled, setAutoListen, setVoiceMode, setNotice }: {
+function VoiceSection({ state, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setNotice }: {
   state: ReturnType<typeof useAppState>['state']
   setVoiceEnabled: (v: boolean) => void
   setAutoListen: (v: boolean) => void
   setVoiceMode: (v: VoiceMode) => void
+  setVoiceReplyMode: (v: VoiceReplyMode) => void
   setNotice: (s: string) => void
 }) {
   return (
@@ -394,6 +395,30 @@ function VoiceSection({ state, setVoiceEnabled, setAutoListen, setVoiceMode, set
           </div>
         </section>
       )}
+
+      <section className="choice-card">
+        <h2>什么时候朗读回答</h2>
+        <p>只会朗读伙伴生成的回答，不会在后台录音。</p>
+        <div className="stacked-choices">
+          {([
+            ['voice-only', '语音问题时朗读'],
+            ['always', '始终朗读'],
+            ['silent', '保持安静'],
+          ] as Array<[VoiceReplyMode, string]>).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={state.voiceReplyMode === mode}
+              onClick={() => {
+                setVoiceReplyMode(mode)
+                setNotice(`回答方式：${label}`)
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="choice-card">
         <h2>使用提示</h2>

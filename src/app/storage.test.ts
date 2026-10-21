@@ -6,10 +6,17 @@ import { loadState, saveState } from './storage'
 describe('primary-only state migration', () => {
   beforeEach(() => localStorage.clear())
 
+  it('starts with child-safe voice reply and motion preferences', () => {
+    expect(createDefaultState()).toMatchObject({
+      voiceReplyMode: 'voice-only',
+      reduceMotion: false,
+    })
+  })
+
   it('creates the approved guardian-authorized grade-5 account', () => {
     const state = createDefaultState()
 
-    expect(state.stateVersion).toBe(2)
+    expect(state.stateVersion).toBe(3)
     expect(state.grade).toBe('grade5')
     expect(state.guardian.authorised).toBe(true)
     expect(state.learningProgress['grade5-6']).toEqual({
@@ -27,10 +34,10 @@ describe('primary-only state migration', () => {
 
     const migrated = loadState()
 
-    expect(migrated.stateVersion).toBe(2)
+    expect(migrated.stateVersion).toBe(3)
     expect(migrated.grade).toBe('grade5')
     expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
-    expect(localStorage.getItem('student-app-primary-v2-migrated')).toBe('1')
+    expect(localStorage.getItem('student-app-primary-v3-migrated')).toBe('1')
     const persisted = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
     saveState({ ...migrated, nickname: '新名字' })
     expect(loadState().nickname).toBe('新名字')
@@ -42,7 +49,7 @@ describe('primary-only state migration', () => {
     expect(loadState()).toEqual(createDefaultState())
   })
 
-  it('drops unknown keys and invalid course progress when loading v2 state', () => {
+  it('drops unknown keys and invalid course progress when loading current state', () => {
     const state = createDefaultState()
     saveState(state)
     const persisted = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
@@ -70,7 +77,7 @@ describe('primary-only state migration', () => {
     expect(JSON.parse(localStorage.getItem('student-app-state') ?? '{}')).not.toHaveProperty('unexpected')
   })
 
-  it('normalizes every hostile v2 field independently into a render-safe state', () => {
+  it('normalizes every hostile legacy field independently into a render-safe state', () => {
     localStorage.setItem('unrelated-preference', 'keep-me')
     localStorage.setItem('student-app-state', JSON.stringify({
       stateVersion: 2,

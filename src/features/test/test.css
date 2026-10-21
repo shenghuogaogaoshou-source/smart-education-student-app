@@ -1058,7 +1058,7 @@
 .test-level-node__copy p { margin: 5px 0 0; color: #766d80; font-size: .64rem; line-height: 1.35; }
 
 .test-route-content > .ai-companion-control--test-map {
-  transform: translate(-50%, -74px);
+  transform: none;
 }
 
 .challenge-intro-overlay {

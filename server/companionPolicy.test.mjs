@@ -23,6 +23,10 @@ describe('companion proxy policy', () => {
     expect(prepareStudentReply('你很笨，别问了。')).toContain('换个方式')
   })
 
+  it('keeps a provider reply to at most two sentences', () => {
+    expect(prepareStudentReply('第一句话。第二句话！第三句话？')).toBe('第一句话。第二句话！')
+  })
+
   it('does not send private contact information to the model', () => {
     const result = prepareStudentQuestion('我的手机号是13800138000', 'momo')
 

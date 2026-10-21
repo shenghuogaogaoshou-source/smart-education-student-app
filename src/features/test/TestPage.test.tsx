@@ -1,7 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
 import { createEmptyLearningProgress, getGradeBand, getPartIdsForBand } from '../../app/learning'
 import { defaultState, type AppState } from '../../app/model'
 import { getPointsBalance } from '../../app/points'
@@ -61,10 +62,23 @@ describe('TestPage', () => {
   })
 
   it('keeps the companion centered above the current node and moves it after passing', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.matches('[data-node-anchor="ael-3"]')) {
+        return { left: 60, top: 400, right: 110, bottom: 450, width: 50, height: 50 } as DOMRect
+      }
+      if (this.classList.contains('test-route-canvas')) {
+        return { left: 20, top: 100, right: 370, bottom: 1000, width: 350, height: 900 } as DOMRect
+      }
+      return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect
+    })
     const user = userEvent.setup()
     renderMap({ grade: 'grade5' })
 
-    expect(screen.getByRole('button', { name: 'AI伙伴' })).toHaveAttribute('data-map-node-id', 'ael-3')
+    const companion = screen.getByRole('button', { name: 'AI伙伴' })
+    expect(companion).toHaveAttribute('data-map-node-id', 'ael-3')
+    await waitFor(() => expect(companion).toHaveStyle({ left: '33px', top: '228px' }))
+    expect(screen.getByRole('button', { name: '算法工具箱 · 当前关卡' }))
+      .toHaveAttribute('data-node-anchor', 'ael-3')
     await user.click(screen.getByRole('button', { name: '算法工具箱 · 当前关卡' }))
     await user.click(screen.getByRole('button', { name: '开始答题' }))
     for (const answer of ['分类', '聚类', '数值预测', '错', '先说明需求并允许同学调整']) {
@@ -99,7 +113,7 @@ describe('TestPage', () => {
       await user.click(screen.getByRole('button', { name: /下一题|查看成绩/ }))
     }
 
-    const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}') as AppState
+    const saved = loadAccountState(defaultState.accountId)
     expect(saved.learningProgress['grade5-6'].testsPassed).toEqual(['ael-1', 'ael-2', 'ael-3'])
     expect(saved.transactions.filter((item) => item.eventId === 'test:ael-3')).toEqual([
       expect.objectContaining({ amount: 50 }),
@@ -129,7 +143,7 @@ describe('TestPage', () => {
     await user.click(screen.getByRole('button', { name: '回顾第 3 部分知识' }))
     expect(onReviewKnowledge).toHaveBeenCalledWith('ael', 3)
     expect(screen.queryByRole('dialog', { name: '算法工具箱答题' })).not.toBeInTheDocument()
-    const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}') as AppState
+    const saved = loadAccountState(defaultState.accountId)
     expect(saved.learningProgress['grade5-6'].testsPassed).toEqual(['ael-1', 'ael-2'])
     expect(getPointsBalance(saved.transactions)).toBe(balanceBefore)
     expect(saved.transactions).toHaveLength(transactionCountBefore)

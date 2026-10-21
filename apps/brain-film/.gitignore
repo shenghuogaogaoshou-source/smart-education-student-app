@@ -1,0 +1,16 @@
+# 本机密钥文件:不要提交、不要随作品夹分享
+.env
+.env.*
+!.env.example
+
+# 测试产物
+tests/out/
+tests/node_modules/
+tests/e2e-drag-shot.png
+
+# 系统杂项
+Thumbs.db
+desktop.ini
+.DS_Store
+# 后端运行时数据(作品库、日志)
+data/

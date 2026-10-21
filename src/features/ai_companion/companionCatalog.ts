@@ -1,4 +1,4 @@
-import type { CompanionCategory } from '../../app/model'
+import type { CompanionCategory, CompanionLoadout } from '../../app/model'
 
 export type CompanionCatalogItem = {
   id: string
@@ -10,7 +10,10 @@ export type CompanionCatalogItem = {
   description: string
 }
 
-export const DEFAULT_COMPANION_ID = 'momo'
+export const COMPANION_IDS = ['momo', 'yunduo', 'cloudbloom', 'cloudbelle'] as const
+export type CompanionId = (typeof COMPANION_IDS)[number]
+
+export const DEFAULT_COMPANION_ID: CompanionId = 'momo'
 
 export const COMPANION_CATALOG: CompanionCatalogItem[] = [
   { id: 'momo', name: '绒桃 Momo', price: 280, asset: '/pets/momo.png', gradient: 'linear-gradient(145deg, #FFF0E8, #FFD2C6)', category: 'appearance', description: 'AI 伙伴形象' },
@@ -27,4 +30,30 @@ export const COMPANION_CATALOG: CompanionCatalogItem[] = [
 
 export function getCompanionItem(id: string | null | undefined) {
   return id ? COMPANION_CATALOG.find((item) => item.id === id) : undefined
+}
+
+export function buildCompanionPreviewLoadout(
+  loadout: CompanionLoadout,
+  item: CompanionCatalogItem,
+): CompanionLoadout {
+  return {
+    ...loadout,
+    equipped: {
+      ...loadout.equipped,
+      [item.category]: item.id,
+    },
+  }
+}
+
+export function restoreDefaultCompanionLoadout(loadout: CompanionLoadout): CompanionLoadout & {
+  equipped: { appearance: CompanionId; outfit: null; decoration: null }
+} {
+  return {
+    ...loadout,
+    equipped: {
+      appearance: DEFAULT_COMPANION_ID,
+      outfit: null,
+      decoration: null,
+    },
+  }
 }

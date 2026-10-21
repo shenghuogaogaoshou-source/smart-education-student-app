@@ -74,13 +74,38 @@ describe('login companion', () => {
     expect(frame).toContainElement(screen.getByRole('img', { name: '绒桃 Momo AI 伙伴形象' }))
   })
 
-  it('responds with a primary welcome on a short tap', async () => {
+  it('responds with varied pet-like reactions on consecutive short taps', async () => {
     const user = userEvent.setup()
     renderCompanion()
+    const companion = screen.getByRole('button', { name: '和绒桃 Momo互动' })
 
-    await user.click(screen.getByRole('button', { name: '和绒桃 Momo互动' }))
+    await user.click(companion)
+    const firstReaction = screen.getByRole('status').textContent
+    expect(firstReaction).toContain('准备好')
 
-    expect(screen.getByRole('status')).toHaveTextContent('今天想先去哪里冒险')
+    await user.click(companion)
+    expect(screen.getByRole('status').textContent).not.toBe(firstReaction)
+  })
+
+  it('cancels long press when the finger moves beyond the drag threshold', () => {
+    vi.useFakeTimers()
+    const recognition = {
+      lang: '', continuous: false, interimResults: false, maxAlternatives: 0,
+      onresult: null, onerror: null, onend: null,
+      start: vi.fn(), stop: vi.fn(), abort: vi.fn(),
+    }
+    const SpeechRecognitionMock = function () { return recognition } as unknown as new () => typeof recognition
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: SpeechRecognitionMock })
+    renderCompanion()
+    const button = screen.getByRole('button', { name: '和绒桃 Momo互动' })
+
+    fireEvent.pointerDown(button, { pointerId: 8, button: 0, clientX: 20, clientY: 20 })
+    fireEvent.pointerMove(button, { pointerId: 8, clientX: 40, clientY: 20 })
+    act(() => vi.advanceTimersByTime(650))
+    fireEvent.pointerUp(button, { pointerId: 8, clientX: 40, clientY: 20 })
+
+    expect(recognition.start).not.toHaveBeenCalled()
+    expect(screen.queryByText('请说，我在听')).not.toBeInTheDocument()
   })
 
   it('starts voice listening beside the companion after a 600ms long press', () => {
@@ -108,6 +133,31 @@ describe('login companion', () => {
     expect(screen.queryByRole('dialog', { name: '语音聊天体验' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('请说，我在听')
     expect(recognition.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the interim transcript in the same bubble while the child is still speaking', () => {
+    vi.useFakeTimers()
+    const recognition = {
+      lang: '', continuous: false, interimResults: false, maxAlternatives: 0,
+      onresult: null as ((event: unknown) => void) | null,
+      onerror: null, onend: null,
+      start: vi.fn(), stop: vi.fn(), abort: vi.fn(),
+    }
+    const SpeechRecognitionMock = function () { return recognition } as unknown as new () => typeof recognition
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: SpeechRecognitionMock })
+    renderCompanion()
+    const button = screen.getByRole('button', { name: '和绒桃 Momo互动' })
+
+    fireEvent.pointerDown(button, { pointerId: 12, button: 0 })
+    act(() => vi.advanceTimersByTime(650))
+    act(() => recognition.onresult?.({
+      resultIndex: 0,
+      results: [{ isFinal: false, 0: { transcript: '彩虹为什么' } }],
+    }))
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByRole('status')).toHaveTextContent('彩虹为什么')
+    expect(screen.getByTestId('partner-appearance')).toHaveAttribute('data-motion', 'listen')
   })
 
   it('keeps listening when a held finger drifts outside the companion before the threshold', () => {

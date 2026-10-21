@@ -1,0 +1,17 @@
+
+.appearance-trigger { min-width: 44px; min-height: 44px; border: 1px solid currentColor; border-radius: 12px; background: transparent; color: inherit; font-weight: 700; }
+.preferences-dialog { width: min(360px, calc(100vw - 24px)); max-height: 80dvh; margin: auto; padding: 22px; border: 1px solid #d9d3c8; border-radius: 22px; background: #fffaf1; color: #2a2415; overflow: auto; }
+.preferences-dialog::backdrop { background: #201c284d; }
+.preferences-heading { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.preferences-heading h2 { font-size: 18px; margin: 0; }
+.preferences-dialog button { min-height: 44px; padding: 8px 14px; border: 1px solid #b8ae9c; border-radius: 12px; background: white; color: #2a2415; }
+.preferences-dialog fieldset { border: 0; padding: 0; margin: 22px 0; display: flex; gap: 10px; }
+.preferences-dialog legend { margin-bottom: 10px; font-weight: bold; }
+.preferences-dialog [aria-pressed="true"] { background: #e9d4a2; border-color: #75613e; }
+.preferences-dialog p { font-size: 13px; line-height: 1.6; }
+:root[data-contrast="clear"] { --text: #211b13; --text-dim: #433924; --text-faint: #584b36; --ink: #211b13; --muted: #49425c; --faint: #514869; --line: #a99eb8; --line-d: #8d84a3; --card: #fff; --bg: #fffdf7; }
+:root[data-reading="large"] .app-viewport p, :root[data-reading="large"] .app-viewport textarea, :root[data-reading="large"] .app-viewport input, :root[data-reading="large"] .app-viewport label { font-size: 18px !important; line-height: 1.75; }
+
+.app-recovery { padding: 36px 24px; min-height: 100%; background: #fffaf1; color: #2a2415; }
+.app-recovery h1 { font-size: 22px; }
+.app-recovery button { min-height: 44px; margin-top: 20px; padding: 10px 20px; border: 1px solid; border-radius: 12px; background: #e9d4a2; }

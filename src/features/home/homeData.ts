@@ -41,8 +41,8 @@ export const homeCopy = {
 }
 
 export const games = [
-  { id: 'game-vision', title: '图像侦探', note: '观察机器怎样找线索', icon: 'vision' },
-  { id: 'game-prompt', title: '提示词工坊', note: '把想法说得更清楚', icon: 'prompt' },
+  { id: 'brain-film', title: '脑洞放映厅', note: '把奇思妙想拍成小电影', icon: 'brain-film' },
+  { id: 'creative-module', title: '创造模块', note: '拼出自己的智能小发明', icon: 'creative-module' },
   { id: 'game-sort', title: '分类挑战', note: '帮 AI 整理新发现', icon: 'sort' },
   { id: 'game-bot', title: '机器判断局', note: '找出答案中的疑点', icon: 'bot' },
   { id: 'game-create', title: '创意拼搭站', note: '组合灵感做作品', icon: 'create' },
@@ -56,18 +56,3 @@ export const cameraTools = [
   { title: '翻译文字', Icon: Languages },
   { title: '内容检查', Icon: SearchCheck },
 ]
-
-export const worksByPeriod = {
-  day: [
-    { id: 'work-camera', title: '会分类的照相机', author: '星河同学', tag: '创意实验' },
-    { id: 'work-library', title: '未来图书馆', author: '小羽同学', tag: '空间设计' },
-  ],
-  week: [
-    { id: 'work-campus', title: '未来校园小设计', author: '林川同学', tag: '本周人气' },
-    { id: 'work-voice', title: '声音地图', author: '清禾同学', tag: '科学表达' },
-  ],
-  year: [
-    { id: 'work-ocean', title: 'AI 海洋观察站', author: '远帆同学', tag: '年度灵感' },
-    { id: 'work-city', title: '会思考的绿色城市', author: '若安同学', tag: '实践创造' },
-  ],
-} as const

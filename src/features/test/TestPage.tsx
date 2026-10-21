@@ -28,6 +28,7 @@ export function TestPage({ onReviewKnowledge }: Props = {}) {
   const currentPartId = getCurrentPartId(course, progress)
   const currentNode = nodes.find((node) => node.id === currentPartId) ?? nodes.at(-1)
   const routeRef = useRef<HTMLDivElement>(null)
+  const [currentAnchor, setCurrentAnchor] = useState<HTMLButtonElement | null>(null)
   const [notice, setNotice] = useState('')
   const [introPart, setIntroPart] = useState<CoursePart | null>(null)
   const [activePart, setActivePart] = useState<CoursePart | null>(null)
@@ -140,11 +141,17 @@ export function TestPage({ onReviewKnowledge }: Props = {}) {
                     part={part}
                     status={nodeStatus(part)}
                     onSelect={openChallenge}
+                    buttonRef={part.id === currentNode?.id ? setCurrentAnchor : undefined}
                   />
                 )
               })}
             </div>
-            {currentNode && <AiCompanion placement="test-map" mapTarget={currentNode} />}
+            {currentNode && (
+              <AiCompanion
+                placement="test-map"
+                mapTarget={{ ...currentNode, anchor: currentAnchor }}
+              />
+            )}
           </div>
         </div>
       </section>

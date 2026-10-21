@@ -1,0 +1,34 @@
+html, body { height: 100%; overflow: hidden; }
+body { display: grid; place-items: center; background: #dedee8; padding: 0; }
+#root { width: min(390px, 100vw); height: min(844px, 100dvh); overflow: hidden; background: #f6f4fd; border-radius: 28px; box-shadow: 0 16px 64px #29244230; transform: translateZ(0); }
+.phone-shell { container: phone / inline-size; height: 100%; overflow: hidden; }
+.app-viewport { height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.stage { width: 100%; }
+#topbar { position: sticky; top: 0; }
+.topbar-tools { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.creation-guide { display: flex; gap: 8px 14px; align-items: center; justify-content: space-between; padding: 8px 14px; background: #fff9df; border-bottom: 1px solid #f2dda0; color: #69501a; font-size: 13px; }
+.creation-guide-main { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.creation-guide strong { color: #59410f; white-space: nowrap; }
+.creation-guide span { color: #765b1c; }
+.creation-guide small { color: #887446; font-size: 12px; white-space: nowrap; }
+.navrow { width: 100%; }
+.toast { max-width: calc(100% - 24px); }
+.overlay { max-height: 100%; }
+.modal { max-height: 90%; }
+@media (max-width: 430px) { #root { border-radius: 0; box-shadow: none; height: 100dvh; } }
+@container phone (max-width: 430px) { .creation-guide { align-items: flex-start; flex-direction: column; gap: 2px; } .creation-guide-main { flex-wrap: wrap; } .creation-guide small { white-space: normal; } }
+@media print { html, body { overflow: visible; height: auto; display: block; } #root, .phone-shell, .app-viewport { height: auto; width: 100%; overflow: visible; transform: none; box-shadow: none; border-radius: 0; } }
+
+.phone-shell { display: flex; flex-direction: column; }
+.app-viewport { min-height: 0; flex: 1; height: auto; }
+.app-navigation { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--line); color: var(--ink); gap: 8px; }
+.app-navigation > button { min-height: 44px; padding: 6px 10px; border: 0; background: transparent; color: var(--purple-d); }
+/* 设置入口要看起来像按钮:上面那条 border:0 会压掉 .appearance-trigger 的描边,这里补回来 */
+.app-navigation > .appearance-trigger { border: 1px solid currentColor; padding: 6px 12px; }
+.app-navigation > button:disabled { opacity: .35; }
+.app-navigation strong { font-size: 15px; }
+.resume-creation { border: 0; background: var(--purple-l); color: var(--purple-d); min-height: 44px; flex-shrink: 0; font-weight: 700; }
+
+/* Hide scroll indicators while preserving touch, wheel and keyboard scrolling. */
+.phone-shell *, .phone-shell ~ dialog { scrollbar-width: none; }
+.phone-shell *::-webkit-scrollbar, .phone-shell ~ dialog::-webkit-scrollbar { display: none; width: 0; height: 0; }

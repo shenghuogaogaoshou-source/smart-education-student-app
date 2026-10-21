@@ -1,10 +1,19 @@
-import { ArrowLeft, Check, PackageCheck, ShoppingBag, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Check, PackageCheck, RotateCcw, ShoppingBag, Sparkles, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import type { CompanionCategory, CompanionLoadout } from '../../app/model'
 import { getPointsBalance } from '../../app/points'
-import { COMPANION_CATALOG, getCompanionItem, type CompanionCatalogItem } from '../ai_companion/companionCatalog'
+import {
+  buildCompanionPreviewLoadout,
+  COMPANION_CATALOG,
+  getCompanionItem,
+  restoreDefaultCompanionLoadout,
+  type CompanionCatalogItem,
+} from '../ai_companion/companionCatalog'
 import { PartnerAppearance } from '../ai_companion/PartnerAppearance'
+import { Companion2DRenderer } from '../ai_companion/render2d/Companion2DRenderer'
+import { CompanionRotator } from '../ai_companion/render2d/CompanionRotator'
+import type { CompanionDirection } from '../ai_companion/render2d/types'
 import './profile.css'
 
 const CATEGORIES = [
@@ -22,20 +31,29 @@ const CATEGORY_LABELS: Record<CompanionCategory, string> = {
   decoration: '装饰',
 }
 
-function PreviewArtwork({ item, loadout }: { item: CompanionCatalogItem; loadout: CompanionLoadout }) {
-  if (item.category === 'appearance') {
-    return (
-      <PartnerAppearance
-        loadout={{
-          ...loadout,
-          equipped: { ...loadout.equipped, appearance: item.id },
-        }}
-        size="preview"
+function DressingStage({
+  label,
+  loadout,
+  direction,
+  onDirectionChange,
+}: {
+  label: string
+  loadout: CompanionLoadout
+  direction: CompanionDirection
+  onDirectionChange: (direction: CompanionDirection) => void
+}) {
+  return (
+    <section className="mall-dressing-stage" aria-label={label}>
+      <div className="mall-dressing-stage__glow" aria-hidden="true" />
+      <CompanionRotator
+        loadout={loadout}
+        scene="mall"
+        initialDirection={direction}
+        onDirectionChange={onDirectionChange}
       />
-    )
-  }
-
-  return <img className="mall-dialog-art" src={item.asset} alt={`${item.name} 3D ${item.description}`} />
+      <small className="mall-dressing-stage__hint">左右拖动或点击箭头，查看搭配的不同方向</small>
+    </section>
+  )
 }
 
 export function MallPage({ onBack }: { onBack: () => void }) {
@@ -43,6 +61,7 @@ export function MallPage({ onBack }: { onBack: () => void }) {
   const [category, setCategory] = useState<MallCategory>('appearance')
   const [selectedItem, setSelectedItem] = useState<CompanionCatalogItem | null>(null)
   const [equipPromptItem, setEquipPromptItem] = useState<CompanionCatalogItem | null>(null)
+  const [previewDirection, setPreviewDirection] = useState<CompanionDirection>('front')
   const [toast, setToast] = useState('')
   const balance = getPointsBalance(state.transactions)
   const loadout = state.companion
@@ -71,6 +90,7 @@ export function MallPage({ onBack }: { onBack: () => void }) {
     purchaseCompanionItem(item.category, item.id, item.price, item.name)
     setSelectedItem(null)
     setEquipPromptItem(item)
+    setCategory('my')
   }
 
   const buySelectedItem = () => {
@@ -91,10 +111,25 @@ export function MallPage({ onBack }: { onBack: () => void }) {
     showToast(`已卸下「${item.name}」`)
   }
 
+  const restoreDefault = () => {
+    const restored = restoreDefaultCompanionLoadout(loadout)
+    equipCompanionItem('appearance', restored.equipped.appearance)
+    unequipCompanionItem('outfit')
+    unequipCompanionItem('decoration')
+    setSelectedItem(null)
+    showToast('已恢复绒桃 Momo 的默认搭配')
+  }
+
   const renderItemCard = (item: CompanionCatalogItem, wardrobe = false) => {
     const isOwned = loadout.owned[item.category].includes(item.id)
     const isEquipped = loadout.equipped[item.category] === item.id
     const categoryLabel = CATEGORY_LABELS[item.category]
+    const appearanceThumbnailLoadout = item.category === 'appearance'
+      ? {
+          ...buildCompanionPreviewLoadout(loadout, item),
+          equipped: { appearance: item.id, outfit: null, decoration: null },
+        }
+      : loadout
 
     return (
       <article key={item.id} className={`mall-item mall-item-${categoryLabel} ${isOwned ? 'owned' : ''} ${isEquipped ? 'equipped' : ''}`}>
@@ -106,7 +141,15 @@ export function MallPage({ onBack }: { onBack: () => void }) {
         >
           <span className="mall-pet-frame" style={{ background: item.gradient }}>
             {item.category === 'appearance' ? (
-              <span className="mall-pet-sprite" role="img" aria-label={`${item.name} AI 伙伴形象`} style={{ backgroundImage: `url(${item.asset})` }} />
+              <span className="mall-pet-thumbnail">
+                <Companion2DRenderer
+                  loadout={appearanceThumbnailLoadout}
+                  scene="mall"
+                  direction="front"
+                  motion="idle"
+                  reduceMotion={state.reduceMotion}
+                />
+              </span>
             ) : (
               <img className="mall-product-art" src={item.asset} alt={`${item.name} 3D ${item.description}`} />
             )}
@@ -185,6 +228,23 @@ export function MallPage({ onBack }: { onBack: () => void }) {
             <span className="mall-wardrobe-icon"><PackageCheck aria-hidden="true" size={20} /></span>
             <span><strong>我的搭配衣橱</strong><small>已购买的物品都在这里，随时装上或卸下</small></span>
           </header>
+          <div className="mall-wardrobe-preview-card">
+            <DressingStage
+              label="当前搭配八方向预览"
+              loadout={loadout}
+              direction={previewDirection}
+              onDirectionChange={setPreviewDirection}
+            />
+            <div className="mall-wardrobe-preview-copy">
+              <span>
+                <small>正在搭配</small>
+                <strong>{currentAppearance?.name}</strong>
+              </span>
+              <button type="button" className="mall-restore-default" onClick={restoreDefault} aria-label="恢复默认搭配">
+                <RotateCcw aria-hidden="true" size={14} />恢复默认
+              </button>
+            </div>
+          </div>
           {(Object.keys(CATEGORY_LABELS) as CompanionCategory[]).map((sectionCategory) => {
             const sectionItems = ownedItems.filter((item) => item.category === sectionCategory)
             return (
@@ -211,7 +271,12 @@ export function MallPage({ onBack }: { onBack: () => void }) {
               <X aria-hidden="true" size={18} />
             </button>
             <div className="mall-dialog-preview" style={{ background: selectedItem.gradient }}>
-              <PreviewArtwork item={selectedItem} loadout={loadout} />
+              <DressingStage
+                label="商品试穿八方向预览"
+                loadout={buildCompanionPreviewLoadout(loadout, selectedItem)}
+                direction={previewDirection}
+                onDirectionChange={setPreviewDirection}
+              />
             </div>
             <small>{CATEGORY_LABELS[selectedItem.category]}</small>
             <h2>{selectedItem.name}</h2>

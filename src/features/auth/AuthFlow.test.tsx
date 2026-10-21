@@ -2,15 +2,19 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
 import { LoginPage } from './LoginPage'
 import { isGuardianConsentRequired } from './age'
+import { SessionCredentialProvider } from './sessionCredential'
 
 function renderLogin() {
   const onNavigate = vi.fn()
   render(
-    <AppStateProvider>
-      <LoginPage onNavigate={onNavigate} />
-    </AppStateProvider>,
+    <SessionCredentialProvider>
+      <AppStateProvider>
+        <LoginPage onNavigate={onNavigate} />
+      </AppStateProvider>
+    </SessionCredentialProvider>,
   )
   return { onNavigate }
 }
@@ -49,11 +53,12 @@ describe('authentication flow', () => {
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
     expect(screen.getByRole('alert')).toHaveTextContent('请填写学习账号和密码')
 
-    await user.type(screen.getByLabelText('学习账号／学习码'), 'demo-2026')
-    await user.type(screen.getByLabelText('密码'), 'secret-pass')
+    await user.type(screen.getByLabelText('学习账号／学习码'), 'xiaoyu')
+    await user.type(screen.getByLabelText('密码'), 'demo-pass')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
-    expect(localStorage.getItem('student-app-state')).not.toContain('secret-pass')
+    expect(loadAccountState('xiaoyu').isLoggedIn).toBe(true)
+    expect(JSON.stringify(localStorage)).not.toContain('demo-pass')
   })
 
   it('captures the equipped companion bounds immediately before a successful login', async () => {
@@ -76,9 +81,11 @@ describe('authentication flow', () => {
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
     expect(JSON.parse(sessionStorage.getItem('student-app-login-companion-bounds') ?? '{}')).toEqual({
-      version: 2,
-      appearanceId: 'momo',
-      rect: { left: 40, top: 72, right: 220, bottom: 252, width: 180, height: 180 },
+      version: 3,
+      companionId: 'momo',
+      loadoutVersion: 1,
+      startRect: { left: 40, top: 72, right: 220, bottom: 252, width: 180, height: 180 },
+      target: 'floating',
     })
     boundsSpy.mockRestore()
   })

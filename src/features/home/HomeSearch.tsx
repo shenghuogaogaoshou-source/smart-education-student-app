@@ -3,16 +3,18 @@ import { Search, X } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { getGradeBand, type PrimaryGrade } from '../../app/learning'
 import { getCourseForBand } from '../knowledge/courseCatalog'
-import { games, worksByPeriod } from './homeData'
+import { useOptionalWorks } from '../works/WorksProvider'
+import { games } from './homeData'
 
 export function HomeSearch({ onOpenContent, onWorkClick }: { onOpenContent?: (courseId: string, chapterNum: number) => void; onWorkClick?: (id: string) => void }) {
   const { state } = useAppState()
+  const works = useOptionalWorks()?.works.filter((work) => work.status === 'published') ?? []
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('全部')
   const course = getCourseForBand(getGradeBand(state.grade as PrimaryGrade))
   const entries = [
     ...course.parts.map(part => ({ id: part.id, title: part.title, category: '知识', description: part.concept || part.summary, searchable: [part.summary, part.experiment, part.safety, ...part.keyConcepts.map(k => `${k.term} ${k.explanation}`)].join(' '), open: onOpenContent ? () => onOpenContent(course.id, part.number) : undefined })),
-    ...Object.values(worksByPeriod).flat().map(work => ({ id: work.id, title: work.title, category: '作品', description: `${work.author} · ${work.tag}`, searchable: '', open: onWorkClick ? () => onWorkClick(work.id) : undefined })),
+    ...works.map(work => ({ id: work.id, title: work.title, category: '作品', description: `${work.aiTools.join(' · ')} · ${work.description}`, searchable: work.description, open: onWorkClick ? () => onWorkClick(work.id) : undefined })),
     ...games.map(game => ({ id: game.id, title: game.title, category: '游戏', description: game.note, searchable: '', open: undefined })),
   ]
   const words = query.normalize('NFKC').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)

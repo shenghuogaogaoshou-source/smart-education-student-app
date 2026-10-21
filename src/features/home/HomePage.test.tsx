@@ -1,7 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { createDefaultState } from '../../app/model'
+import { createMemoryWorkRepository } from '../works/memoryRepository'
+import { WorksProvider } from '../works/WorksProvider'
 import { homeCopy } from './homeData'
 import { HomePage } from './HomePage'
 
@@ -64,7 +67,24 @@ describe('home page', () => {
 
   it('opens honest tool states and keeps showcase interactions local', async () => {
     const user = userEvent.setup()
-    render(<AppStateProvider><HomePage /></AppStateProvider>)
+    const repository = createMemoryWorkRepository()
+    const accountId = createDefaultState().accountId
+    const work = await repository.saveDraft(accountId, {
+      source: 'external-upload',
+      title: '我的公开作品',
+      description: '',
+      aiTools: ['豆包'],
+      fileName: 'work.txt',
+      blob: new Blob(['作品'], { type: 'text/plain' }),
+    })
+    await repository.setStatus(accountId, work.id, 'published')
+    render(
+      <AppStateProvider>
+        <WorksProvider accountId={accountId} repository={repository}>
+          <HomePage />
+        </WorksProvider>
+      </AppStateProvider>,
+    )
 
     await user.click(screen.getByRole('button', { name: '拍照与扫码' }))
     expect(screen.getByRole('heading', { name: '拍照与识别工具' })).toBeInTheDocument()
@@ -74,8 +94,20 @@ describe('home page', () => {
     await user.click(screen.getByRole('button', { name: '每周' }))
     expect(screen.getByRole('button', { name: '每周' })).toHaveAttribute('aria-pressed', 'true')
 
-    const like = screen.getAllByRole('button', { name: '点赞作品' })[0]
+    const like = (await screen.findAllByRole('button', { name: '点赞作品' }))[0]
     await user.click(like)
     expect(like).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('前两个精选入口按确认顺序打开游戏', async () => {
+    const user = userEvent.setup()
+    const onOpenGame = vi.fn()
+    render(<AppStateProvider><HomePage onOpenGame={onOpenGame} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: /脑洞放映厅/ }))
+    expect(onOpenGame).toHaveBeenCalledWith('brain-film')
+
+    await user.click(screen.getByRole('button', { name: /创造模块/ }))
+    expect(onOpenGame).toHaveBeenCalledWith('creative-module')
   })
 })

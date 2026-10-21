@@ -1,27 +1,26 @@
-import { ArrowLeft, Bookmark, Heart } from 'lucide-react'
+import { ArrowLeft, Bookmark, Heart, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
-import { worksByPeriod } from '../home/homeData'
+import { rankPublishedWorks, type RankingPeriod } from './moderation'
+import { useOptionalWorks } from './WorksProvider'
 import './works.css'
 
-type Period = keyof typeof worksByPeriod
-
-const periodLabels: Array<{ id: Period; label: string }> = [
+const periodLabels: Array<{ id: RankingPeriod; label: string }> = [
   { id: 'day', label: '每天' },
   { id: 'week', label: '每周' },
   { id: 'year', label: '每年' },
 ]
 
 export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; onWorkClick?: (workId: string) => void }) {
-  const [period, setPeriod] = useState<Period>('day')
-  const { state, toggleLike, toggleFavorite } = useAppState()
-
-  const allWorks = Object.values(worksByPeriod).flat()
+  const [period, setPeriod] = useState<RankingPeriod>('day')
+  const { state } = useAppState()
+  const worksState = useOptionalWorks()
+  const allPublished = rankPublishedWorks(worksState?.works ?? [], period)
 
   return (
     <div className="works-gallery-page">
       <header className="gallery-header">
-        <button className="back-button" type="button" onClick={onBack}>
+        <button className="back-button" type="button" onClick={onBack} aria-label="返回">
           <ArrowLeft size={20} />
         </button>
         <div className="gallery-header-title">
@@ -32,48 +31,27 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
 
       <div className="gallery-period-tabs" aria-label="作品热度时间范围">
         {periodLabels.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={period === id}
-            onClick={() => setPeriod(id)}
-          >
-            {label}
-          </button>
+          <button key={id} type="button" aria-pressed={period === id} onClick={() => setPeriod(id)}>{label}</button>
         ))}
       </div>
 
       <div className="gallery-work-list">
-        {worksByPeriod[period].map((work, index) => {
-          const liked = state.likes.includes(work.id)
-          const saved = state.favorites.includes(work.id)
+        {allPublished.map((work, index) => {
+          const liked = work.likedBy.includes(state.accountId)
+          const saved = work.favoritedBy.includes(state.accountId)
           return (
             <article className="gallery-showcase-card" key={work.id}>
               <div className="gallery-work-index">{String(index + 1).padStart(2, '0')}</div>
-              <div
-                className="gallery-work-copy"
-                onClick={() => onWorkClick?.(work.id)}
-                style={{ cursor: onWorkClick ? 'pointer' : 'default' }}
-              >
-                <span>{work.tag}</span>
+              <div className="gallery-work-copy" onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
+                <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
                 <h3>{work.title}</h3>
-                <p>{work.author}</p>
+                <p>{state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
               </div>
               <div className="gallery-work-actions">
-                <button
-                  type="button"
-                  aria-label="点赞作品"
-                  aria-pressed={liked}
-                  onClick={() => toggleLike(work.id)}
-                >
+                <button type="button" aria-label="点赞作品" aria-pressed={liked} onClick={() => worksState?.toggleLike(work.id)}>
                   <Heart aria-hidden="true" size={18} fill={liked ? 'currentColor' : 'none'} />
                 </button>
-                <button
-                  type="button"
-                  aria-label="收藏作品"
-                  aria-pressed={saved}
-                  onClick={() => toggleFavorite(work.id)}
-                >
+                <button type="button" aria-label="收藏作品" aria-pressed={saved} onClick={() => worksState?.toggleFavorite(work.id)}>
                   <Bookmark aria-hidden="true" size={18} fill={saved ? 'currentColor' : 'none'} />
                 </button>
               </div>
@@ -82,35 +60,27 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
         })}
       </div>
 
-      <div className="gallery-all-works">
-        <p className="gallery-section-title">全部作品 ({allWorks.length})</p>
-        <div className="gallery-all-list">
-          {allWorks.map((work) => {
-            const liked = state.likes.includes(work.id)
-            const saved = state.favorites.includes(work.id)
-            return (
-              <article
-                className="gallery-all-card"
-                key={work.id}
-                onClick={() => onWorkClick?.(work.id)}
-                style={{ cursor: onWorkClick ? 'pointer' : 'default' }}
-              >
-                <div className="gallery-all-placeholder">
-                  <span>{work.tag}</span>
-                </div>
-                <div className="gallery-all-info">
-                  <h3>{work.title}</h3>
-                  <p>{work.author}</p>
-                  <div className="gallery-all-stats">
-                    <span><Heart size={12} fill={liked ? 'currentColor' : 'none'} /> {liked ? 1 : 0}</span>
-                    <span><Bookmark size={12} fill={saved ? 'currentColor' : 'none'} /> {saved ? 1 : 0}</span>
-                  </div>
-                </div>
-              </article>
-            )
-          })}
+      {!worksState?.loading && allPublished.length === 0 && (
+        <div className="gallery-empty" role="status">
+          <Sparkles aria-hidden="true" />
+          <strong>还没有公开作品</strong>
+          <p>完成一次创作并发布后，就会出现在这里。</p>
         </div>
-      </div>
+      )}
+
+      {allPublished.length > 0 && (
+        <div className="gallery-all-works">
+          <p className="gallery-section-title">全部作品 ({allPublished.length})</p>
+          <div className="gallery-all-list">
+            {allPublished.map((work) => (
+              <article className="gallery-all-card" key={`all-${work.id}`} onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
+                <div className="gallery-all-placeholder"><span>{work.source === 'external-upload' ? '文件作品' : '创意作品'}</span></div>
+                <div className="gallery-all-info"><h3>{work.title}</h3><p>{work.aiTools.join(' · ')}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

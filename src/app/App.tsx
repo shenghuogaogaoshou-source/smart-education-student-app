@@ -4,13 +4,21 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { GuardianConsentPage } from '../features/auth/GuardianConsentPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { RegisterPage } from '../features/auth/RegisterPage'
+import { SessionCredentialProvider } from '../features/auth/sessionCredential'
 import { MainShell } from '../features/shell/MainShell'
+import { WorksProvider } from '../features/works/WorksProvider'
 
 function AppRoutes() {
   const { state } = useAppState()
   const navigate = useNavigate()
 
-  if (state.isLoggedIn) return <MainShell />
+  if (state.isLoggedIn) {
+    return (
+      <WorksProvider accountId={state.accountId}>
+        <MainShell />
+      </WorksProvider>
+    )
+  }
 
   return (
     <Routes>
@@ -26,9 +34,11 @@ export function App() {
   return (
     <div className="app-frame">
       <BrowserRouter>
-        <AppStateProvider>
-          <AppRoutes />
-        </AppStateProvider>
+        <SessionCredentialProvider>
+          <AppStateProvider>
+            <AppRoutes />
+          </AppStateProvider>
+        </SessionCredentialProvider>
       </BrowserRouter>
     </div>
   )

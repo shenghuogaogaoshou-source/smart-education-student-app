@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
 import { defaultState } from '../../app/model'
 import { getPointsBalance } from '../../app/points'
-import { loadState, saveState } from '../../app/storage'
+import { saveState } from '../../app/storage'
+import { AiCompanion } from '../ai_companion/AiCompanion'
+import { LoginCompanion } from '../ai_companion/LoginCompanion'
 import { MallPage } from './MallPage'
 
 function renderMall(balance = 1280) {
@@ -60,6 +63,14 @@ describe('points mall companion catalogue', () => {
     expect(screen.queryByText('云宝 Nimbo')).not.toBeInTheDocument()
   })
 
+  it('renders appearance cards with the normalized 2D companion renderer', () => {
+    renderMall()
+
+    const yunduoCard = screen.getByRole('button', { name: '查看 云朵 Yunduo' })
+    expect(within(yunduoCard).getByTestId('companion-2d')).toHaveAttribute('data-companion-id', 'yunduo')
+    expect(yunduoCard.querySelector('.mall-pet-sprite')).toBeNull()
+  })
+
   it('shows elementary 3D companion clothing instead of the forthcoming placeholder', async () => {
     const user = userEvent.setup()
     renderMall()
@@ -89,6 +100,20 @@ describe('points mall companion catalogue', () => {
 
     expect(screen.getByRole('dialog', { name: '云朵 Yunduo 商品预览' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '购买 云朵 Yunduo' })).toBeInTheDocument()
+  })
+
+  it('tries an unowned item on the rotatable companion without spending points or granting ownership', async () => {
+    const user = userEvent.setup()
+    renderMall()
+
+    await user.click(screen.getByRole('tab', { name: '服饰' }))
+    await user.click(screen.getByRole('button', { name: '查看 云朵小背包' }))
+
+    const preview = screen.getByRole('region', { name: '商品试穿八方向预览' })
+    expect(within(preview).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(preview).getByRole('button', { name: '向右转动伙伴' })).toBeInTheDocument()
+    expect(screen.getByText('当前积分').parentElement).toHaveTextContent('1,280')
+    expect(loadAccountState(defaultState.accountId).companion.owned.outfit).toEqual([])
   })
 
   it('offers a clear purchase button on every unowned product card', async () => {
@@ -153,7 +178,7 @@ describe('points mall companion catalogue', () => {
       await user.click(screen.getByRole('button', { name: '现在换上' }))
     }
     view.unmount()
-    expect(loadState().companion).toMatchObject({
+    expect(loadAccountState(defaultState.accountId).companion).toMatchObject({
       owned: { appearance: ['momo', 'yunduo'], outfit: ['cloud-backpack'], decoration: ['cloud-flower-lamp'] },
       equipped: { appearance: 'yunduo', outfit: 'cloud-backpack', decoration: 'cloud-flower-lamp' },
     })
@@ -162,7 +187,7 @@ describe('points mall companion catalogue', () => {
     expect(screen.getByTestId('companion-outfit')).toBeInTheDocument()
     expect(screen.getByTestId('companion-decoration')).toBeInTheDocument()
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('580')
-    expect(loadState().transactions.filter((entry) => entry.kind === 'purchase')).toHaveLength(3)
+    expect(loadAccountState(defaultState.accountId).transactions.filter((entry) => entry.kind === 'purchase')).toHaveLength(3)
   })
 
   it('deducts the item price from the account balance after purchase', async () => {
@@ -183,7 +208,7 @@ describe('points mall companion catalogue', () => {
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('2,000')
     await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo，360 积分' }))
 
-    const saved = loadState()
+    const saved = loadAccountState(defaultState.accountId)
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('1,640')
     expect(getPointsBalance(saved.transactions)).toBe(1640)
     expect(saved.transactions.filter((entry) => entry.kind === 'purchase')).toMatchObject([
@@ -211,10 +236,23 @@ describe('points mall companion catalogue', () => {
 
     const wardrobe = screen.getByRole('region', { name: '我的 AI 伙伴衣橱' })
     for (const name of ['绒桃 Momo', '云朵 Yunduo', '云朵小背包', '云光花灯']) {
-      expect(within(wardrobe).getByText(name)).toBeInTheDocument()
+      expect(within(wardrobe).getAllByText(name).length).toBeGreaterThan(0)
     }
     expect(within(wardrobe).queryByText('云绽 Cloudbloom')).not.toBeInTheDocument()
     expect(within(wardrobe).queryByText('晨光云杖')).not.toBeInTheDocument()
+  })
+
+  it('shows the equipped loadout on a rotatable dressing stage in My', async () => {
+    const user = userEvent.setup()
+    renderOwnedPrimaryWardrobe()
+
+    await user.click(screen.getByRole('tab', { name: '我的' }))
+
+    const stage = screen.getByRole('region', { name: '当前搭配八方向预览' })
+    expect(within(stage).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(stage).getByTestId('companion-attachment-cloud-flower-lamp')).toBeInTheDocument()
+    await user.click(within(stage).getByRole('button', { name: '向右转动伙伴' }))
+    expect(within(stage).getByTestId('companion-2d')).toHaveAttribute('data-direction', 'front-right')
   })
 
   it('switches to another owned appearance from My while keeping the base appearance non-removable', async () => {
@@ -243,5 +281,86 @@ describe('points mall companion catalogue', () => {
     expect(screen.queryByTestId(testId)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: `装上 ${name}` }))
     expect(screen.getAllByTestId(testId).length).toBeGreaterThan(0)
+  })
+
+  it('restores Momo with no outfit or decoration while keeping purchased items in My', async () => {
+    const user = userEvent.setup()
+    saveState({
+      ...defaultState,
+      companion: {
+        owned: {
+          appearance: ['momo', 'yunduo'],
+          outfit: ['cloud-backpack'],
+          decoration: ['cloud-flower-lamp'],
+        },
+        equipped: {
+          appearance: 'yunduo',
+          outfit: 'cloud-backpack',
+          decoration: 'cloud-flower-lamp',
+        },
+        version: 3,
+      },
+    })
+    render(<AppStateProvider><MallPage onBack={() => undefined} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('tab', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '恢复默认搭配' }))
+
+    const stage = screen.getByRole('region', { name: '当前搭配八方向预览' })
+    expect(within(stage).getByTestId('companion-2d')).toHaveAttribute('data-companion-id', 'momo')
+    expect(within(stage).queryByTestId('companion-outfit')).not.toBeInTheDocument()
+    expect(within(stage).queryByTestId('companion-decoration')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '我的 AI 伙伴衣橱' })).getByText('云朵 Yunduo')).toBeInTheDocument()
+    expect(loadAccountState(defaultState.accountId).companion).toMatchObject({
+      owned: {
+        appearance: ['momo', 'yunduo'],
+        outfit: ['cloud-backpack'],
+        decoration: ['cloud-flower-lamp'],
+      },
+      equipped: { appearance: 'momo', outfit: null, decoration: null },
+    })
+  })
+
+  it('keeps one equipped loadout in login, floating, and mall previews after remounting', async () => {
+    const user = userEvent.setup()
+    const renderSurfaces = () => render(
+      <AppStateProvider>
+        <section aria-label="登录页伙伴预览">
+          <LoginCompanion onBoundsChange={() => undefined} />
+        </section>
+        <section aria-label="应用内悬浮伙伴预览" className="app-frame">
+          <AiCompanion />
+        </section>
+        <MallPage onBack={() => undefined} />
+      </AppStateProvider>,
+    )
+    saveState({
+      ...defaultState,
+      transactions: [{
+        id: 'sync-balance',
+        eventId: 'sync:balance',
+        kind: 'starter',
+        title: '跨页面同步测试积分',
+        amount: 1280,
+        occurredAt: '2026-10-13',
+      }],
+      processedRewardIds: ['sync:balance'],
+    })
+
+    const view = renderSurfaces()
+    await user.click(screen.getByRole('tab', { name: '服饰' }))
+    await user.click(screen.getByRole('button', { name: '购买 云朵小背包，160 积分' }))
+    await user.click(screen.getByRole('button', { name: '现在换上' }))
+
+    expect(within(screen.getByRole('region', { name: '登录页伙伴预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '应用内悬浮伙伴预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '当前搭配八方向预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+
+    view.unmount()
+    renderSurfaces()
+    await user.click(screen.getByRole('tab', { name: '我的' }))
+    expect(within(screen.getByRole('region', { name: '登录页伙伴预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '应用内悬浮伙伴预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '当前搭配八方向预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()
   })
 })

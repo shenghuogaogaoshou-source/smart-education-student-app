@@ -2,16 +2,23 @@ import { render, screen, within, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { createDefaultState } from '../../app/model'
+import { createMemoryWorkRepository } from '../works/memoryRepository'
+import { WorksProvider } from '../works/WorksProvider'
 import { HomeSearch } from './HomeSearch'
 afterEach(cleanup)
 it('finds works, filters categories, opens a result and clears search', async () => {
  const user = userEvent.setup(); const open = vi.fn()
- render(<AppStateProvider><HomeSearch onWorkClick={open} /></AppStateProvider>)
+ const repository = createMemoryWorkRepository()
+ const accountId = createDefaultState().accountId
+ const work = await repository.saveDraft(accountId, { source: 'external-upload', title: '未来图书馆', description: '空间设计', aiTools: ['豆包'], fileName: 'library.txt', blob: new Blob(['library']) })
+ await repository.setStatus(accountId, work.id, 'published')
+ render(<AppStateProvider><WorksProvider accountId={accountId} repository={repository}><HomeSearch onWorkClick={open} /></WorksProvider></AppStateProvider>)
  const input = screen.getByRole('searchbox')
  await user.type(input, '未来图书馆')
  const results = within(screen.getByRole('region', { name: '搜索结果' }))
  await user.click(results.getByRole('button', { name: /未来图书馆/ }))
- expect(open).toHaveBeenCalledWith('work-library')
+ expect(open).toHaveBeenCalledWith(work.id)
  await user.click(results.getByRole('button', { name: '游戏' }))
  expect(results.getByText(/没有找到相关内容/)).toBeInTheDocument()
  await user.click(screen.getByRole('button', { name: '清空搜索' }))

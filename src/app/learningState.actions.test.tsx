@@ -5,6 +5,7 @@ import { AppStateProvider, useAppState } from './AppState'
 import { getGradeBand, getPartIdsForBand, type CoursePartId, type PrimaryGrade } from './learning'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
+import { loadAccountState, saveAccountState } from './companionAccountRepository'
 import { getCourseForBand } from '../features/knowledge/courseCatalog'
 
 const pairedGrade: Record<PrimaryGrade, PrimaryGrade> = {
@@ -25,7 +26,7 @@ function seedEmptyProgress(grade: PrimaryGrade, completedPartIds: CoursePartId[]
     testsPassed: completedPartIds,
   }
   state.processedRewardIds = state.transactions.map((tx) => tx.eventId)
-  localStorage.setItem('student-app-state', JSON.stringify(state))
+  saveAccountState(state.accountId, state)
 }
 
 function Harness({ grade, partId, title, lockedPartId }: {
@@ -87,7 +88,7 @@ describe('learning progress actions', () => {
     expect(screen.getByLabelText('balance')).toHaveTextContent('2100')
     expect(screen.getByLabelText('knowledge')).toHaveTextContent(partId)
     expect(screen.getByLabelText('tests')).toHaveTextContent(partId)
-    let saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+    let saved = loadAccountState(createDefaultState().accountId)
     expect(saved.learningProgress[getGradeBand(grade)].knowledgeCompleted).toEqual([partId])
     expect(saved.learningProgress[getGradeBand(grade)].testsPassed).toEqual([partId])
     for (const [kind, amount] of [['knowledge', 30], ['test', 50], ['medal', 20]] as const) {
@@ -102,7 +103,7 @@ describe('learning progress actions', () => {
     render(<AppStateProvider><Harness grade={grade} partId={partId} title={title} lockedPartId={lockedPartId} /></AppStateProvider>)
     await user.click(screen.getByRole('button', { name: '完成知识' }))
     await user.click(screen.getByRole('button', { name: '通过测试' }))
-    saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+    saved = loadAccountState(createDefaultState().accountId)
     expect(saved.transactions.filter((tx: { eventId: string }) => tx.eventId.endsWith(`:${partId}`))).toHaveLength(3)
     expect(screen.getByLabelText('balance')).toHaveTextContent('2100')
   })
@@ -122,7 +123,7 @@ describe('learning progress actions', () => {
     await user.click(screen.getByRole('button', { name: '切换同段年级' }))
     await user.click(screen.getByRole('button', { name: '完成知识' }))
 
-    const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+    const saved = loadAccountState(createDefaultState().accountId)
     expect(saved.transactions.filter((tx: { eventId: string }) => [
       `knowledge:${finalPart.id}`, `test:${finalPart.id}`, `medal:${finalPart.id}`, `band:${band}`,
     ].includes(tx.eventId)).map((tx: { eventId: string; amount: number }) => [tx.eventId, tx.amount])).toEqual([
@@ -156,7 +157,7 @@ describe('learning progress actions', () => {
 
     expect(screen.getByLabelText('tests')).not.toHaveTextContent(lockedPartId)
     expect(screen.getByLabelText('balance')).toHaveTextContent('2000')
-    const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+    const saved = loadAccountState(createDefaultState().accountId)
     expect(saved.transactions.filter((tx: { eventId: string }) => tx.eventId.endsWith(`:${lockedPartId}`))).toHaveLength(0)
   })
 })

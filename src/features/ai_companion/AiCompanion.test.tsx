@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState } from '../../app/companionAccountRepository'
 import { defaultState } from '../../app/model'
-import { loadState, saveState } from '../../app/storage'
+import { saveState } from '../../app/storage'
 import { AiCompanion } from './AiCompanion'
+import { HANDOFF_DURATION_MS } from './CompanionHandoff'
 import { classifyDemoCommand } from './safety'
 
 const savedMatchMedia = window.matchMedia
@@ -38,7 +40,7 @@ afterEach(() => {
 })
 
 describe('temporary AI companion', () => {
-  it.each(['null', '{bad', JSON.stringify({ version: 1 }), JSON.stringify({ version: 2, appearanceId: 'momo', rect: { width: -1 } })])('discards invalid handoff records without hiding the control', (record) => {
+  it.each(['null', '{bad', JSON.stringify({ version: 2 }), JSON.stringify({ version: 3, companionId: 'momo', loadoutVersion: 1, startRect: { width: -1 }, target: 'floating' })])('discards invalid handoff records without hiding the control', (record) => {
     sessionStorage.setItem('student-app-login-companion-bounds', record)
     render(<AppStateProvider><AiCompanion /></AppStateProvider>)
     expect(screen.getByRole('button', { name: 'AI伙伴' })).toBeVisible()
@@ -58,8 +60,8 @@ describe('temporary AI companion', () => {
     fireEvent.click(control)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(control).toHaveStyle({ left: '247px', top: '574px' })
-    expect(loadState().aiPosition.x).toBeCloseTo(47 / 460)
-    expect(loadState().aiPosition.y).toBeCloseTo(574 / 700)
+    expect(loadAccountState(defaultState.accountId).aiPosition.x).toBeCloseTo(47 / 460)
+    expect(loadAccountState(defaultState.accountId).aiPosition.y).toBeCloseTo(574 / 700)
     view.unmount()
     render(tree)
     expect(screen.getByRole('button', { name: 'AI伙伴' })).toHaveStyle({ left: '247px', top: '574px' })
@@ -74,7 +76,7 @@ describe('temporary AI companion', () => {
     expect(screen.getByTestId('partner-appearance')).toHaveAttribute('data-motion', 'run')
     act(() => vi.advanceTimersByTime(820))
     expect(screen.getByTestId('partner-appearance')).toHaveAttribute('data-motion', 'idle')
-    expect(loadState().aiPosition).toEqual({ x: .88, y: .84 })
+    expect(loadAccountState(defaultState.accountId).aiPosition).toEqual({ x: .88, y: .84 })
   })
 
   it('displays and speaks the proxy reply after long-press speech input using the equipped identity', async () => {
@@ -170,6 +172,8 @@ describe('temporary AI companion', () => {
     expect(within(control).getByTestId('companion-outfit')).toBeInTheDocument()
     expect(within(control).getByTestId('companion-decoration')).toBeInTheDocument()
     await user.click(control)
+    expect(screen.getByRole('status')).toHaveTextContent('继续上次')
+    await user.click(control)
     expect(screen.getByRole('dialog', { name: 'AI 学习伙伴' })).toBeInTheDocument()
   })
 
@@ -186,28 +190,33 @@ describe('temporary AI companion', () => {
       return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect
     })
     sessionStorage.setItem('student-app-login-companion-bounds', JSON.stringify({
-      version: 2,
-      appearanceId: 'momo',
-      rect: { left: 40, top: 80, right: 220, bottom: 260, width: 180, height: 180 },
+      version: 3,
+      companionId: 'momo',
+      loadoutVersion: 1,
+      startRect: { left: 40, top: 80, right: 220, bottom: 260, width: 180, height: 180 },
+      target: 'floating',
     }))
 
     render(<div className="app-frame"><AppStateProvider><AiCompanion /></AppStateProvider></div>)
 
     const handoff = screen.getByTestId('companion-handoff')
     expect(handoff).toHaveAttribute('data-handoff-status', 'running')
-    expect(handoff).toHaveAttribute('data-handoff-motion', 'glide')
+    expect(handoff).toHaveAttribute('data-handoff-motion', 'idle')
     expect(handoff).toHaveStyle({
-      left: '95px',
-      top: '135px',
-      width: '70px',
-      height: '70px',
-      '--handoff-x': '205px',
-      '--handoff-y': '365px',
+      left: '40px',
+      top: '80px',
+      width: '180px',
+      height: '180px',
+      '--handoff-dx': '260px',
+      '--handoff-dy': '420px',
     })
-    expect(handoff.style.getPropertyValue('--handoff-scale')).toBe('')
-    fireEvent.resize(window)
-    act(() => vi.advanceTimersByTime(800))
-    expect(screen.getByTestId('companion-handoff')).toHaveAttribute('data-handoff-status', 'complete')
+    expect(Number(handoff.style.getPropertyValue('--handoff-scale-x'))).toBeCloseTo(70 / 180)
+    act(() => vi.advanceTimersByTime(260))
+    expect(screen.getByTestId('companion-handoff')).toHaveAttribute('data-handoff-motion', 'wave')
+    act(() => vi.advanceTimersByTime(350))
+    expect(screen.getByTestId('companion-handoff')).toHaveAttribute('data-handoff-motion', 'walk')
+    act(() => vi.advanceTimersByTime(HANDOFF_DURATION_MS))
+    expect(screen.queryByTestId('companion-handoff')).not.toBeInTheDocument()
     expect(sessionStorage.getItem('student-app-login-companion-bounds')).toBeNull()
   })
 
@@ -218,9 +227,11 @@ describe('temporary AI companion', () => {
       value: vi.fn().mockReturnValue({ matches: true }),
     })
     sessionStorage.setItem('student-app-login-companion-bounds', JSON.stringify({
-      version: 2,
-      appearanceId: 'momo',
-      rect: { left: 40, top: 80, right: 220, bottom: 260, width: 180, height: 180 },
+      version: 3,
+      companionId: 'momo',
+      loadoutVersion: 1,
+      startRect: { left: 40, top: 80, right: 220, bottom: 260, width: 180, height: 180 },
+      target: 'floating',
     }))
 
     render(<AppStateProvider><AiCompanion /></AppStateProvider>)
@@ -238,13 +249,29 @@ describe('temporary AI companion', () => {
     expect(classifyDemoCommand('打开我的作品')).toBe('safe')
   })
 
-  it('opens the AI learning assistant on tap', async () => {
+  it('shows a page-aware reaction first and opens the assistant on a second tap', async () => {
     const user = userEvent.setup()
     render(<AppStateProvider><AiCompanion /></AppStateProvider>)
+    const companion = screen.getByRole('button', { name: 'AI伙伴' })
+
+    await user.click(companion)
+    expect(screen.getByRole('status')).toHaveTextContent('继续上次')
+    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
+
+    await user.click(companion)
+    expect(screen.getByRole('dialog', { name: 'AI 学习伙伴' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '输入想问的问题' })).toBeInTheDocument()
+  })
+
+  it('keeps test-map taps as short level reactions instead of opening the full assistant', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><AiCompanion placement="test-map" mapTarget={{ id: 'a', x: 30, y: 40 }} /></AppStateProvider>)
 
     await user.click(screen.getByRole('button', { name: 'AI伙伴' }))
-    expect(screen.getByRole('dialog', { name: 'AI 学习伙伴' })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('发消息...')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'AI伙伴' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('关')
+    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
   })
 
   it('starts voice listening in a small companion bubble after a deliberate long press', () => {
@@ -266,5 +293,26 @@ describe('temporary AI companion', () => {
     expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('请说，我在听')
     expect(recognition.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts voice capture on pointer cancel instead of submitting a partial question', () => {
+    vi.useFakeTimers()
+    const recognition = {
+      lang: '', continuous: false, interimResults: false, maxAlternatives: 0,
+      onresult: null, onerror: null, onend: null,
+      start: vi.fn(), stop: vi.fn(), abort: vi.fn(),
+    }
+    const SpeechRecognitionMock = function () { return recognition } as unknown as new () => typeof recognition
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: SpeechRecognitionMock })
+    render(<AppStateProvider><AiCompanion /></AppStateProvider>)
+    const control = screen.getByRole('button', { name: 'AI伙伴' })
+
+    fireEvent.pointerDown(control, { clientX: 300, clientY: 500, pointerId: 11 })
+    act(() => vi.advanceTimersByTime(650))
+    fireEvent.pointerCancel(control, { clientX: 300, clientY: 500, pointerId: 11 })
+
+    expect(recognition.abort).toHaveBeenCalledTimes(1)
+    expect(recognition.stop).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
   })
 })

@@ -1,0 +1,401 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#root { height: 100dvh; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.app-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--surface); color: var(--ink); font-weight: bold; flex-shrink: 0; }
+.app-button:disabled { opacity: .4; }
+.app-button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+.canvas-app-actions { position: absolute; top: 16px; left: 16px; z-index: 5; display: flex; gap: 10px; }
+.market-entry { background: var(--amber-bright); box-shadow: 3px 3px 0 var(--ink); }
+.canvas-touch-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); pointer-events: none; font-size: 12px; white-space: nowrap; background: var(--surface); border-radius: 20px; padding: 5px 12px; }
+.app-panel { padding: 0; border: 0; color: var(--text); background: var(--surface); max-width: none; max-height: none; overflow: hidden; }
+.app-panel::backdrop { background: rgb(42 36 21 / 35%); }
+.panel-content { height: 100%; min-height: 0; }
+.market-screen { inset: 0; width: 100%; height: 100dvh; margin: 0; padding: env(safe-area-inset-top) max(0px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0px, env(safe-area-inset-left)); }
+.market-screen aside { border: 0; max-width: 900px; margin: auto; }
+.inspector-sheet { inset: auto 0 0; margin: 0 auto; width: 100%; height: calc(100dvh * 2 / 3); border: 2px solid var(--ink); border-bottom: 0; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -10px 40px #2a241522; }
+.inspector-sheet aside { border: 0; }
+.inspector-sheet button { min-height: 44px; min-width: 44px; }
+.react-flow__node { -webkit-touch-callout: none; }
+.app-toolbar { flex-shrink: 0; }
+.app-status { flex-shrink: 0; }
+@container phone (max-width: 767px) {
+  .app-toolbar { height: auto; min-height: 104px; flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+  .app-toolbar > div:first-child { width: 100%; }
+  .app-toolbar > div:nth-child(2), .app-toolbar > div:nth-last-child(2), .app-toolbar > div:last-child > div { display: none; }
+  .app-toolbar button, .level-app header button { min-height: 44px; }
+  .app-toolbar > div:last-child { margin-left: auto; }
+  .app-status { display: none; }
+  .react-flow__minimap { display: none; }
+  .react-flow__controls { bottom: 45px; }
+  .react-flow__controls-button { width: 36px; height: 36px; }
+  .react-flow__handle { min-width: 18px; min-height: 18px; }
+  .canvas-app-actions { top: 12px; left: 12px; }
+  .canvas-touch-hint { font-size: 11px; bottom: 8px; }
+  .market-screen input, .inspector-sheet input, .inspector-sheet select, .inspector-sheet textarea { font-size: 16px; }
+  .level-app header { height: auto; flex-wrap: wrap; padding: 8px; gap: 8px; }
+  .level-app header > div:last-child { overflow-x: auto; max-width: 100%; }
+  .level-scene { height: 180px; }
+  .level-guide { display: none; }
+}
+
+:root {
+  /* 纸张底色 */
+  --bg: #f4ead5;
+  --surface: #fdf6e3;
+  --surface-2: #f0e6cc;
+  --surface-3: #e8dcc0;
+  --border: #c9b896;
+  --border-bright: #7a6a4a;
+  /* 复古蜡笔 accent */
+  --amber: #d4a04a;
+  --amber-bright: #e8c878;
+  --amber-dim: #a87a2e;
+  --cyan: #6ba3c3;
+  --green: #8aab6e;
+  --red: #c66b5a;
+  --violet: #a888c7;
+  --orange: #d4825a;
+  /* 墨色文字 */
+  --text: #3d3422;
+  --text-dim: #6b5d3f;
+  --text-faint: #9a8a6a;
+  --ink: #2a2415;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  /* 正文用手写体 */
+  font-family: 'Patrick Hand', 'Kalam', ui-sans-serif, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  /* 自定义手形光标：图片路径 + 热点坐标(x,y) + 兜底指针 */
+  cursor: url('/cursor_hand.png') 4 2, pointer;
+}
+
+/* 兜底：若自定义光标加载失败，所有元素仍用系统 pointer */
+button,
+a,
+[role='button'],
+[class*='cursor-pointer'],
+.react-flow__node,
+.react-flow__handle {
+  cursor: url('/cursor_hand.png') 4 2, pointer;
+}
+
+/* 文本输入/选择区域 —— 使用文本选择光标 + 同一手形图标兜底 */
+input,
+textarea,
+[contenteditable='true'] {
+  cursor: text;
+}
+
+/* ============================================================
+   纸张纹理 —— 多层水彩纸颗粒 + 边缘晕染
+   ============================================================ */
+.paper-bg {
+  background-color: var(--bg);
+  /* 水彩纸颗粒 + 大面积色斑模拟水彩晕染 */
+  background-image:
+    /* 颗粒噪点 */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.20 0 0 0 0 0.13 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* 暖色水彩晕染 */
+    radial-gradient(900px 500px at 8% 0%, rgba(212, 160, 74, 0.12), transparent 60%),
+    radial-gradient(800px 460px at 92% 6%, rgba(107, 163, 195, 0.10), transparent 60%),
+    radial-gradient(700px 420px at 50% 100%, rgba(168, 136, 199, 0.08), transparent 65%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+}
+
+/* 面包板点阵 → 改为手绘网格纸（淡蓝格线，像方格本） */
+.breadboard-bg {
+  background-color: var(--bg);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.20 0 0 0 0 0.13 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* 方格本淡线 */
+    linear-gradient(rgba(107, 163, 195, 0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(107, 163, 195, 0.10) 1px, transparent 1px),
+    radial-gradient(900px 500px at 10% 0%, rgba(212, 160, 74, 0.10), transparent 60%),
+    radial-gradient(800px 460px at 90% 8%, rgba(138, 171, 110, 0.08), transparent 60%);
+  background-size: 180px 180px, 24px 24px, 24px 24px, auto, auto;
+  background-repeat: repeat, repeat, repeat, no-repeat, no-repeat;
+}
+
+/* 顶部水彩氛围（保留柔和晕染） */
+.lab-aurora {
+  position: relative;
+}
+.lab-aurora::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 380px at 14% -12%, rgba(212, 160, 74, 0.18), transparent 60%),
+    radial-gradient(800px 360px at 86% -10%, rgba(107, 163, 195, 0.14), transparent 60%);
+  pointer-events: none;
+}
+
+/* 滚动条 —— 纸卷感 */
+.level-adventure-scroll {
+  scrollbar-width: none;
+}
+
+.level-adventure-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(201, 184, 150, 0.25);
+}
+::-webkit-scrollbar-thumb {
+  background: #b5a07a;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8a6a3e;
+  background-clip: content-box;
+}
+
+::selection {
+  background: rgba(212, 160, 74, 0.35);
+  color: var(--ink);
+}
+
+/* ============================================================
+   手绘漫画分镜边框 —— 粗墨线 + 硬偏移阴影
+   ============================================================ */
+.comic-panel {
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 0 var(--ink);
+  background: var(--surface);
+}
+.comic-panel-sm {
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 0 var(--ink);
+  background: var(--surface);
+}
+
+/* 水彩色块（节点 header 等） */
+.watercolor-tint {
+  position: relative;
+}
+.watercolor-tint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  filter: blur(1px) saturate(0.85);
+  opacity: 0.55;
+  border-radius: inherit;
+  z-index: -1;
+}
+
+/* ---------- React Flow 主题覆盖 ---------- */
+.react-flow {
+  background: transparent;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__edge-path {
+  stroke: var(--border-bright);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path {
+  stroke: var(--amber);
+}
+
+/* 端口手绘圆点 */
+.react-flow__handle {
+  width: 13px;
+  height: 13px;
+  border: 2.5px solid var(--ink);
+  background: var(--surface-3);
+  border-radius: 50%;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.react-flow__handle:hover {
+  transform: scale(1.3);
+}
+
+/* 节点层始终在 pane 之上，确保可点击 */
+.react-flow__node {
+  cursor: pointer;
+}
+.react-flow__node.selected {
+  z-index: 10 !important;
+}
+
+.react-flow__controls {
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 0 var(--ink);
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: transparent;
+  border-bottom: 1.5px solid var(--border);
+  color: var(--text-dim);
+  fill: var(--text-dim);
+}
+.react-flow__controls-button:hover {
+  background: var(--surface-2);
+  color: var(--amber-dim);
+  fill: var(--amber-dim);
+}
+
+.react-flow__minimap {
+  background: var(--surface) !important;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 0 var(--ink);
+  overflow: hidden;
+}
+
+/* 连线端口类型颜色 —— 蜡笔色 */
+.handle-image {
+  background: var(--cyan) !important;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+.handle-label {
+  background: var(--amber) !important;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+.handle-confidence {
+  background: var(--violet) !important;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+.handle-signal {
+  background: var(--green) !important;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* ============================================================
+   动画
+   ============================================================ */
+@keyframes flowPulse {
+  0% { offset-distance: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+@keyframes signalGlow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* 数据流虚线流动（内联样式引用，须在全局定义） */
+@keyframes flowDash {
+  to { stroke-dashoffset: -18; }
+}
+
+.scanline {
+  animation: scanline 2.6s linear infinite;
+}
+
+.spin-slow {
+  animation: spinSlow 2.4s linear infinite;
+}
+
+.blink {
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+/* ============================================================
+   工具类
+   ============================================================ */
+.glass {
+  background: linear-gradient(180deg, rgba(240, 230, 204, 0.92), rgba(253, 246, 227, 0.95));
+  backdrop-filter: blur(6px);
+}
+
+/* 小标签：手写体大写感 */
+.chip {
+  font-family: 'Kalam', 'Patrick Hand', cursive;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+/* 手绘标题字 */
+.handwritten {
+  font-family: 'Caveat', 'Patrick Hand', cursive;
+}
+
+/* 节点标题栏：水彩渐变 */
+.node-header {
+  background: linear-gradient(180deg, rgba(232, 220, 192, 0.9), rgba(240, 230, 204, 0.95));
+}
+
+/* 代码块：墨水笔记本风 */
+.code-block {
+  font-family: 'IBM Plex Mono', monospace;
+  background:
+    repeating-linear-gradient(
+      transparent,
+      transparent 17px,
+      rgba(107, 163, 195, 0.15) 17px,
+      rgba(107, 163, 195, 0.15) 18px
+    ),
+    var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+
+html body #root { height: 100dvh; }
+
+.mobile-hints { display: none; }
+@container phone (max-width: 767px) { .mobile-hints { display: inline-flex; } .app-toolbar > div:last-child { gap: 8px; } }
+
+/* Fixed phone-sized application viewport on desktop. */
+html, body { height: 100%; overflow: hidden; }
+body { display: grid; place-items: center; background: #ddd8cf; }
+html body #root { container: phone / inline-size; width: min(390px, 100vw); height: min(844px, 100dvh); overflow: hidden; position: relative; transform: translateZ(0); border-radius: 28px; box-shadow: 0 16px 64px #29241930; }
+.market-screen { width: min(390px, 100vw); height: min(844px, 100dvh); margin: auto; border-radius: 28px; }
+.inspector-sheet { width: min(390px, 100vw); height: min(calc(844px * 2 / 3), calc(100dvh * 2 / 3)); bottom: max(0px, calc((100dvh - 844px) / 2)); }
+@media (max-width: 430px) { html body #root { height: 100dvh; border-radius: 0; box-shadow: none; } .market-screen { border-radius: 0; height: 100dvh; } .inspector-sheet { bottom: 0; height: calc(100dvh * 2 / 3); } }

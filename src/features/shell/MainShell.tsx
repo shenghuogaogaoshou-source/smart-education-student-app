@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { getGradeBand } from '../../app/learning'
 import { AiCompanion } from '../ai_companion/AiCompanion'
+import { AppCommandProvider, useAppCommand, useOptionalAppCommand } from '../ai_companion/commands/AppCommandContext'
+import type { CompanionCommand } from '../ai_companion/commands/commandTypes'
+import { EmbeddedGamePage } from '../games/EmbeddedGamePage'
+import type { GameId } from '../games/gameRegistry'
 import { HomePage } from '../home/HomePage'
 import { NotificationsPage } from '../home/NotificationsPage'
 import { AiCenterPage } from '../profile/AiCenterPage'
@@ -25,6 +29,7 @@ import { WorksGalleryPage } from '../works/WorksGalleryPage'
 import { WorkDetailPage } from '../works/WorkDetailPage'
 import { CourseContentPage } from '../knowledge/CourseContentPage'
 import { KnowledgePage } from '../knowledge/KnowledgePage'
+import { getCourseForBand } from '../knowledge/courseCatalog'
 import { TestPage } from '../test/TestPage'
 import { BottomNavigation, type MainTab } from './BottomNavigation'
 import './shell.css'
@@ -32,7 +37,7 @@ import './shell.css'
 // 导航栈中的视图。每个实例携带唯一 id，用于按实例记忆/恢复滚动位置。
 type View =
   | { kind: 'tab'; id: number }
-  | { kind: 'settings'; id: number }
+  | { kind: 'settings'; id: number; initialDetail?: string }
   | { kind: 'work'; id: number; workId: string }
   | { kind: 'tools'; id: number }
   | { kind: 'medals'; id: number }
@@ -51,14 +56,31 @@ type View =
   | { kind: 'ai-center'; id: number }
   | { kind: 'works-manage'; id: number; filter?: string }
   | { kind: 'continue-create'; id: number }
+  | { kind: 'embedded-game'; id: number; gameId: GameId }
   | { kind: 'course-content'; id: number; courseId: string; chapterNum: number }
 
 export function MainShell() {
+  const inheritedCommands = useOptionalAppCommand()
+  if (inheritedCommands) return <MainShellBody />
+  return (
+    <AppCommandProvider>
+      <MainShellBody />
+    </AppCommandProvider>
+  )
+}
+
+function MainShellBody() {
   const { state } = useAppState()
+  const commandContext = useAppCommand()
   const shellClassName = `main-shell main-shell--${getGradeBand(state.grade)}`
   const [activeTab, setActiveTab] = useState<MainTab>('home')
   const [stack, setStack] = useState<View[]>([{ kind: 'tab', id: 0 }])
   const view = stack[stack.length - 1]
+  const companionScene = view.kind === 'mall'
+    ? 'mall'
+    : activeTab === 'knowledge' || view.kind === 'course-content'
+      ? 'knowledge'
+      : 'home'
   const nextIdRef = useRef(1)
   // 每个视图实例的滚动位置：push 时在点击现场保存（此时旧视图仍挂载，
   // scrollY 准确），pop 后恢复，使返回回到进入前的地方。
@@ -92,11 +114,110 @@ export function MainShell() {
     ])
   }
 
+  const openProfileView = (nextView: DistributiveOmit<View, 'id'>) => {
+    setActiveTab('profile')
+    push(nextView)
+  }
+
+  const executeCompanionCommand = (command: CompanionCommand) => {
+    const band = getGradeBand(state.grade)
+    const course = getCourseForBand(band)
+
+    switch (command.type) {
+      case 'navigate':
+        if (command.target === 'home' || command.target === 'knowledge' || command.target === 'test' || command.target === 'profile') {
+          selectTab(command.target)
+        } else if (command.target === 'settings') {
+          push({ kind: 'settings' })
+        } else if (command.target === 'mall') {
+          openProfileView({ kind: 'mall' })
+        } else if (command.target === 'points') {
+          openProfileView({ kind: 'points' })
+        } else if (command.target === 'medals') {
+          openProfileView({ kind: 'medals' })
+        } else {
+          openProfileView({ kind: 'schedule' })
+        }
+        return
+      case 'continue-learning': {
+        const completedPartIds = state.learningProgress[band].knowledgeCompleted
+        const latestPartId = completedPartIds[completedPartIds.length - 1]
+        const latestPart = course.parts.find((part) => part.id === latestPartId)
+        if (latestPart) openKnowledgeContent(course.id, latestPart.number)
+        else selectTab('knowledge')
+        return
+      }
+      case 'resume-game':
+        push({ kind: 'continue-create' })
+        return
+      case 'search-course':
+        selectTab('knowledge')
+        return
+      case 'play-course': {
+        const requestedPart = course.id === command.courseId
+          ? course.parts.find((part) => part.number === (command.chapterNum ?? 1))
+          : undefined
+        if (requestedPart) openKnowledgeContent(course.id, requestedPart.number)
+        else selectTab('knowledge')
+        return
+      }
+      case 'show-points':
+        openProfileView({ kind: 'points' })
+        return
+      case 'show-medals':
+        openProfileView({ kind: 'medals' })
+        return
+      case 'submit-test':
+        selectTab('test')
+        return
+      case 'publish-work':
+        openProfileView({ kind: 'works-manage' })
+        return
+      case 'post-comment':
+        push({ kind: 'work', workId: command.workId })
+        return
+      case 'update-schedule':
+        openProfileView({ kind: 'schedule' })
+        return
+      case 'replace-progress': {
+        const partMatch = /^([a-z0-9]+)-(\d+)$/i.exec(command.partId)
+        const requestedPart = partMatch?.[1] === course.id
+          ? course.parts.find((part) => part.number === Number(partMatch[2]))
+          : undefined
+        if (requestedPart) openKnowledgeContent(course.id, requestedPart.number)
+        else selectTab('knowledge')
+        return
+      }
+      case 'update-account-security':
+      case 'sign-out-devices':
+      case 'delete-account':
+        push({ kind: 'settings', initialDetail: 'security' })
+        return
+      case 'view-guardian':
+      case 'update-guardian':
+        push({ kind: 'settings', initialDetail: 'guardian' })
+        return
+      case 'clear-account-data':
+        push({ kind: 'settings', initialDetail: 'storage' })
+        return
+      case 'purchase':
+      case 'equip':
+      case 'unequip':
+        return
+    }
+  }
+
+  useEffect(() => commandContext.registerExecutor(executeCompanionCommand))
+
   if (view.kind === 'settings') {
     return (
       <main className={shellClassName}>
-        <SettingsPage onBack={pop} onOpenMall={() => push({ kind: 'mall' })} />
-        <AiCompanion />
+        <SettingsPage
+          initialDetail={view.initialDetail}
+          onBack={pop}
+          onOpenMall={() => push({ kind: 'mall' })}
+        />
+        <AiCompanion scene={companionScene} />
       </main>
     )
   }
@@ -124,7 +245,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <LearningSchedulePage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -134,7 +255,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <CalendarPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -144,7 +265,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <WorksGalleryPage onBack={pop} onWorkClick={(workId) => push({ kind: 'work', workId })} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -154,7 +275,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <WorkDetailPage workId={view.workId} onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -164,7 +285,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <LearningToolsDetailPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -174,7 +295,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <MedalsPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -184,7 +305,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <PointsPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -194,7 +315,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <MallPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -204,7 +325,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <RankingPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -214,7 +335,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <WrongBookPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -224,7 +345,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <FavoritesPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -234,7 +355,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <HistoryPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -244,7 +365,7 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <AiCenterPage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -255,10 +376,17 @@ export function MainShell() {
       <main className={shellClassName}>
         <WorksManagePage
           onBack={pop}
-          onContinueCreate={() => push({ kind: 'continue-create' })}
+          onWorkClick={(workId) => push({ kind: 'work', workId })}
+          onContinueCreate={(work) => {
+            if (work?.source === 'brain-film' || work?.source === 'creative-module') {
+              push({ kind: 'embedded-game', gameId: work.source })
+            } else {
+              push({ kind: 'continue-create' })
+            }
+          }}
           initialFilter={view.filter}
         />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -268,8 +396,16 @@ export function MainShell() {
     return (
       <main className={shellClassName}>
         <ContinueCreatePage onBack={pop} />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
+      </main>
+    )
+  }
+
+  if (view.kind === 'embedded-game') {
+    return (
+      <main className={shellClassName}>
+        <EmbeddedGamePage gameId={view.gameId} onBack={pop} />
       </main>
     )
   }
@@ -283,7 +419,7 @@ export function MainShell() {
           onBack={pop}
           onStartTest={() => selectTab('test')}
         />
-        <AiCompanion />
+        <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
     )
@@ -299,6 +435,7 @@ export function MainShell() {
             onOpenNotifications={() => push({ kind: 'notifications' })}
             onNavigateToKnowledge={() => selectTab('knowledge')}
             onOpenContent={(courseId, chapterNum) => push({ kind: 'course-content', courseId, chapterNum })}
+            onOpenGame={(gameId) => push({ kind: 'embedded-game', gameId })}
           />
         )}
         {activeTab === 'knowledge' && (
@@ -328,7 +465,7 @@ export function MainShell() {
           />
         )}
       </div>
-      {activeTab !== 'test' && <AiCompanion placement="floating" />}
+      {activeTab !== 'test' && <AiCompanion placement="floating" scene={companionScene} />}
       <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
     </main>
   )

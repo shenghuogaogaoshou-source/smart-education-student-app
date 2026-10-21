@@ -1,7 +1,7 @@
 import type { LearningProgress, PrimaryGrade } from './learning'
 import type { PointTransaction } from './points'
 
-export const APP_STATE_VERSION = 2 as const
+export const APP_STATE_VERSION = 3 as const
 
 export type FontScale = 'standard' | 'large' | 'xlarge'
 
@@ -28,6 +28,14 @@ export type VoiceMode = 'warm' | 'bright' | 'calm'
 export type SafeMode = 'strict' | 'standard' | 'relaxed'
 export type ContentLevel = 'general' | 'teen' | 'child'
 export type PermissionStatus = 'granted' | 'denied' | 'prompt'
+export type VoiceReplyMode = 'always' | 'voice-only' | 'silent'
+
+export type ConversationSummary = {
+  id: string
+  topic: string
+  summary: string
+  occurredAt: string
+}
 
 export type CompanionCategory = 'appearance' | 'outfit' | 'decoration'
 
@@ -65,9 +73,12 @@ export type AppState = {
   voiceEnabled: boolean
   autoListenEnabled: boolean
   voiceMode: VoiceMode
+  voiceReplyMode: VoiceReplyMode
+  reduceMotion: boolean
   saveHistory: boolean
   aiMemoryEnabled: boolean
   historyCount: number
+  conversationSummaries: ConversationSummary[]
   confirmDangerous: boolean
   guardianApprove: boolean
   safeMode: SafeMode
@@ -142,9 +153,12 @@ export function createDefaultState(): AppState {
     voiceEnabled: true,
     autoListenEnabled: false,
     voiceMode: 'warm',
+    voiceReplyMode: 'voice-only',
+    reduceMotion: false,
     saveHistory: true,
     aiMemoryEnabled: true,
     historyCount: 47,
+    conversationSummaries: [],
     confirmDangerous: true,
     guardianApprove: false,
     safeMode: 'strict',
