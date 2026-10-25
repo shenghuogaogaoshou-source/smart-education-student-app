@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { getGradeBand, getPartIdsForBand, type CoursePartId, type PrimaryGrade } from './learning'
 import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type CompanionLoadout, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from './model'
+import { normalizeLearningPlan, type DailyAvailability, type LearningPlanTask } from './learningPlan'
 import { applyTransactionOnce, buildProgressRewardTransactions, getPointsBalance } from './points'
 import { loadAccountState, peekAccountCompanion, saveAccountState } from './companionAccountRepository'
 import { useOptionalSessionCredential } from '../features/auth/sessionCredential'
@@ -16,6 +17,11 @@ type Action =
   | { type: 'set-grade'; grade: PrimaryGrade }
   | { type: 'complete-knowledge'; partId: CoursePartId; title: string; occurredAt: string }
   | { type: 'pass-test'; partId: CoursePartId; title: string; occurredAt: string }
+  | { type: 'replace-learning-plan'; tasks: LearningPlanTask[]; source: 'student' | 'ai' | 'fallback' }
+  | { type: 'upsert-plan-task'; task: LearningPlanTask }
+  | { type: 'remove-plan-task'; id: string }
+  | { type: 'reorder-plan-tasks'; date: string; ids: string[] }
+  | { type: 'set-plan-availability'; availability: DailyAvailability[] }
   | { type: 'replace-account'; state: AppState }
   | { type: 'logout' }
   | { type: 'set-font-scale'; scale: FontScale }
@@ -134,11 +140,109 @@ function purchase(
   }
 }
 
+function currentPlan(state: AppState, now: Date) {
+  return normalizeLearningPlan(state.learningPlan, state.learningPlan, now, state.grade)
+}
+
+function normalizedPlan(
+  state: AppState,
+  tasks: LearningPlanTask[],
+  availability: DailyAvailability[],
+  now: Date,
+) {
+  return normalizeLearningPlan({ ...state.learningPlan, tasks, availability }, state.learningPlan, now, state.grade)
+}
+
+function replaceLearningPlan(
+  state: AppState,
+  action: Extract<Action, { type: 'replace-learning-plan' }>,
+) {
+  const now = new Date()
+  const refreshed = currentPlan(state, now)
+  const activeDates = new Set(refreshed.availability.map((day) => day.date))
+  const history = refreshed.tasks.filter((task) => !activeDates.has(task.date))
+  const replacement = action.tasks
+    .filter((task) => activeDates.has(task.date))
+    .map((task) => ({ ...task, source: action.source }))
+  return {
+    ...state,
+    learningPlan: normalizedPlan(state, [...history, ...replacement], refreshed.availability, now),
+  }
+}
+
+function upsertPlanTask(
+  state: AppState,
+  action: Extract<Action, { type: 'upsert-plan-task' }>,
+) {
+  const now = new Date()
+  const refreshed = currentPlan(state, now)
+  const activeDates = new Set(refreshed.availability.map((day) => day.date))
+  if (!activeDates.has(action.task.date)) return state
+  const tasks = [
+    ...refreshed.tasks.filter((task) => task.id !== action.task.id || !activeDates.has(task.date)),
+    action.task,
+  ]
+  return {
+    ...state,
+    learningPlan: normalizedPlan(state, tasks, refreshed.availability, now),
+  }
+}
+
+function reorderPlanTasks(
+  state: AppState,
+  action: Extract<Action, { type: 'reorder-plan-tasks' }>,
+) {
+  const now = new Date()
+  const refreshed = currentPlan(state, now)
+  if (!refreshed.availability.some((day) => day.date === action.date)) return state
+
+  const dailyTasks = refreshed.tasks
+    .filter((task) => task.date === action.date)
+    .sort((left, right) => left.order - right.order)
+  const byId = new Map(dailyTasks.map((task) => [task.id, task]))
+  const orderedIds = [...new Set(action.ids)].filter((id) => byId.has(id))
+  for (const task of dailyTasks) {
+    if (!orderedIds.includes(task.id)) orderedIds.push(task.id)
+  }
+  const orderedTasks = orderedIds.map((id, index) => ({ ...byId.get(id)!, order: index }))
+  let orderedIndex = 0
+  const tasks = refreshed.tasks.map((task) => task.date === action.date
+    ? orderedTasks[orderedIndex++]
+    : task)
+  return {
+    ...state,
+    learningPlan: normalizedPlan(state, tasks, refreshed.availability, now),
+  }
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'set-grade': return { ...state, grade: action.grade }
     case 'complete-knowledge':
     case 'pass-test': return updateProgress(state, action)
+    case 'replace-learning-plan': return replaceLearningPlan(state, action)
+    case 'upsert-plan-task': return upsertPlanTask(state, action)
+    case 'remove-plan-task': {
+      const now = new Date()
+      const refreshed = currentPlan(state, now)
+      return {
+        ...state,
+        learningPlan: normalizedPlan(
+          state,
+          refreshed.tasks.filter((task) => task.id !== action.id),
+          refreshed.availability,
+          now,
+        ),
+      }
+    }
+    case 'reorder-plan-tasks': return reorderPlanTasks(state, action)
+    case 'set-plan-availability': {
+      const now = new Date()
+      return {
+        ...state,
+        learningPlan: normalizedPlan(state, state.learningPlan.tasks, action.availability, now),
+      }
+    }
     case 'replace-account': return action.state
     case 'logout': return { ...state, isLoggedIn: false }
     case 'set-font-scale': return { ...state, fontScale: action.scale }
@@ -216,6 +320,11 @@ type AppStateContextValue = {
   setGrade: (grade: PrimaryGrade) => void
   completeKnowledge: (partId: CoursePartId, title: string) => void
   passTest: (partId: CoursePartId, title: string) => void
+  replaceLearningPlan: (tasks: LearningPlanTask[], source: 'student' | 'ai' | 'fallback') => void
+  upsertPlanTask: (task: LearningPlanTask) => void
+  removePlanTask: (id: string) => void
+  reorderPlanTasks: (date: string, ids: string[]) => void
+  setPlanAvailability: (availability: DailyAvailability[]) => void
   login: (accountId: string) => void
   logout: () => void
   previewCompanion: (accountId: string) => CompanionLoadout
@@ -282,6 +391,11 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setGrade: (grade) => dispatch({ type: 'set-grade', grade }),
     completeKnowledge: (partId, title) => dispatch({ type: 'complete-knowledge', partId, title, occurredAt: new Date().toISOString() }),
     passTest: (partId, title) => dispatch({ type: 'pass-test', partId, title, occurredAt: new Date().toISOString() }),
+    replaceLearningPlan: (tasks, source) => dispatch({ type: 'replace-learning-plan', tasks, source }),
+    upsertPlanTask: (task) => dispatch({ type: 'upsert-plan-task', task }),
+    removePlanTask: (id) => dispatch({ type: 'remove-plan-task', id }),
+    reorderPlanTasks: (date, ids) => dispatch({ type: 'reorder-plan-tasks', date, ids }),
+    setPlanAvailability: (availability) => dispatch({ type: 'set-plan-availability', availability }),
     login: (accountId) => {
       const next = { ...loadAccountState(accountId), isLoggedIn: true }
       saveAccountState(accountId, next)
