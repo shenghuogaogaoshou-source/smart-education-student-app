@@ -11,7 +11,13 @@ const FOCUSABLE = [
 
 function focusableElements(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
-    .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true')
+    .filter((element) => {
+      const style = window.getComputedStyle(element)
+      return element.tabIndex >= 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && !element.closest('[hidden], [aria-hidden="true"], [inert], fieldset[disabled]')
+    })
 }
 
 export function useDialogFocus<T extends HTMLElement>(

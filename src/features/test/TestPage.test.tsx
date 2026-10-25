@@ -86,6 +86,21 @@ describe('TestPage', () => {
     expect(node).toHaveFocus()
   })
 
+  it('returns focus to the map node after closing the quiz launched from its introduction', async () => {
+    const user = userEvent.setup()
+    renderMap({ grade: 'grade5' })
+
+    const node = screen.getByRole('button', { name: '算法工具箱 · 当前关卡' })
+    await user.click(node)
+    await user.click(screen.getByRole('button', { name: '开始答题' }))
+
+    const quiz = screen.getByRole('dialog', { name: '算法工具箱答题' })
+    await user.click(within(quiz).getByRole('button', { name: '关闭' }))
+
+    expect(screen.queryByRole('dialog', { name: '算法工具箱答题' })).not.toBeInTheDocument()
+    expect(node).toHaveFocus()
+  })
+
   it('focuses the requested unlocked plan test and opens its introduction', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
       if (this.classList.contains('test-route-canvas')) return 900
