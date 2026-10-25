@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
 import { LearningSchedulePage } from './LearningSchedulePage'
 
@@ -36,6 +36,7 @@ function mockElementFromPoint(element: Element) {
 
 describe('LearningSchedulePage', () => {
   beforeEach(() => localStorage.clear())
+  afterEach(() => vi.unstubAllGlobals())
 
   async function addTodayCourse(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: '添加学习内容' }))
@@ -236,5 +237,42 @@ describe('LearningSchedulePage', () => {
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent('预计时长需要填写 5—90 分钟。')
     expect(dialog).toBeInTheDocument()
+  })
+
+  it('opens AI planning and writes a confirmed suggestion into the formal schedule', async () => {
+    const user = userEvent.setup()
+    const now = new Date().toISOString()
+    const suggestedTask = {
+      id: 'ai-page-suggestion',
+      grade: 'grade5',
+      partId: 'ael-4',
+      kind: 'knowledge',
+      title: 'AI 安排测试',
+      date: localDate(1),
+      time: '18:30',
+      minutes: 15,
+      order: 0,
+      source: 'ai',
+      review: false,
+      createdAt: now,
+      updatedAt: now,
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      tasks: [suggestedTask],
+      weekSummary: '从一次小探索开始。',
+      reasons: { 'ai-page-suggestion': '先认识实验目标，再动手探索。' },
+    }), { status: 200 })))
+    renderSchedule()
+
+    await user.click(screen.getByRole('button', { name: 'AI 帮我安排' }))
+    expect(screen.getByRole('region', { name: 'AI 帮我安排' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    expect(await screen.findByRole('heading', { name: '安排预览' })).toBeInTheDocument()
+    expect(screen.getByLabelText('正式计划')).not.toHaveTextContent('AI 安排测试')
+
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+
+    const tomorrow = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
+    expect(within(tomorrow).getByText('AI 安排测试')).toBeInTheDocument()
   })
 })

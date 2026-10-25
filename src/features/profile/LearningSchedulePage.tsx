@@ -12,6 +12,7 @@ import {
   FlaskConical,
   GripVertical,
   Pencil,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -26,6 +27,7 @@ import { useAppState } from '../../app/AppState'
 import { getGradeBand, isTestUnlocked, type LearningProgress } from '../../app/learning'
 import { getTaskCompletion, getTaskTiming, type LearningPlanTask } from '../../app/learningPlan'
 import { getCourseForBand } from '../knowledge/courseCatalog'
+import { AiSchedulePanel } from './AiSchedulePanel'
 import { LearningContentPicker } from './LearningContentPicker'
 import { getPlanCandidates, type PlanCandidate } from './learningPlanner'
 import './profile.css'
@@ -109,6 +111,8 @@ export function LearningSchedulePage({
     upsertPlanTask,
     removePlanTask,
     reorderPlanTasks,
+    replaceLearningPlan,
+    setPlanAvailability,
   } = useAppState()
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()))
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -117,6 +121,7 @@ export function LearningSchedulePage({
   const [notice, setNotice] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const [aiPanelOpen, setAiPanelOpen] = useState(false)
   const pointerDrag = useRef<PointerDrag | null>(null)
   const now = new Date()
   const dates = useMemo(
@@ -389,10 +394,21 @@ export function LearningSchedulePage({
           <p className="section-kicker">未来七天</p>
           <h1>成长安排</h1>
         </div>
-        <button className="schedule-add" type="button" onClick={openAdd}>
-          <CalendarPlus aria-hidden="true" size={17} />
-          添加学习内容
-        </button>
+        <div className="schedule-header-actions">
+          <button
+            className="schedule-ai-open"
+            type="button"
+            aria-expanded={aiPanelOpen}
+            onClick={() => setAiPanelOpen((open) => !open)}
+          >
+            <Sparkles aria-hidden="true" size={17} />
+            AI 帮我安排
+          </button>
+          <button className="schedule-add" type="button" onClick={openAdd}>
+            <CalendarPlus aria-hidden="true" size={17} />
+            添加学习内容
+          </button>
+        </div>
       </header>
 
       <p className="schedule-page-intro">选一项真实课程或挑战，按自己的节奏安排。临时改变也没关系。</p>
@@ -417,6 +433,23 @@ export function LearningSchedulePage({
       </nav>
 
       {notice && <p className="success-note schedule-notice" role="status">{notice}</p>}
+
+      {aiPanelOpen && (
+        <AiSchedulePanel
+          grade={state.grade}
+          course={course}
+          progress={progress}
+          availability={state.learningPlan.availability}
+          currentTasks={weekTasks}
+          onSaveAvailability={setPlanAvailability}
+          onConfirm={(tasks, source) => {
+            replaceLearningPlan(tasks, source)
+            setAiPanelOpen(false)
+            setNotice(source === 'ai' ? 'AI 建议已由你确认并保存。' : '基础安排已由你确认并保存。')
+          }}
+          onClose={() => setAiPanelOpen(false)}
+        />
+      )}
 
       <div className="schedule-days">
         {dates.map((date, index) => {
