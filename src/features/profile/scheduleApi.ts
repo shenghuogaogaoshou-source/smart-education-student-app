@@ -12,6 +12,7 @@ type CatalogKind = 'knowledge' | 'test'
 export type ScheduleCatalogItem = {
   partId: CoursePartId
   kind: CatalogKind
+  title: string
   suggestedMinutes: number
 }
 
@@ -60,30 +61,34 @@ function parseTask(value: unknown, request: ScheduleSuggestionRequest): Learning
     || typeof value.id !== 'string' || !/^[A-Za-z0-9:_-]{1,120}$/.test(value.id)
     || value.grade !== request.grade
     || typeof value.partId !== 'string'
-    || !request.catalog.some((item) => item.partId === value.partId && item.kind === value.kind)
     || (value.kind !== 'knowledge' && value.kind !== 'test')
-    || typeof value.title !== 'string' || !value.title.trim()
     || typeof value.date !== 'string' || !request.availability.some((day) => day.date === value.date)
     || typeof value.time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)
     || !Number.isInteger(value.minutes) || (value.minutes as number) < 5 || (value.minutes as number) > 90
     || !Number.isInteger(value.order) || (value.order as number) < 0
     || value.source !== 'ai'
-    || typeof value.review !== 'boolean'
     || !validTimestamp(value.createdAt) || !validTimestamp(value.updatedAt)) {
     throw new ScheduleSuggestionError(502, 'invalid_response')
   }
+  const catalogItem = request.catalog.find((item) => item.partId === value.partId && item.kind === value.kind)
+  if (!catalogItem || typeof catalogItem.title !== 'string' || !catalogItem.title.trim()) {
+    throw new ScheduleSuggestionError(502, 'invalid_response')
+  }
+  const completed = value.kind === 'knowledge'
+    ? request.progress.knowledgeCompleted.includes(catalogItem.partId)
+    : request.progress.testsPassed.includes(catalogItem.partId)
   return {
     id: value.id,
     grade: value.grade as PrimaryGrade,
     partId: value.partId as CoursePartId,
     kind: value.kind,
-    title: value.title,
+    title: catalogItem.title,
     date: value.date,
     time: value.time,
     minutes: value.minutes as number,
     order: value.order as number,
     source: 'ai',
-    review: value.review,
+    review: completed,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   }

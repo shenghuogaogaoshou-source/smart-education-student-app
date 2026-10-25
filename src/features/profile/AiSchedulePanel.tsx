@@ -23,6 +23,11 @@ import {
 
 type PreviewSource = 'ai' | 'fallback'
 
+type PlanChange = {
+  kind: 'added' | 'adjusted' | 'removed'
+  label: string
+}
+
 export type AiSchedulePanelProps = {
   grade: PrimaryGrade
   course: CoursePackage
@@ -88,6 +93,67 @@ function hasOverlap(tasks: LearningPlanTask[]) {
   return false
 }
 
+function taskIdentity(task: LearningPlanTask) {
+  return `${task.partId}:${task.kind}`
+}
+
+function sameTaskTiming(left: LearningPlanTask, right: LearningPlanTask) {
+  return left.date === right.date
+    && left.time === right.time
+    && left.minutes === right.minutes
+}
+
+function summarizePlanChanges(
+  selectedTasks: LearningPlanTask[],
+  currentTasks: LearningPlanTask[],
+  includeRemovals: boolean,
+) {
+  const changes: PlanChange[] = []
+  const selectedByIdentity = new Map<string, LearningPlanTask[]>()
+  const currentByIdentity = new Map<string, LearningPlanTask[]>()
+  for (const task of selectedTasks) {
+    const group = selectedByIdentity.get(taskIdentity(task)) ?? []
+    group.push(task)
+    selectedByIdentity.set(taskIdentity(task), group)
+  }
+  for (const task of currentTasks) {
+    const group = currentByIdentity.get(taskIdentity(task)) ?? []
+    group.push(task)
+    currentByIdentity.set(taskIdentity(task), group)
+  }
+
+  for (const [identity, selectedGroup] of selectedByIdentity) {
+    const currentGroup = currentByIdentity.get(identity) ?? []
+    selectedGroup.forEach((task, index) => {
+      const existing = currentGroup[index]
+      if (!existing) {
+        changes.push({ kind: 'added', label: task.title })
+      } else if (!sameTaskTiming(existing, task)) {
+        changes.push({ kind: 'adjusted', label: task.title })
+      }
+    })
+    if (includeRemovals) {
+      currentGroup.slice(selectedGroup.length).forEach((task) => {
+        changes.push({ kind: 'removed', label: task.title })
+      })
+    }
+  }
+
+  if (includeRemovals) {
+    for (const [identity, currentGroup] of currentByIdentity) {
+      if (!selectedByIdentity.has(identity)) {
+        currentGroup.forEach((task) => changes.push({ kind: 'removed', label: task.title }))
+      }
+    }
+  }
+
+  return {
+    added: changes.filter((change) => change.kind === 'added'),
+    adjusted: changes.filter((change) => change.kind === 'adjusted'),
+    removed: changes.filter((change) => change.kind === 'removed'),
+  }
+}
+
 export function AiSchedulePanel({
   grade,
   course,
@@ -102,6 +168,7 @@ export function AiSchedulePanel({
 }: AiSchedulePanelProps) {
   const [days, setDays] = useState(() => availability.map((day) => ({ ...day })))
   const [previewTasks, setPreviewTasks] = useState<LearningPlanTask[] | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [previewSource, setPreviewSource] = useState<PreviewSource>('ai')
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [weekSummary, setWeekSummary] = useState('')
@@ -117,6 +184,13 @@ export function AiSchedulePanel({
   const enabledCount = days.filter((day) => day.enabled).length
   const availabilityValid = days.every(validDay) && enabledCount > 0
   const previewTotal = previewTasks?.reduce((sum, task) => sum + task.minutes, 0) ?? 0
+  const selectedTasks = previewTasks?.filter((task) => selectedIds.has(task.id)) ?? []
+  const selectedTotal = selectedTasks.reduce((sum, task) => sum + task.minutes, 0)
+  const allSelected = Boolean(previewTasks?.length) && selectedTasks.length === previewTasks?.length
+  const changes = useMemo(
+    () => summarizePlanChanges(selectedTasks, currentTasks, allSelected),
+    [allSelected, currentTasks, selectedTasks],
+  )
 
   const updateDay = (date: string, patch: Partial<DailyAvailability>) => {
     setDays((current) => current.map((day) => day.date === date ? { ...day, ...patch } : day))
@@ -133,6 +207,7 @@ export function AiSchedulePanel({
     setError('')
     setMessage('')
     setPreviewTasks(null)
+    setSelectedIds(new Set())
     confirmedRef.current = false
     onSaveAvailability(days.map((day) => ({ ...day })))
 
@@ -143,6 +218,7 @@ export function AiSchedulePanel({
       catalog: candidates.map((candidate) => ({
         partId: candidate.partId,
         kind: candidate.kind,
+        title: candidate.title,
         suggestedMinutes: candidate.suggestedMinutes,
       })),
       progress: {
@@ -156,7 +232,9 @@ export function AiSchedulePanel({
     try {
       const suggestion = await requestSuggestion(request, controller.signal)
       if (controller.signal.aborted) return
-      setPreviewTasks(suggestion.tasks.map((task) => ({ ...task })))
+      const tasks = suggestion.tasks.map((task) => ({ ...task }))
+      setPreviewTasks(tasks)
+      setSelectedIds(new Set(tasks.map((task) => task.id)))
       setReasons({ ...suggestion.reasons })
       setWeekSummary(suggestion.weekSummary)
       setPreviewSource('ai')
@@ -181,6 +259,7 @@ export function AiSchedulePanel({
           : '先从一项合适的内容开始，按自己的节奏探索。',
       ]))
       setPreviewTasks(fallback)
+      setSelectedIds(new Set(fallback.map((task) => task.id)))
       setReasons(fallbackReasons)
       setWeekSummary('先从几项容易开始的内容出发，之后还可以继续调整。')
       setPreviewSource('fallback')
@@ -201,6 +280,28 @@ export function AiSchedulePanel({
       const next = current?.filter((task) => task.id !== id) ?? null
       return next?.length ? next : null
     })
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+    setError('')
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setError('')
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected
+      ? new Set()
+      : new Set(previewTasks?.map((task) => task.id) ?? []))
     setError('')
   }
 
@@ -220,8 +321,19 @@ export function AiSchedulePanel({
 
   const confirm = () => {
     if (!previewTasks?.length || confirmedRef.current) return
-    const valid = validatePlanTasks(previewTasks, { course, availability: days, now })
-    if (valid.length !== previewTasks.length) {
+    if (!selectedTasks.length) {
+      setError('先选择至少一项想采用的安排。')
+      return
+    }
+    const selectedIdentities = new Set(selectedTasks.map((task) => taskIdentity(task)))
+    const nextTasks = allSelected
+      ? selectedTasks
+      : [
+        ...currentTasks.filter((task) => !selectedIdentities.has(taskIdentity(task))),
+        ...selectedTasks,
+      ].sort((left, right) => left.date.localeCompare(right.date) || left.order - right.order)
+    const valid = validatePlanTasks(nextTasks, { course, availability: days, now })
+    if (valid.length !== nextTasks.length) {
       setError('有些安排超出了可用时间，请调整时间或时长后再确认。')
       return
     }
@@ -230,6 +342,7 @@ export function AiSchedulePanel({
       return
     }
     confirmedRef.current = true
+    onSaveAvailability(days.map((day) => ({ ...day })))
     onConfirm(valid, previewSource)
   }
 
@@ -345,9 +458,26 @@ export function AiSchedulePanel({
               <span>第 2 步</span>
               <h3 id="ai-preview-title">安排预览</h3>
             </div>
-            <span>共 {previewTasks.length} 项 · {previewTotal} 分钟</span>
+            <span>已选 {selectedTasks.length}/{previewTasks.length} 项 · {selectedTotal}/{previewTotal} 分钟</span>
           </div>
           <p className="ai-schedule-summary">{weekSummary}</p>
+
+          <section className="ai-schedule-changes" aria-label="与当前计划的变更">
+            <div className="ai-schedule-changes-head">
+              <strong>与当前计划的变化</strong>
+              <button type="button" onClick={toggleSelectAll}>
+                {allSelected ? '取消全选' : '一键选择全部建议'}
+              </button>
+            </div>
+            <ul>
+              <li><span>新增 {changes.added.length} 项</span>{changes.added.length > 0 && `：${changes.added.map((item) => item.label).join('、')}`}</li>
+              <li><span>调整 {changes.adjusted.length} 项</span>{changes.adjusted.length > 0 && `：${changes.adjusted.map((item) => item.label).join('、')}`}</li>
+              <li><span>移除 {changes.removed.length} 项</span>{changes.removed.length > 0 && `：${changes.removed.map((item) => item.label).join('、')}`}</li>
+            </ul>
+            {!changes.added.length && !changes.adjusted.length && !changes.removed.length && (
+              <p>所选建议与当前计划一致。</p>
+            )}
+          </section>
 
           <div className="ai-schedule-preview-days">
             {previewGroups.map((group) => (
@@ -355,8 +485,17 @@ export function AiSchedulePanel({
                 <h4>{dateLabel(group.date)}</h4>
                 <ul className="ai-schedule-preview-list" aria-label="建议安排列表">
                   {group.tasks.map((task, index) => (
-                    <li key={task.id}>
+                    <li key={task.id} className={selectedIds.has(task.id) ? 'is-selected' : ''}>
                       <div className="ai-preview-task-head">
+                        <label className="ai-preview-select">
+                          <input
+                            type="checkbox"
+                            aria-label={`选择建议：${task.title}`}
+                            checked={selectedIds.has(task.id)}
+                            onChange={() => toggleSelected(task.id)}
+                          />
+                          <span>采用</span>
+                        </label>
                         <span className={`schedule-kind schedule-kind--${task.kind}`}>
                           {task.kind === 'knowledge' ? '知识' : '测试'}
                         </span>
@@ -417,7 +556,7 @@ export function AiSchedulePanel({
 
           <footer className="ai-schedule-preview-footer">
             <button type="button" onClick={close}>取消</button>
-            <button type="button" onClick={confirm}>
+            <button type="button" disabled={!selectedTasks.length} onClick={confirm}>
               <Check aria-hidden="true" size={17} />确认采用
             </button>
           </footer>

@@ -247,7 +247,7 @@ describe('LearningSchedulePage', () => {
       grade: 'grade5',
       partId: 'ael-4',
       kind: 'knowledge',
-      title: 'AI 安排测试',
+      title: '第一次 AI 实验',
       date: localDate(1),
       time: '18:30',
       minutes: 15,
@@ -268,11 +268,50 @@ describe('LearningSchedulePage', () => {
     expect(screen.getByRole('region', { name: 'AI 帮我安排' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
     expect(await screen.findByRole('heading', { name: '安排预览' })).toBeInTheDocument()
-    expect(screen.getByLabelText('正式计划')).not.toHaveTextContent('AI 安排测试')
+    const tomorrowBefore = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
+    expect(within(tomorrowBefore).queryByText('第一次 AI 实验')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '确认采用' }))
 
     const tomorrow = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
-    expect(within(tomorrow).getByText('AI 安排测试')).toBeInTheDocument()
+    expect(within(tomorrow).getByText('第一次 AI 实验')).toBeInTheDocument()
+  })
+
+  it('persists availability edited after preview before applying the AI plan', async () => {
+    const user = userEvent.setup()
+    const now = new Date().toISOString()
+    const suggestedTask = {
+      id: 'ai-availability-suggestion',
+      grade: 'grade5',
+      partId: 'ael-4',
+      kind: 'knowledge',
+      title: '第一次 AI 实验',
+      date: localDate(1),
+      time: '18:30',
+      minutes: 15,
+      order: 0,
+      source: 'ai',
+      review: false,
+      createdAt: now,
+      updatedAt: now,
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      tasks: [suggestedTask],
+      weekSummary: '从一次小探索开始。',
+      reasons: { 'ai-availability-suggestion': '先认识实验目标，再动手探索。' },
+    }), { status: 200 })))
+    renderSchedule()
+
+    await user.click(screen.getByRole('button', { name: 'AI 帮我安排' }))
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    await screen.findByRole('heading', { name: '安排预览' })
+    const start = screen.getByLabelText(/明天 .* 开始时间/)
+    fireEvent.change(start, { target: { value: '18:00' } })
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+
+    const tomorrow = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
+    expect(within(tomorrow).getByText('第一次 AI 实验')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'AI 帮我安排' }))
+    expect(screen.getByLabelText(/明天 .* 开始时间/)).toHaveValue('18:00')
   })
 })

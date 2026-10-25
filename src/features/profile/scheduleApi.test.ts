@@ -15,7 +15,7 @@ const request: ScheduleSuggestionRequest = {
     endTime: '19:30',
     maxMinutes: 30,
   }],
-  catalog: [{ partId: 'ael-4', kind: 'knowledge', suggestedMinutes: 15 }],
+  catalog: [{ partId: 'ael-4', kind: 'knowledge', title: '第一次 AI 实验', suggestedMinutes: 15 }],
   progress: { knowledgeCompleted: ['ael-1'], testsPassed: [] },
   currentTasks: [],
   wrongQuestionSummaries: [],
@@ -101,6 +101,24 @@ describe('scheduleApi', () => {
     await expect(requestScheduleSuggestion(request)).rejects.toMatchObject({
       name: 'ScheduleSuggestionError',
       code: 'invalid_response',
+    })
+  })
+
+  it('uses catalog titles and learning progress instead of trusting provider task metadata', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ...responseBody,
+      tasks: [{
+        ...responseBody.tasks[0],
+        title: '虚构课程',
+        review: true,
+      }],
+    }), { status: 200 })))
+
+    const result = await requestScheduleSuggestion(request)
+
+    expect(result.tasks[0]).toMatchObject({
+      title: '第一次 AI 实验',
+      review: false,
     })
   })
 })

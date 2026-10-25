@@ -2018,6 +2018,58 @@
   padding-top: 4px;
 }
 
+.ai-schedule-changes {
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+}
+
+.ai-schedule-changes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-schedule-changes-head strong {
+  font-size: calc(0.64rem * var(--font-scale));
+}
+
+.ai-schedule-changes-head button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--primary-deep);
+  font-size: calc(0.56rem * var(--font-scale));
+  font-weight: 800;
+}
+
+.ai-schedule-changes ul {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: calc(0.57rem * var(--font-scale));
+  line-height: 1.5;
+  list-style: none;
+}
+
+.ai-schedule-changes li > span {
+  margin-right: 3px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.ai-schedule-changes > p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: calc(0.57rem * var(--font-scale));
+}
+
 .ai-schedule-preview-days {
   display: grid;
   gap: 10px;
@@ -2049,10 +2101,40 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface-soft);
+  transition: border-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.ai-schedule-preview-list > li.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--line));
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+}
+
+.ai-schedule-preview-list > li:not(.is-selected) {
+  opacity: 0.68;
 }
 
 .ai-preview-task-head {
   flex-wrap: wrap;
+}
+
+.ai-preview-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--primary-deep);
+  font-size: calc(0.55rem * var(--font-scale));
+  font-weight: 800;
+}
+
+.ai-preview-select input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--primary-deep);
 }
 
 .ai-preview-task-head strong {
@@ -2124,6 +2206,10 @@
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
+}
+
+.ai-schedule-preview-footer button:disabled {
+  opacity: 0.42;
 }
 
 .is-spinning {
@@ -2221,6 +2307,11 @@
 
   .ai-preview-fields {
     grid-template-columns: 1fr;
+  }
+
+  .ai-schedule-changes-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

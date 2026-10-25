@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { BandProgress, PrimaryGrade } from '../../app/learning'
@@ -119,6 +119,127 @@ describe('AiSchedulePanel', () => {
     expect(onConfirm).toHaveBeenCalledWith([
       expect.objectContaining({ title: 'AI 建议任务', minutes: 20 }),
     ], 'ai')
+  })
+
+  it('previews changes and partially adopts selected suggestions without deleting unselected tasks', async () => {
+    const firstDate = state.learningPlan.availability[1].date
+    const secondDate = state.learningPlan.availability[2].date
+    const timestamp = new Date().toISOString()
+    const existingFive = suggestion({
+      id: 'existing-five',
+      partId: 'ael-5',
+      title: '已有第二项',
+      date: firstDate,
+      time: '19:10',
+      minutes: 10,
+      source: 'student',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const existingSix = suggestion({
+      id: 'existing-six',
+      partId: 'ael-6',
+      title: '已有第三项',
+      date: secondDate,
+      time: '18:30',
+      minutes: 10,
+      source: 'student',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const adjustedFive = suggestion({
+      id: 'ai-existing-five',
+      partId: 'ael-5',
+      title: '调整第二项',
+      date: firstDate,
+      time: '19:00',
+      minutes: 10,
+      order: 1,
+    })
+    const requestSuggestion = vi.fn(async () => ({
+      ...result,
+      tasks: [suggestion(), adjustedFive],
+      reasons: {
+        'ai-suggested': '先探索。',
+        'ai-existing-five': '再练习。',
+      },
+    }))
+    const user = userEvent.setup()
+    const { onConfirm } = renderPanel({
+      requestSuggestion,
+      currentTasks: [existingFive, existingSix],
+    })
+
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    expect(await screen.findByLabelText('与当前计划的变更')).toHaveTextContent('新增 1 项')
+    expect(screen.getByLabelText('与当前计划的变更')).toHaveTextContent('调整 1 项')
+    expect(screen.getByLabelText('与当前计划的变更')).toHaveTextContent('移除 1 项')
+
+    await user.click(screen.getByRole('checkbox', { name: '选择建议：调整第二项' }))
+    expect(screen.getByLabelText('与当前计划的变更')).toHaveTextContent('移除 0 项')
+
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onConfirm).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'ai-suggested', partId: 'ael-4' }),
+      expect.objectContaining({ id: 'existing-five', partId: 'ael-5' }),
+      expect.objectContaining({ id: 'existing-six', partId: 'ael-6' }),
+    ]), 'ai')
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.not.arrayContaining([expect.objectContaining({ id: 'ai-existing-five' })]),
+      'ai',
+    )
+  })
+
+  it('persists availability changes made after preview before confirming selected tasks', async () => {
+    const user = userEvent.setup()
+    const { onConfirm, onSaveAvailability } = renderPanel()
+
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    const tomorrowStart = screen.getByLabelText(/明天 .* 开始时间/)
+    fireEvent.change(tomorrowStart, { target: { value: '18:00' } })
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+
+    expect(onSaveAvailability).toHaveBeenLastCalledWith(expect.arrayContaining([
+      expect.objectContaining({ startTime: '18:00' }),
+    ]))
+    expect(onConfirm).toHaveBeenCalledWith(
+      [expect.objectContaining({ title: 'AI 建议任务', date: state.learningPlan.availability[1].date })],
+      'ai',
+    )
+  })
+
+  it('selects every preview item from the one-click path and uses full-adoption semantics', async () => {
+    const timestamp = new Date().toISOString()
+    const existing = suggestion({
+      id: 'existing-to-remove',
+      partId: 'ael-6',
+      title: '原有第三项',
+      date: state.learningPlan.availability[2].date,
+      time: '18:30',
+      minutes: 10,
+      source: 'student',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const user = userEvent.setup()
+    const { onConfirm } = renderPanel({ currentTasks: [existing] })
+
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    expect(await screen.findByLabelText('与当前计划的变更')).toHaveTextContent('移除 1 项')
+    await user.click(screen.getByRole('button', { name: '取消全选' }))
+    expect(screen.getByRole('button', { name: '确认采用' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '一键选择全部建议' }))
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'ai-suggested', partId: 'ael-4' })],
+      'ai',
+    )
+    expect(onConfirm).not.toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'existing-to-remove' })]),
+      'ai',
+    )
   })
 
   it('falls back to a local editable plan when the AI endpoint is unavailable', async () => {
