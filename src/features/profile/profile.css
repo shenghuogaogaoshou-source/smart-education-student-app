@@ -1256,6 +1256,16 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
+  transition: border-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.schedule-card.is-dragging {
+  opacity: 0.58;
+}
+
+.schedule-card.is-drag-over {
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--line));
+  transform: translateY(-1px);
 }
 
 .schedule-card-top,
@@ -1299,12 +1309,52 @@
 
 .schedule-grip {
   margin-left: auto;
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
   color: color-mix(in srgb, var(--muted) 62%, transparent);
+  cursor: grab;
+  touch-action: none;
+}
+
+.schedule-grip:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.schedule-grip:active {
+  cursor: grabbing;
+}
+
+.schedule-card-open {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-card-open:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.schedule-card-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 56%, transparent);
+  outline-offset: 2px;
 }
 
 .schedule-card-main {
   justify-content: space-between;
-  margin-top: 8px;
 }
 
 .schedule-card-main strong {

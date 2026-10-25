@@ -40,13 +40,17 @@ export function LearningContentPicker({ candidates, selected, onSelect }: Learni
       <div className="schedule-picker-list" aria-label={kind === 'knowledge' ? '知识内容' : '测试内容'}>
         {visibleCandidates.map((candidate) => {
           const active = candidate.partId === selected.partId && candidate.kind === selected.kind
+          const accessibleState = [
+            candidate.review ? '复习' : '',
+            !candidate.unlocked ? '先学知识' : '',
+          ].filter(Boolean).join('，')
           return (
             <button
               className="schedule-picker-item"
               type="button"
               key={`${candidate.partId}-${candidate.kind}`}
               aria-pressed={active}
-              aria-label={`${kind === 'knowledge' ? '知识' : '测试'}：${candidate.title}${candidate.review ? '，复习' : ''}`}
+              aria-label={`${kind === 'knowledge' ? '知识' : '测试'}：${candidate.title}${accessibleState ? `，${accessibleState}` : ''}`}
               onClick={() => onSelect(candidate)}
             >
               <span className="schedule-picker-number">{candidate.partNumber}</span>

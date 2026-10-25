@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
@@ -21,6 +21,16 @@ function renderSchedule(onStartTask = vi.fn()) {
 describe('LearningSchedulePage', () => {
   beforeEach(() => localStorage.clear())
 
+  async function addTodayCourse(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: '添加学习内容' }))
+    const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
+    await user.click(within(dialog).getByRole('button', { name: /知识：数据侦探营/ }))
+    await user.selectOptions(within(dialog).getByLabelText('日期'), localDate(0))
+    await user.clear(within(dialog).getByLabelText('学习时间'))
+    await user.type(within(dialog).getByLabelText('学习时间'), '18:30')
+    await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
+  }
+
   it('adds a real course item to an empty day with the edited duration', async () => {
     const user = userEvent.setup()
     const onStartTask = vi.fn()
@@ -34,6 +44,8 @@ describe('LearningSchedulePage', () => {
       partId: 'ael-4',
       kind: 'knowledge',
     }))
+    await user.click(within(today).getByRole('button', { name: '第一次 AI 实验，查看学习安排' }))
+    expect(onStartTask).toHaveBeenCalledTimes(2)
 
     await user.click(screen.getByRole('button', { name: '添加学习内容' }))
     const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
@@ -53,13 +65,7 @@ describe('LearningSchedulePage', () => {
     const user = userEvent.setup()
     renderSchedule()
 
-    await user.click(screen.getByRole('button', { name: '添加学习内容' }))
-    let dialog = screen.getByRole('dialog', { name: '安排学习内容' })
-    await user.click(within(dialog).getByRole('button', { name: /知识：数据侦探营/ }))
-    await user.selectOptions(within(dialog).getByLabelText('日期'), localDate(0))
-    await user.clear(within(dialog).getByLabelText('学习时间'))
-    await user.type(within(dialog).getByLabelText('学习时间'), '18:30')
-    await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
+    await addTodayCourse(user)
 
     const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
     let cards = within(today).getAllByRole('listitem')
@@ -71,7 +77,7 @@ describe('LearningSchedulePage', () => {
     expect(cards[0]).toHaveTextContent('数据侦探营')
 
     await user.click(within(cards[0]).getByRole('button', { name: '编辑 数据侦探营' }))
-    dialog = screen.getByRole('dialog', { name: '安排学习内容' })
+    const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
     await user.clear(within(dialog).getByLabelText('预计时长'))
     await user.type(within(dialog).getByLabelText('预计时长'), '25')
     await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
@@ -81,6 +87,60 @@ describe('LearningSchedulePage', () => {
     expect(screen.getByText('这项安排会从计划中移除，学习进度不会改变。')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '确认删除' }))
     expect(screen.queryByText('数据侦探营')).not.toBeInTheDocument()
+  })
+
+  it('reorders tasks by dragging within one day', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+    await addTodayCourse(user)
+
+    const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
+    const [firstCard, secondCard] = within(today).getAllByRole('listitem')
+    const handle = within(firstCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+
+    fireEvent.dragStart(handle)
+    fireEvent.dragOver(secondCard)
+    fireEvent.drop(secondCard)
+
+    const reordered = within(today).getAllByRole('listitem')
+    expect(reordered[0]).toHaveTextContent('数据侦探营')
+    expect(reordered[1]).toHaveTextContent('第一次 AI 实验')
+  })
+
+  it('supports touch-style pointer reordering on the drag handle', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+    await addTodayCourse(user)
+
+    const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
+    const [firstCard, secondCard] = within(today).getAllByRole('listitem')
+    const handle = within(firstCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, pointerType: 'touch' })
+    fireEvent.pointerEnter(secondCard, { pointerId: 1, pointerType: 'touch' })
+    fireEvent.pointerUp(secondCard, { pointerId: 1, pointerType: 'touch' })
+
+    const reordered = within(today).getAllByRole('listitem')
+    expect(reordered[0]).toHaveTextContent('数据侦探营')
+    expect(reordered[1]).toHaveTextContent('第一次 AI 实验')
+  })
+
+  it('does not move a task across dates when it is dropped on another day', () => {
+    renderSchedule()
+
+    const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
+    const tomorrow = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
+    const sourceCard = within(today).getAllByRole('listitem')[0]
+    const targetCard = within(tomorrow).getAllByRole('listitem')[0]
+    const targetText = targetCard.textContent
+    const handle = within(sourceCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+
+    fireEvent.dragStart(handle)
+    fireEvent.dragOver(targetCard)
+    fireEvent.drop(targetCard)
+
+    expect(within(today).getAllByRole('listitem')[0]).toHaveTextContent('第一次 AI 实验')
+    expect(within(tomorrow).getAllByRole('listitem')[0]).toHaveTextContent(targetText ?? '')
   })
 
   it('shows a calm empty state for days without tasks', () => {

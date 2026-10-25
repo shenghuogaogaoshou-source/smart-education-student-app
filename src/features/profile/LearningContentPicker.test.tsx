@@ -30,7 +30,8 @@ describe('LearningContentPicker', () => {
     await user.click(screen.getByRole('button', { name: '测试' }))
     expect(screen.getAllByText('先学知识').length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole('button', { name: /测试：第一次 AI 实验/ }))
+    const lockedTest = screen.getByRole('button', { name: '测试：第一次 AI 实验，先学知识' })
+    await user.click(lockedTest)
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
       partId: 'ael-4',
       kind: 'test',

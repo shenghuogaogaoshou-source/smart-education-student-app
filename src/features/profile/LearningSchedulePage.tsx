@@ -15,7 +15,12 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import {
+  useMemo,
+  useState,
+  type DragEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { useAppState } from '../../app/AppState'
 import { getGradeBand, isTestUnlocked, type LearningProgress } from '../../app/learning'
 import { getTaskCompletion, getTaskTiming, type LearningPlanTask } from '../../app/learningPlan'
@@ -102,6 +107,8 @@ export function LearningSchedulePage({
   const [editorError, setEditorError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
   const now = new Date()
   const dates = useMemo(
     () => datesFromToday(now),
@@ -232,6 +239,78 @@ export function LearningSchedulePage({
     reorderPlanTasks(task.date, ids)
   }
 
+  const clearDragState = () => {
+    setDraggingTaskId(null)
+    setDragOverTaskId(null)
+  }
+
+  const reorderDraggedTask = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return
+    const source = state.learningPlan.tasks.find((task) => task.id === sourceId)
+    const target = state.learningPlan.tasks.find((task) => task.id === targetId)
+    if (!source || !target || source.date !== target.date) return
+    const dayTasks = tasksForDate(target.date)
+    const fromIndex = dayTasks.findIndex((task) => task.id === sourceId)
+    const targetIndex = dayTasks.findIndex((task) => task.id === targetId)
+    if (fromIndex < 0 || targetIndex < 0) return
+    const ids = dayTasks.map((task) => task.id)
+    ids.splice(fromIndex, 1)
+    ids.splice(Math.min(targetIndex, ids.length), 0, sourceId)
+    reorderPlanTasks(target.date, ids)
+    setNotice('学习顺序已调整。')
+  }
+
+  const handleDragStart = (event: DragEvent<HTMLButtonElement>, task: LearningPlanTask) => {
+    setDraggingTaskId(task.id)
+    setDragOverTaskId(null)
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', task.id)
+    }
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLLIElement>, task: LearningPlanTask) => {
+    if (!draggingTaskId) return
+    const source = state.learningPlan.tasks.find((item) => item.id === draggingTaskId)
+    if (!source) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    setDragOverTaskId(source.date === task.date ? task.id : null)
+  }
+
+  const handleDrop = (event: DragEvent<HTMLLIElement>, task: LearningPlanTask) => {
+    event.preventDefault()
+    const sourceId = draggingTaskId ?? event.dataTransfer?.getData('text/plain')
+    if (sourceId) reorderDraggedTask(sourceId, task.id)
+    clearDragState()
+  }
+
+  const handlePointerDown = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    task: LearningPlanTask,
+  ) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (event.pointerType !== 'mouse') event.preventDefault()
+    setDraggingTaskId(task.id)
+    setDragOverTaskId(null)
+  }
+
+  const handlePointerEnter = (
+    event: ReactPointerEvent<HTMLLIElement>,
+    task: LearningPlanTask,
+  ) => {
+    if (!draggingTaskId) return
+    const source = state.learningPlan.tasks.find((item) => item.id === draggingTaskId)
+    setDragOverTaskId(source?.date === task.date ? task.id : null)
+  }
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLLIElement>, task: LearningPlanTask) => {
+    if (!draggingTaskId) return
+    event.preventDefault()
+    reorderDraggedTask(draggingTaskId, dragOverTaskId ?? task.id)
+    clearDragState()
+  }
+
   const confirmDelete = (id: string) => {
     removePlanTask(id)
     setDeleteId(null)
@@ -302,7 +381,20 @@ export function LearningSchedulePage({
                     const status = statusFor(task, state.learningProgress)
                     const lockedTest = task.kind === 'test' && !isTestUnlocked(progress, task.partId)
                     return (
-                      <li className="schedule-card" key={task.id}>
+                      <li
+                        className={[
+                          'schedule-card',
+                          draggingTaskId === task.id ? 'is-dragging' : '',
+                          dragOverTaskId === task.id ? 'is-drag-over' : '',
+                        ].filter(Boolean).join(' ')}
+                        key={task.id}
+                        data-plan-task-id={task.id}
+                        onDragOver={(event) => handleDragOver(event, task)}
+                        onDrop={(event) => handleDrop(event, task)}
+                        onPointerEnter={(event) => handlePointerEnter(event, task)}
+                        onPointerUp={(event) => handlePointerUp(event, task)}
+                        onPointerCancel={clearDragState}
+                      >
                         <div className="schedule-card-top">
                           <span className={`schedule-kind schedule-kind--${task.kind}`}>
                             {task.kind === 'knowledge'
@@ -311,20 +403,38 @@ export function LearningSchedulePage({
                             {task.kind === 'knowledge' ? '知识' : '测试'}
                           </span>
                           {task.review && <span className="schedule-review">复习</span>}
-                          <GripVertical className="schedule-grip" aria-hidden="true" size={17} />
+                          <button
+                            className="schedule-grip"
+                            type="button"
+                            draggable
+                            aria-label={`拖动 ${task.title} 排序`}
+                            title="拖动调整同一天的学习顺序"
+                            onDragStart={(event) => handleDragStart(event, task)}
+                            onDragEnd={clearDragState}
+                            onPointerDown={(event) => handlePointerDown(event, task)}
+                          >
+                            <GripVertical aria-hidden="true" size={17} />
+                          </button>
                         </div>
-                        <div className="schedule-card-main">
-                          <strong>{task.title}</strong>
-                          <span className={`schedule-status schedule-status--${status.tone}`}>
-                            {status.tone === 'complete' && <CheckCircle2 aria-hidden="true" size={13} />}
-                            {status.tone === 'overdue' && <AlertCircle aria-hidden="true" size={13} />}
-                            {status.label}
+                        <button
+                          className="schedule-card-open"
+                          type="button"
+                          aria-label={`${task.title}，查看学习安排`}
+                          onClick={() => onStartTask?.(task)}
+                        >
+                          <span className="schedule-card-main">
+                            <strong>{task.title}</strong>
+                            <span className={`schedule-status schedule-status--${status.tone}`}>
+                              {status.tone === 'complete' && <CheckCircle2 aria-hidden="true" size={13} />}
+                              {status.tone === 'overdue' && <AlertCircle aria-hidden="true" size={13} />}
+                              {status.label}
+                            </span>
                           </span>
-                        </div>
-                        <div className="schedule-meta">
-                          <span><Clock aria-hidden="true" size={14} />{task.time}</span>
-                          <span>预计 {task.minutes} 分钟</span>
-                        </div>
+                          <span className="schedule-meta">
+                            <span><Clock aria-hidden="true" size={14} />{task.time}</span>
+                            <span>预计 {task.minutes} 分钟</span>
+                          </span>
+                        </button>
                         <div className="schedule-card-actions">
                           <button
                             className="schedule-start"
