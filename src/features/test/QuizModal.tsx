@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRight, BookOpen, Check, RotateCcw, Trophy, X, XCircle } from 'lucide-react'
+import { useDialogFocus } from '../../app/useDialogFocus'
 import type { QuizChapter } from '../knowledge/courseCatalog'
 import './quiz-modal.css'
 
@@ -35,6 +36,7 @@ export function QuizModal({
   const [answers, setAnswers] = useState<(number | null)[]>(() => chapter.questions.map(() => null))
   const currentQuestion = chapter.questions[questionIndex]
   const picked = answers[questionIndex]
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose)
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -69,7 +71,7 @@ export function QuizModal({
   }
 
   return createPortal(
-    <div className="quiz-overlay" role="dialog" aria-modal="true" aria-label={`${levelTitle}答题`}>
+    <div ref={dialogRef} className="quiz-overlay" role="dialog" aria-modal="true" aria-label={`${levelTitle}答题`}>
       <div className="quiz-modal quiz-modal--catalog">
         <header className="quiz-header">
           <div className="quiz-titles">

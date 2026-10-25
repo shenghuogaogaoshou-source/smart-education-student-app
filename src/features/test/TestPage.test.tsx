@@ -66,6 +66,26 @@ describe('TestPage', () => {
     expect(screen.getByRole('heading', { name: '算法工具箱' })).toBeInTheDocument()
   })
 
+  it('traps challenge-introduction focus and restores the node after closing', async () => {
+    const user = userEvent.setup()
+    renderMap({ grade: 'grade5' })
+
+    const node = screen.getByRole('button', { name: '算法工具箱 · 当前关卡' })
+    await user.click(node)
+    const dialog = screen.getByRole('dialog', { name: '算法工具箱挑战介绍' })
+    const closeButton = within(dialog).getByRole('button', { name: '关闭挑战介绍' })
+    const startButton = within(dialog).getByRole('button', { name: '开始答题' })
+
+    await waitFor(() => expect(closeButton).toHaveFocus())
+    startButton.focus()
+    await user.tab()
+    expect(closeButton).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: '算法工具箱挑战介绍' })).not.toBeInTheDocument()
+    expect(node).toHaveFocus()
+  })
+
   it('focuses the requested unlocked plan test and opens its introduction', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
       if (this.classList.contains('test-route-canvas')) return 900
@@ -74,9 +94,9 @@ describe('TestPage', () => {
     })
     renderMap({ grade: 'grade5' }, undefined, 'ael-3')
 
-    expect(await screen.findByRole('dialog', { name: '算法工具箱挑战介绍' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: '算法工具箱挑战介绍' })
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '算法工具箱 · 当前关卡' })).toHaveFocus()
+      expect(within(dialog).getByRole('button', { name: '关闭挑战介绍' })).toHaveFocus()
     })
     const route = screen.getByRole('region', { name: '可上下滑动的完整闯关地图' }).closest('.test-route-scroll')
     expect(route).not.toBeNull()

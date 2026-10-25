@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, BookOpen, Map, Sparkles, X } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_BAND_LABELS, getGradeBand, isTestUnlocked, type CoursePartId, type PrimaryGrade } from '../../app/learning'
+import { useDialogFocus } from '../../app/useDialogFocus'
 import { AiCompanion } from '../ai_companion/AiCompanion'
 import { getCourseForBand, type CoursePart } from '../knowledge/courseCatalog'
 import { QuizModal } from './QuizModal'
@@ -35,6 +36,7 @@ export function TestPage({ onReviewKnowledge, initialPartId }: Props = {}) {
   const [activePart, setActivePart] = useState<CoursePart | null>(null)
   const [result, setResult] = useState<ChallengeResult | null>(null)
   const handledInitialPart = useRef<CoursePartId | null>(null)
+  const introDialogRef = useDialogFocus<HTMLDivElement>(Boolean(introPart), () => setIntroPart(null))
 
   useEffect(() => {
     const route = routeRef.current
@@ -187,7 +189,7 @@ export function TestPage({ onReviewKnowledge, initialPartId }: Props = {}) {
       </section>
 
       {introPart && (
-        <div className="challenge-intro-overlay" role="dialog" aria-modal="true" aria-label={`${introPart.title}挑战介绍`}>
+        <div ref={introDialogRef} className="challenge-intro-overlay" role="dialog" aria-modal="true" aria-label={`${introPart.title}挑战介绍`}>
           <section className="challenge-intro-card">
             <button type="button" className="challenge-intro-close" aria-label="关闭挑战介绍" onClick={() => setIntroPart(null)}>
               <X size={20} />

@@ -26,6 +26,7 @@ import {
 import { useAppState } from '../../app/AppState'
 import { getGradeBand, isTestUnlocked, type LearningProgress } from '../../app/learning'
 import { getTaskCompletion, getTaskTiming, type LearningPlanTask } from '../../app/learningPlan'
+import { useDialogFocus } from '../../app/useDialogFocus'
 import { getCourseForBand } from '../knowledge/courseCatalog'
 import { AiSchedulePanel } from './AiSchedulePanel'
 import { LearningContentPicker } from './LearningContentPicker'
@@ -128,6 +129,7 @@ export function LearningSchedulePage({
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const editorDialogRef = useDialogFocus<HTMLElement>(Boolean(editor), () => setEditor(null))
   const pointerDrag = useRef<PointerDrag | null>(null)
   const now = new Date()
   const dates = useMemo(
@@ -592,7 +594,7 @@ export function LearningSchedulePage({
 
       {editor && (
         <div className="schedule-editor-backdrop" role="presentation">
-          <section className="schedule-editor" role="dialog" aria-modal="true" aria-label="安排学习内容">
+          <section ref={editorDialogRef} className="schedule-editor" role="dialog" aria-modal="true" aria-label="安排学习内容">
             <header>
               <div>
                 <p className="section-kicker">{editor.taskId ? '调整已有安排' : '添加新安排'}</p>

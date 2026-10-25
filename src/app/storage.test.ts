@@ -127,6 +127,8 @@ describe('primary-only state migration', () => {
   })
 
   it('normalizes every hostile legacy field independently into a render-safe state', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 25, 12, 0))
     localStorage.setItem('unrelated-preference', 'keep-me')
     localStorage.setItem('student-app-state', JSON.stringify({
       stateVersion: 2,
@@ -182,28 +184,32 @@ describe('primary-only state migration', () => {
       autoCleanDays: 'never',
     }))
 
-    const loaded = loadState()
-    const fresh = createDefaultState()
+    try {
+      const loaded = loadState()
+      const fresh = createDefaultState()
 
-    expect(loaded).toEqual({
-      ...fresh,
-      isLoggedIn: true,
-      nickname: '保留昵称',
-      learningProgress: {
-        ...fresh.learningProgress,
-        'grade5-6': {
-          knowledgeCompleted: ['ael-1'],
-          testsPassed: ['ael-2'],
+      expect(loaded).toEqual({
+        ...fresh,
+        isLoggedIn: true,
+        nickname: '保留昵称',
+        learningProgress: {
+          ...fresh.learningProgress,
+          'grade5-6': {
+            knowledgeCompleted: ['ael-1'],
+            testsPassed: ['ael-2'],
+          },
         },
-      },
-      transactions: [],
-      processedRewardIds: [],
-      devices: [],
-    })
-    expect(() => getPointsBalance(loaded.transactions)).not.toThrow()
-    expect(getPointsBalance(loaded.transactions)).toBe(0)
-    expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
-    expect(localStorage.getItem('student-app-primary-v2-migrated')).toBeNull()
+        transactions: [],
+        processedRewardIds: [],
+        devices: [],
+      })
+      expect(() => getPointsBalance(loaded.transactions)).not.toThrow()
+      expect(getPointsBalance(loaded.transactions)).toBe(0)
+      expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
+      expect(localStorage.getItem('student-app-primary-v2-migrated')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps valid collection entries when corrupt siblings are present', () => {

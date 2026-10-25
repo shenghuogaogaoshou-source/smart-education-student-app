@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
@@ -237,6 +237,27 @@ describe('LearningSchedulePage', () => {
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent('预计时长需要填写 5—90 分钟。')
     expect(dialog).toBeInTheDocument()
+  })
+
+  it('traps keyboard focus in the schedule editor and restores it on close', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+
+    const addButton = screen.getByRole('button', { name: '添加学习内容' })
+    addButton.focus()
+    await user.click(addButton)
+    const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
+    const closeButton = within(dialog).getByRole('button', { name: '关闭安排编辑' })
+    const saveButton = within(dialog).getByRole('button', { name: '保存安排' })
+
+    await waitFor(() => expect(closeButton).toHaveFocus())
+    saveButton.focus()
+    await user.tab()
+    expect(closeButton).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: '安排学习内容' })).not.toBeInTheDocument()
+    expect(addButton).toHaveFocus()
   })
 
   it('opens AI planning and writes a confirmed suggestion into the formal schedule', async () => {
