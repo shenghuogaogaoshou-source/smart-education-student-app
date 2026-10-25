@@ -191,6 +191,83 @@ describe('AiSchedulePanel', () => {
     )
   })
 
+  it('keeps the same course on another date when only one occurrence is adopted', async () => {
+    const firstDate = state.learningPlan.availability[1].date
+    const secondDate = state.learningPlan.availability[2].date
+    const timestamp = new Date().toISOString()
+    const existingFirst = suggestion({
+      id: 'existing-first-date',
+      partId: 'ael-5',
+      title: '第一次安排',
+      date: firstDate,
+      time: '19:10',
+      minutes: 10,
+      source: 'student',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const existingSecond = suggestion({
+      id: 'existing-second-date',
+      partId: 'ael-5',
+      title: '第二次安排',
+      date: secondDate,
+      time: '18:30',
+      minutes: 10,
+      source: 'student',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const adjustedFirst = suggestion({
+      id: 'ai-first-date',
+      partId: 'ael-5',
+      title: '调整第一次安排',
+      date: firstDate,
+      time: '19:00',
+      minutes: 10,
+    })
+    const otherSuggestion = suggestion({
+      id: 'ai-other',
+      partId: 'ael-4',
+      title: '另一项建议',
+      date: firstDate,
+      time: '18:30',
+      minutes: 15,
+    })
+    const requestSuggestion = vi.fn(async () => ({
+      ...result,
+      tasks: [otherSuggestion, adjustedFirst],
+      reasons: {
+        'ai-other': '先探索。',
+        'ai-first-date': '调整其中一次安排。',
+      },
+    }))
+    const user = userEvent.setup()
+    const { onConfirm } = renderPanel({
+      requestSuggestion,
+      currentTasks: [existingFirst, existingSecond],
+    })
+
+    await user.click(screen.getByRole('button', { name: '生成 7 天建议' }))
+    await screen.findByLabelText('与当前计划的变更')
+    await user.click(screen.getByRole('checkbox', { name: '选择建议：另一项建议' }))
+
+    expect(screen.getByLabelText('与当前计划的变更')).toHaveTextContent('移除 0 项')
+    await user.click(screen.getByRole('button', { name: '确认采用' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'ai-first-date', date: firstDate, source: 'ai' }),
+      expect.objectContaining({ id: 'existing-second-date', date: secondDate, source: 'student' }),
+    ]), 'ai')
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.not.arrayContaining([expect.objectContaining({ id: 'existing-first-date' })]),
+      'ai',
+    )
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.not.arrayContaining([expect.objectContaining({ id: 'ai-other' })]),
+      'ai',
+    )
+  })
+
   it('persists availability changes made after preview before confirming selected tasks', async () => {
     const user = userEvent.setup()
     const { onConfirm, onSaveAvailability } = renderPanel()

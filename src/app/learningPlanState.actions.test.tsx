@@ -109,6 +109,39 @@ describe('learning plan state actions', () => {
     })
   })
 
+  it('preserves the source of existing tasks in a mixed replacement', async () => {
+    const retained = makeTask('retained-student-task', {
+      time: '18:30',
+      source: 'student',
+    })
+    const added = makeTask('new-ai-task', {
+      partId: 'ael-5',
+      time: '19:00',
+      source: 'ai',
+    })
+    seedPlan('student_a', [retained])
+    const user = userEvent.setup()
+
+    render(
+      <AppStateProvider>
+        <PlanHarness
+          replacement={[retained, added]}
+          inserted={makeTask('unused')}
+          removeId="unused"
+          reorderDate={localDate(0)}
+          reorderIds={[]}
+          availability={[]}
+        />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '登录账号 A' }))
+    await user.click(screen.getByRole('button', { name: '采用 AI 预览' }))
+
+    expect(screen.getByLabelText('plan')).toHaveTextContent('retained-student-task:ael-4:student:0')
+    expect(screen.getByLabelText('plan')).toHaveTextContent('new-ai-task:ael-5:ai:0')
+  })
+
   it('upserts, removes and reorders tasks while saving valid availability', async () => {
     const first = makeTask('first', { order: 0 })
     const second = makeTask('second', { order: 1, time: '19:00' })

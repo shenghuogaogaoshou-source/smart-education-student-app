@@ -94,7 +94,7 @@ function hasOverlap(tasks: LearningPlanTask[]) {
 }
 
 function taskIdentity(task: LearningPlanTask) {
-  return `${task.partId}:${task.kind}`
+  return `${task.date}:${task.partId}:${task.kind}`
 }
 
 function sameTaskTiming(left: LearningPlanTask, right: LearningPlanTask) {
@@ -109,40 +109,28 @@ function summarizePlanChanges(
   includeRemovals: boolean,
 ) {
   const changes: PlanChange[] = []
-  const selectedByIdentity = new Map<string, LearningPlanTask[]>()
-  const currentByIdentity = new Map<string, LearningPlanTask[]>()
+  const selectedByIdentity = new Map<string, LearningPlanTask>()
+  const currentByIdentity = new Map<string, LearningPlanTask>()
   for (const task of selectedTasks) {
-    const group = selectedByIdentity.get(taskIdentity(task)) ?? []
-    group.push(task)
-    selectedByIdentity.set(taskIdentity(task), group)
+    selectedByIdentity.set(taskIdentity(task), task)
   }
   for (const task of currentTasks) {
-    const group = currentByIdentity.get(taskIdentity(task)) ?? []
-    group.push(task)
-    currentByIdentity.set(taskIdentity(task), group)
+    currentByIdentity.set(taskIdentity(task), task)
   }
 
-  for (const [identity, selectedGroup] of selectedByIdentity) {
-    const currentGroup = currentByIdentity.get(identity) ?? []
-    selectedGroup.forEach((task, index) => {
-      const existing = currentGroup[index]
-      if (!existing) {
-        changes.push({ kind: 'added', label: task.title })
-      } else if (!sameTaskTiming(existing, task)) {
-        changes.push({ kind: 'adjusted', label: task.title })
-      }
-    })
-    if (includeRemovals) {
-      currentGroup.slice(selectedGroup.length).forEach((task) => {
-        changes.push({ kind: 'removed', label: task.title })
-      })
+  for (const [identity, task] of selectedByIdentity) {
+    const existing = currentByIdentity.get(identity)
+    if (!existing) {
+      changes.push({ kind: 'added', label: task.title })
+    } else if (!sameTaskTiming(existing, task)) {
+      changes.push({ kind: 'adjusted', label: task.title })
     }
   }
 
   if (includeRemovals) {
-    for (const [identity, currentGroup] of currentByIdentity) {
+    for (const [identity, task] of currentByIdentity) {
       if (!selectedByIdentity.has(identity)) {
-        currentGroup.forEach((task) => changes.push({ kind: 'removed', label: task.title }))
+        changes.push({ kind: 'removed', label: task.title })
       }
     }
   }

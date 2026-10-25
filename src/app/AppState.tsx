@@ -162,9 +162,14 @@ function replaceLearningPlan(
   const activeDates = new Set(refreshed.availability.map((day) => day.date))
   const history = refreshed.tasks.filter((task) =>
     !activeDates.has(task.date) && getTaskCompletion(task, state.learningProgress) === 'completed')
+  const currentById = new Map(
+    refreshed.tasks
+      .filter((task) => activeDates.has(task.date))
+      .map((task) => [task.id, task]),
+  )
   const replacement = action.tasks
     .filter((task) => activeDates.has(task.date))
-    .map((task) => ({ ...task, source: action.source }))
+    .map((task) => ({ ...task, source: currentById.get(task.id)?.source ?? action.source }))
   return {
     ...state,
     learningPlan: normalizedPlan(state, [...history, ...replacement], refreshed.availability, now),
