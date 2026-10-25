@@ -105,7 +105,8 @@ export async function handleCompanionApiRequest(
   if (path === '/api/companion/schedule') {
     if (!apiKey) return { status: 503, body: { error: 'missing_api_key' } }
     try {
-      const schedule = normalizeScheduleRequest(body)
+      const requestTime = new Date()
+      const schedule = normalizeScheduleRequest(body, requestTime)
       const upstream = await proxyJsonRequest({
         url: 'https://api.deepseek.com/chat/completions',
         apiKey,
@@ -113,7 +114,7 @@ export async function handleCompanionApiRequest(
         fetchImpl,
         signal: AbortSignal.timeout(15_000),
       })
-      return { status: 200, body: validateScheduleResponse(upstream, schedule) }
+      return { status: 200, body: validateScheduleResponse(upstream, schedule, requestTime) }
     } catch (error) {
       const code = error instanceof Error ? error.message : ''
       const safeCode = code === 'invalid_input' ? 'invalid_input'

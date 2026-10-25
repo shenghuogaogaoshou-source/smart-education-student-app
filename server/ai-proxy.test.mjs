@@ -14,6 +14,15 @@ describe('AI companion proxy routes', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
+  it('returns 400 invalid_input for inherited grade properties', async () => {
+    const body = { grade: 'constructor', availability: [{ date: '2026-10-25', enabled: true, startTime: '18:00', endTime: '19:00', maxMinutes: 20 }],
+      catalog: [{ partId: 'ael-4', kind: 'knowledge', title: 'test' }], progress: {} }
+    const fetchImpl = vi.fn()
+    expect(await handleCompanionApiRequest({ method: 'POST', path: '/api/companion/schedule', body }, { apiKey: 'fixture', fetchImpl }))
+      .toEqual({ status: 400, body: { error: 'invalid_input' } })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('sends a filtered schedule request and returns server-validated tasks', async () => {
     const date = new Date()
     const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -29,7 +38,7 @@ describe('AI companion proxy routes', () => {
     const result = await handleCompanionApiRequest({ method: 'POST', path: '/api/companion/schedule', body }, { apiKey: 'fixture', fetchImpl })
     expect(result.status).toBe(200)
     expect(result.body.tasks).toHaveLength(1)
-    expect(result.body.tasks[0]).toMatchObject({ partId: 'ael-4', source: 'ai', title: '拆解' })
+    expect(result.body.tasks[0]).toMatchObject({ partId: 'ael-4', source: 'ai', title: '第一次 AI 实验' })
     expect(result.body.reasons[result.body.tasks[0].id]).toBe('了解知识。')
     expect(fetchImpl).toHaveBeenCalledOnce()
     const [url, init] = fetchImpl.mock.calls[0]
