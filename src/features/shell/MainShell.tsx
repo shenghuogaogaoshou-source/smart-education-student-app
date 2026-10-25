@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../../app/AppState'
-import { getGradeBand } from '../../app/learning'
+import { getGradeBand, isTestUnlocked } from '../../app/learning'
+import type { LearningPlanTask } from '../../app/learningPlan'
 import { AiCompanion } from '../ai_companion/AiCompanion'
 import { AppCommandProvider, useAppCommand, useOptionalAppCommand } from '../ai_companion/commands/AppCommandContext'
 import type { CompanionCommand } from '../ai_companion/commands/commandTypes'
@@ -56,6 +57,7 @@ type View =
   | { kind: 'works-manage'; id: number; filter?: string }
   | { kind: 'embedded-game'; id: number; gameId: GameId }
   | { kind: 'course-content'; id: number; courseId: string; chapterNum: number }
+  | { kind: 'test-part'; id: number; partId: LearningPlanTask['partId'] }
 
 export function MainShell() {
   const inheritedCommands = useOptionalAppCommand()
@@ -110,6 +112,27 @@ function MainShellBody() {
       { kind: 'tab', id: nextIdRef.current++ },
       { kind: 'course-content', id: nextIdRef.current++, courseId, chapterNum },
     ])
+  }
+
+  const openTestPart = (partId: LearningPlanTask['partId']) => {
+    scrollMemories.current.set(view.id, window.scrollY)
+    setActiveTab('test')
+    setStack([
+      { kind: 'tab', id: nextIdRef.current++ },
+      { kind: 'test-part', id: nextIdRef.current++, partId },
+    ])
+  }
+
+  const startPlanTask = (task: LearningPlanTask) => {
+    const course = getCourseForBand(getGradeBand(task.grade))
+    const part = course.parts.find((candidate) => candidate.id === task.partId)
+    if (!part) return
+    const progress = state.learningProgress[course.band]
+    if (task.kind === 'knowledge' || !isTestUnlocked(progress, task.partId)) {
+      openKnowledgeContent(course.id, part.number)
+      return
+    }
+    openTestPart(task.partId)
   }
 
   const openProfileView = (nextView: DistributiveOmit<View, 'id'>) => {
@@ -249,7 +272,7 @@ function MainShellBody() {
   if (view.kind === 'schedule') {
     return (
       <main className={shellClassName}>
-        <LearningSchedulePage onBack={pop} />
+        <LearningSchedulePage onBack={pop} onStartTask={startPlanTask} />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
@@ -259,7 +282,11 @@ function MainShellBody() {
   if (view.kind === 'calendar') {
     return (
       <main className={shellClassName}>
-        <CalendarPage onBack={pop} />
+        <CalendarPage
+          onBack={pop}
+          onStartTask={startPlanTask}
+          onOpenSchedule={() => push({ kind: 'schedule' })}
+        />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
@@ -422,6 +449,15 @@ function MainShellBody() {
     )
   }
 
+  if (view.kind === 'test-part') {
+    return (
+      <main className={shellClassName}>
+        <TestPage initialPartId={view.partId} onReviewKnowledge={openKnowledgeContent} />
+        <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
+      </main>
+    )
+  }
+
   return (
     <main className={shellClassName}>
       <div className="tab-content">
@@ -449,7 +485,7 @@ function MainShellBody() {
             onOpenPoints={() => push({ kind: 'points' })}
             onOpenMall={() => push({ kind: 'mall' })}
             onOpenRanking={() => push({ kind: 'ranking' })}
-            onStartLearning={() => selectTab('knowledge')}
+            onStartTask={startPlanTask}
             onOpenSchedule={() => push({ kind: 'schedule' })}
             onOpenCalendar={() => push({ kind: 'calendar' })}
             onOpenWrongBook={() => push({ kind: 'wrong-book' })}

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
 import { loadAccountState } from '../../app/companionAccountRepository'
-import { createEmptyLearningProgress, getGradeBand, getPartIdsForBand } from '../../app/learning'
+import { createEmptyLearningProgress, getGradeBand, getPartIdsForBand, type CoursePartId } from '../../app/learning'
 import { defaultState, type AppState } from '../../app/model'
 import { getPointsBalance } from '../../app/points'
 import { saveState } from '../../app/storage'
@@ -14,9 +14,14 @@ import { TestPage } from './TestPage'
 function renderMap(
   state: Partial<AppState> = {},
   onReviewKnowledge?: (courseId: string, chapterNum: number) => void,
+  initialPartId?: CoursePartId,
 ) {
   saveState({ ...defaultState, ...state })
-  return render(<AppStateProvider><TestPage onReviewKnowledge={onReviewKnowledge} /></AppStateProvider>)
+  return render(
+    <AppStateProvider>
+      <TestPage initialPartId={initialPartId} onReviewKnowledge={onReviewKnowledge} />
+    </AppStateProvider>,
+  )
 }
 
 describe('TestPage', () => {
@@ -59,6 +64,36 @@ describe('TestPage', () => {
 
     await user.click(screen.getByRole('button', { name: '开始答题' }))
     expect(screen.getByRole('heading', { name: '算法工具箱' })).toBeInTheDocument()
+  })
+
+  it('focuses the requested unlocked plan test and opens its introduction', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('test-route-canvas')) return 900
+      if (this.classList.contains('test-route-scroll')) return 420
+      return 0
+    })
+    renderMap({ grade: 'grade5' }, undefined, 'ael-3')
+
+    expect(await screen.findByRole('dialog', { name: '算法工具箱挑战介绍' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '算法工具箱 · 当前关卡' })).toHaveFocus()
+    })
+    const route = screen.getByRole('region', { name: '可上下滑动的完整闯关地图' }).closest('.test-route-scroll')
+    expect(route).not.toBeNull()
+    expect((route as HTMLElement).scrollTop).toBeGreaterThan(0)
+  })
+
+  it('keeps a requested locked plan test closed and explains the knowledge prerequisite', async () => {
+    renderMap({
+      grade: 'grade5',
+      learningProgress: {
+        ...createEmptyLearningProgress(),
+        'grade5-6': { knowledgeCompleted: ['ael-1'], testsPassed: [] },
+      },
+    }, undefined, 'ael-4')
+
+    expect(await screen.findByRole('status')).toHaveTextContent('先完成第 4 部分知识')
+    expect(screen.queryByRole('dialog', { name: '第一次 AI 实验挑战介绍' })).not.toBeInTheDocument()
   })
 
   it('keeps the companion centered above the current node and moves it after passing', async () => {

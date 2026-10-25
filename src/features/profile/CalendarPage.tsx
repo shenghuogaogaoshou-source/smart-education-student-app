@@ -1,23 +1,33 @@
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { useState } from 'react'
-import { formatMonthTitle, tasksForDate } from './plan'
+import { useAppState } from '../../app/AppState'
+import type { LearningPlanTask } from '../../app/learningPlan'
+import { formatMonthTitle, getPlanTaskView, isActiveBandTask, tasksForDate } from './plan'
 import './profile.css'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
-export function CalendarPage({ onBack }: { onBack: () => void }) {
+type Props = {
+  onBack: () => void
+  onStartTask?: (task: LearningPlanTask) => void
+  onOpenSchedule?: () => void
+}
+
+export function CalendarPage({ onBack, onStartTask, onOpenSchedule }: Props) {
+  const { state } = useAppState()
   const now = new Date()
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() })
-  const [selected, setSelected] = useState<string>(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const [selected, setSelected] = useState(() => {
+    const date = new Date()
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   })
+  const tasks = state.learningPlan.tasks.filter((task) => isActiveBandTask(task, state.grade))
 
   const firstWeekday = new Date(cursor.y, cursor.m, 1).getDay()
   const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate()
   const cells: (Date | null)[] = [
     ...Array.from({ length: firstWeekday }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(cursor.y, cursor.m, i + 1)),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(cursor.y, cursor.m, index + 1)),
   ]
 
   const moveMonth = (delta: number) => {
@@ -27,17 +37,14 @@ export function CalendarPage({ onBack }: { onBack: () => void }) {
     })
   }
 
-  const selectedDate = (() => {
-    const [y, m, d] = selected.split('-').map(Number)
-    return new Date(y, m, d)
-  })()
-  const selectedTasks = tasksForDate(selectedDate)
+  const [selectedYear, selectedMonth, selectedDay] = selected.split('-').map(Number)
+  const selectedDate = new Date(selectedYear, selectedMonth - 1, selectedDay)
+  const selectedTasks = tasksForDate(tasks, selectedDate)
   const isCurrentMonth = cursor.y === now.getFullYear() && cursor.m === now.getMonth()
 
-  const label = (d: Date) => {
-    const today = new Date()
-    if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()) return '今天'
-    return `${d.getMonth() + 1} 月 ${d.getDate()} 日`
+  const label = (date: Date) => {
+    if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()) return '今天'
+    return `${date.getMonth() + 1} 月 ${date.getDate()} 日`
   }
 
   return (
@@ -57,24 +64,37 @@ export function CalendarPage({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="calendar-grid" role="grid" aria-label={`${formatMonthTitle(cursor.y, cursor.m)} 日历`}>
-          {WEEKDAYS.map((w) => (
-            <div key={w} className="calendar-weekday" role="columnheader">{w}</div>
+          {WEEKDAYS.map((weekday) => (
+            <div key={weekday} className="calendar-weekday" role="columnheader">{weekday}</div>
           ))}
-          {cells.map((d, i) => {
-            if (!d) return <div key={`empty-${i}`} className="calendar-day empty" />
-            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-            const hasTask = tasksForDate(d).length > 0
-            const isToday = key === `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`
+          {cells.map((date, index) => {
+            if (!date) return <div key={`empty-${index}`} className="calendar-day empty" />
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+            const dayTasks = tasksForDate(tasks, date)
+            const statuses = dayTasks.map((task) => getPlanTaskView(task, state.learningProgress).statusLabel)
+            const isToday = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
             const classes = [
               'calendar-day',
-              hasTask ? 'has-task' : '',
+              dayTasks.length ? 'has-task' : '',
+              statuses.includes('待调整') ? 'has-overdue' : '',
+              statuses.includes('已完成') ? 'has-completed' : '',
               isToday ? 'today' : '',
               key === selected ? 'selected' : '',
             ].filter(Boolean).join(' ')
+            const statusCopy = dayTasks.length
+              ? `，有安排${statuses.includes('待调整') ? '，有待调整' : statuses.includes('已完成') ? '，有已完成' : ''}`
+              : ''
             return (
-              <button key={key} type="button" className={classes} aria-label={`${d.getDate()} 日${hasTask ? '，有安排' : ''}`} aria-pressed={key === selected} onClick={() => setSelected(key)}>
-                <span>{d.getDate()}</span>
-                {hasTask && <i aria-hidden="true" />}
+              <button
+                key={key}
+                type="button"
+                className={classes}
+                aria-label={`${date.getDate()} 日${statusCopy}`}
+                aria-pressed={key === selected}
+                onClick={() => setSelected(key)}
+              >
+                <span>{date.getDate()}</span>
+                {dayTasks.length > 0 && <i aria-hidden="true" />}
               </button>
             )
           })}
@@ -82,22 +102,36 @@ export function CalendarPage({ onBack }: { onBack: () => void }) {
 
         <div className="calendar-legend">
           <span><i className="legend-dot today-dot" aria-hidden="true" />今天</span>
-          <span><i className="legend-dot task-dot" aria-hidden="true" />有安排的日子</span>
+          <span><i className="legend-dot task-dot" aria-hidden="true" />有安排</span>
+          <span><i className="legend-dot completed-dot" aria-hidden="true" />已完成</span>
+          <span><i className="legend-dot overdue-dot" aria-hidden="true" />待调整</span>
         </div>
       </section>
 
       <section className="calendar-card selected-day-card">
-        <h2>{label(selectedDate)}的安排</h2>
+        <div className="section-heading-row">
+          <h2>{label(selectedDate)}的安排</h2>
+          {onOpenSchedule && <button className="calendar-adjust" type="button" onClick={onOpenSchedule}>调整这天的安排</button>}
+        </div>
         {selectedTasks.length === 0 ? (
           <p className="calendar-empty">这一天暂时没有安排，好好休息吧。</p>
         ) : (
-          <ul className="schedule-list">
-            {selectedTasks.map((t) => (
-              <li key={t.title} className="schedule-item">
-                <span className="schedule-time">{t.time}</span>
-                <div className="schedule-copy"><strong>{t.title}</strong><small>预计 {t.minutes} 分钟</small></div>
-              </li>
-            ))}
+          <ul className="schedule-list calendar-task-list">
+            {selectedTasks.map((task) => {
+              const view = getPlanTaskView(task, state.learningProgress)
+              return (
+                <li key={task.id} className="calendar-task-card">
+                  <div className="calendar-task-top">
+                    <span className={`schedule-kind schedule-kind--${task.kind}`}>{view.kindLabel}</span>
+                    {view.showReview && <span className="schedule-review">复习</span>}
+                    <span className={`schedule-status schedule-status--${view.tone}`}>{view.statusLabel}</span>
+                  </div>
+                  <strong>{task.title}</strong>
+                  <span className="schedule-time"><Clock3 aria-hidden="true" size={13} />{task.time} · 预计 {task.minutes} 分钟</span>
+                  <button type="button" onClick={() => onStartTask?.(task)}>开始 {task.title}</button>
+                </li>
+              )
+            })}
           </ul>
         )}
         {isCurrentMonth && <p className="calendar-tip">点日历上的其他日期，可以查看那天的安排。</p>}

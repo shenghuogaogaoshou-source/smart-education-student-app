@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, BookOpen, Map, Sparkles, X } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
-import { GRADE_BAND_LABELS, getGradeBand, isTestUnlocked, type PrimaryGrade } from '../../app/learning'
+import { GRADE_BAND_LABELS, getGradeBand, isTestUnlocked, type CoursePartId, type PrimaryGrade } from '../../app/learning'
 import { AiCompanion } from '../ai_companion/AiCompanion'
 import { getCourseForBand, type CoursePart } from '../knowledge/courseCatalog'
 import { QuizModal } from './QuizModal'
@@ -17,9 +17,10 @@ type ChallengeResult = {
 
 type Props = {
   onReviewKnowledge?: (courseId: string, chapterNum: number) => void
+  initialPartId?: CoursePartId
 }
 
-export function TestPage({ onReviewKnowledge }: Props = {}) {
+export function TestPage({ onReviewKnowledge, initialPartId }: Props = {}) {
   const { state, passTest } = useAppState()
   const band = getGradeBand(state.grade as PrimaryGrade)
   const course = getCourseForBand(band)
@@ -33,6 +34,7 @@ export function TestPage({ onReviewKnowledge }: Props = {}) {
   const [introPart, setIntroPart] = useState<CoursePart | null>(null)
   const [activePart, setActivePart] = useState<CoursePart | null>(null)
   const [result, setResult] = useState<ChallengeResult | null>(null)
+  const handledInitialPart = useRef<CoursePartId | null>(null)
 
   useEffect(() => {
     const route = routeRef.current
@@ -43,6 +45,34 @@ export function TestPage({ onReviewKnowledge }: Props = {}) {
     const centerFromTop = ((100 - currentNode.y) / 100) * canvasHeight
     route.scrollTop = Math.max(0, centerFromTop - route.clientHeight / 2)
   }, [currentNode?.id, currentNode?.y])
+
+  useEffect(() => {
+    handledInitialPart.current = null
+  }, [initialPartId])
+
+  useEffect(() => {
+    if (!initialPartId || handledInitialPart.current === initialPartId) return
+    const requestedPart = course.parts.find((part) => part.id === initialPartId)
+    if (!requestedPart) {
+      setNotice('没有找到这项学习安排，可以回到计划里重新选择。')
+      handledInitialPart.current = initialPartId
+      return
+    }
+    const requestedNode = nodes.find((node) => node.id === requestedPart.id)
+    const route = routeRef.current
+    if (route && requestedNode) {
+      const canvas = route.firstElementChild as HTMLElement | null
+      const canvasHeight = canvas?.clientHeight || 1100
+      const centerFromTop = ((100 - requestedNode.y) / 100) * canvasHeight
+      route.scrollTop = Math.max(0, centerFromTop - route.clientHeight / 2)
+    }
+    const anchor = routeRef.current?.querySelector<HTMLButtonElement>(
+      `[data-node-anchor="${requestedPart.id}"]`,
+    )
+    anchor?.focus({ preventScroll: true })
+    openChallenge(requestedPart)
+    handledInitialPart.current = initialPartId
+  }, [initialPartId, course.id])
 
   function nodeStatus(part: CoursePart): TestLevelStatus {
     if (progress.testsPassed.includes(part.id)) return 'completed'

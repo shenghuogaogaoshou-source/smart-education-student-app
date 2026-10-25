@@ -1,6 +1,7 @@
 import { ChevronRight, Settings, UserRound } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
+import type { LearningPlanTask } from '../../app/learningPlan'
 import type { GameId } from '../games/gameRegistry'
 import { GrowthSection } from './GrowthSection'
 import { LearningOverview } from './LearningOverview'
@@ -18,7 +19,7 @@ export function ProfilePage({
   onOpenPoints,
   onOpenMall,
   onOpenRanking,
-  onStartLearning,
+  onStartTask,
   onOpenSchedule,
   onOpenCalendar,
   onOpenWrongBook,
@@ -37,7 +38,7 @@ export function ProfilePage({
   onOpenPoints?: () => void
   onOpenMall?: () => void
   onOpenRanking?: () => void
-  onStartLearning?: () => void
+  onStartTask?: (task: LearningPlanTask) => void
   onOpenSchedule?: () => void
   onOpenCalendar?: () => void
   onOpenWrongBook?: () => void
@@ -60,8 +61,8 @@ export function ProfilePage({
       </header>
       <LearningOverview />
       <GrowthSection
-        onStartLearning={onStartLearning ?? (() => { })}
-        onAdjustSchedule={onOpenSchedule ?? (() => { })}
+        onStartTask={onStartTask ?? (() => { })}
+        onOpenSchedule={onOpenSchedule ?? (() => { })}
         onOpenCalendar={onOpenCalendar ?? (() => { })}
       />
       <RewardsSection onOpenMedals={onOpenMedals} onOpenPoints={onOpenPoints} onOpenMall={onOpenMall} onOpenRanking={onOpenRanking} />

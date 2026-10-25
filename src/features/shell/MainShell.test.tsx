@@ -3,10 +3,41 @@ import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { saveAccountState } from '../../app/companionAccountRepository'
+import type { LearningPlanTask } from '../../app/learningPlan'
+import { createDefaultState } from '../../app/model'
 import { SessionCredentialProvider, useSessionCredential } from '../auth/sessionCredential'
 import { AppCommandProvider, useAppCommand } from '../ai_companion/commands/AppCommandContext'
 import type { InterpretedIntent } from '../ai_companion/commands/commandTypes'
 import { MainShell } from './MainShell'
+
+function localDate(offset: number) {
+  const now = new Date()
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function seedPlan(task: Partial<LearningPlanTask> = {}) {
+  const timestamp = new Date().toISOString()
+  const state = createDefaultState()
+  state.learningPlan.tasks = [{
+    id: 'shell-plan-task',
+    grade: 'grade5',
+    partId: 'ael-4',
+    kind: 'knowledge',
+    title: '第一次 AI 实验',
+    date: localDate(1),
+    time: '19:00',
+    minutes: 15,
+    order: 0,
+    source: 'student',
+    review: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...task,
+  }]
+  saveAccountState(state.accountId, state)
+}
 
 function CredentialSeed() {
   const credential = useSessionCredential()
@@ -128,6 +159,50 @@ describe('main shell navigation', () => {
     await user.click(screen.getByRole('button', { name: /第一件作品正在等你/ }))
 
     expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
+  })
+
+  it('opens the exact knowledge chapter from the next plan card', async () => {
+    const user = userEvent.setup()
+    seedPlan()
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '开始学习' }))
+
+    expect(screen.getByRole('heading', { name: '第4章 · 第一次 AI 实验' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '知识' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('opens the exact unlocked test introduction from the next plan card', async () => {
+    const user = userEvent.setup()
+    seedPlan({
+      partId: 'ael-3',
+      kind: 'test',
+      title: '算法工具箱',
+    })
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '开始测试' }))
+
+    expect(screen.getByRole('dialog', { name: '算法工具箱挑战介绍' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '测试' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('routes a planned locked test to its exact knowledge chapter', async () => {
+    const user = userEvent.setup()
+    seedPlan({
+      partId: 'ael-4',
+      kind: 'test',
+      title: '第一次 AI 实验',
+    })
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '开始学习' }))
+
+    expect(screen.getByRole('heading', { name: '第4章 · 第一次 AI 实验' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '第一次 AI 实验挑战介绍' })).not.toBeInTheDocument()
   })
 
   it('uses only the in-map interactive companion on the elementary test tab', async () => {

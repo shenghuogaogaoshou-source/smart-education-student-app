@@ -1,13 +1,51 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { saveAccountState } from '../../app/companionAccountRepository'
+import type { LearningPlanTask } from '../../app/learningPlan'
 import { createDefaultState } from '../../app/model'
+import { CalendarPage } from './CalendarPage'
 import { ProfilePage } from './ProfilePage'
 import { ProfileDetailPage } from './ProfileDetailPage'
 import { ProfileEditPage } from './ProfileEditPage'
 
+function localDate(offset: number) {
+  const now = new Date()
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function planTask(overrides: Partial<LearningPlanTask> = {}): LearningPlanTask {
+  const timestamp = new Date().toISOString()
+  return {
+    id: 'profile-real-task',
+    grade: 'grade5',
+    partId: 'ael-4',
+    kind: 'knowledge',
+    title: '第一次 AI 实验',
+    date: localDate(1),
+    time: '19:00',
+    minutes: 15,
+    order: 0,
+    source: 'student',
+    review: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  }
+}
+
+function seedPlan(tasks: LearningPlanTask[]) {
+  const state = createDefaultState()
+  state.learningPlan.tasks = tasks
+  saveAccountState(state.accountId, state)
+  return state
+}
+
 describe('profile dashboard', () => {
+  beforeEach(() => localStorage.clear())
+
   it('presents the current primary grade and band without stage labels', () => {
     const view = render(<AppStateProvider><ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} /></AppStateProvider>)
 
@@ -59,13 +97,94 @@ describe('profile dashboard', () => {
     expect(screen.getByText('耐心找方法的小研究员')).toBeInTheDocument()
   })
 
-  it('previews an AI schedule suggestion before applying it', async () => {
+  it('shows the real next plan task and opens the schedule flow for AI advice', async () => {
     const user = userEvent.setup()
-    render(<AppStateProvider><ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} /></AppStateProvider>)
+    const task = planTask()
+    seedPlan([task])
+    const onStartTask = vi.fn()
+    const onOpenSchedule = vi.fn()
+    render(
+      <AppStateProvider>
+        <ProfilePage
+          onOpenSettings={vi.fn()}
+          onOpenProfileDetail={vi.fn()}
+          onStartTask={onStartTask}
+          onOpenSchedule={onOpenSchedule}
+        />
+      </AppStateProvider>,
+    )
 
-    await user.click(screen.getByRole('button', { name: '看看 AI 建议' }))
-    expect(screen.getByRole('dialog', { name: '安排建议预览' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '确认调整' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '第一次 AI 实验' })).toBeInTheDocument()
+    expect(screen.queryByText('图片识别小探索')).not.toBeInTheDocument()
+    expect(screen.getByText('知识')).toBeInTheDocument()
+    expect(screen.getByText('预计 15 分钟')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '开始学习' }))
+    expect(onStartTask).toHaveBeenCalledWith(task)
+
+    await user.click(screen.getByRole('button', { name: 'AI 帮我安排' }))
+    expect(onOpenSchedule).toHaveBeenCalledOnce()
+  })
+
+  it('shows an overdue pending task as waiting for adjustment without changing its date', async () => {
+    const task = planTask({ date: localDate(-1), time: '18:30' })
+    seedPlan([task])
+    const onStartTask = vi.fn()
+    render(
+      <AppStateProvider>
+        <ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} onStartTask={onStartTask} />
+      </AppStateProvider>,
+    )
+
+    expect(screen.getByRole('heading', { name: '第一次 AI 实验' })).toBeInTheDocument()
+    expect(screen.getByText('待调整')).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: '开始学习' }))
+    expect(onStartTask).toHaveBeenCalledWith(expect.objectContaining({ date: task.date }))
+  })
+
+  it('renders the account plan and live completion state in the real month calendar', async () => {
+    const user = userEvent.setup()
+    const task = planTask()
+    const completedReview = planTask({
+      id: 'profile-completed-review',
+      partId: 'ael-1',
+      title: 'AI 系统拆解站',
+      date: localDate(2),
+      review: true,
+    })
+    seedPlan([task, completedReview])
+    const onStartTask = vi.fn()
+    const onOpenSchedule = vi.fn()
+    render(
+      <AppStateProvider>
+        <CalendarPage
+          onBack={vi.fn()}
+          onStartTask={onStartTask}
+          onOpenSchedule={onOpenSchedule}
+        />
+      </AppStateProvider>,
+    )
+
+    const targetDate = new Date()
+    targetDate.setDate(targetDate.getDate() + 1)
+    const scheduledDay = screen.getByRole('button', { name: `${targetDate.getDate()} 日，有安排` })
+    await user.click(scheduledDay)
+
+    expect(screen.getByText('第一次 AI 实验')).toBeInTheDocument()
+    expect(screen.queryByText('语音地图小任务')).not.toBeInTheDocument()
+    expect(screen.getByText('待开始')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '开始 第一次 AI 实验' }))
+    expect(onStartTask).toHaveBeenCalledWith(task)
+    await user.click(screen.getByRole('button', { name: '调整这天的安排' }))
+    expect(onOpenSchedule).toHaveBeenCalledOnce()
+
+    const completedDate = new Date()
+    completedDate.setDate(completedDate.getDate() + 2)
+    await user.click(screen.getByRole('button', { name: `${completedDate.getDate()} 日，有安排，有已完成` }))
+    const completedCard = screen.getByText('AI 系统拆解站').closest('li')
+    expect(completedCard).not.toBeNull()
+    expect(within(completedCard!).getByText('已完成')).toBeInTheDocument()
+    expect(within(completedCard!).getByText('复习')).toBeInTheDocument()
   })
 
   it('derives the profile medal count from course progress and earned growth medals', () => {

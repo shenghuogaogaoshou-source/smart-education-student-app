@@ -1,30 +1,105 @@
-// 成长安排的共享数据：成长卡片、学习安排页与整月日历共用同一份计划。
-export type PlanTask = {
-  dayOffset: number // 0 = 今天
-  time: string // HH:MM
-  title: string
-  minutes: number
+import { getGradeBand, type LearningProgress } from '../../app/learning'
+import {
+  getTaskCompletion,
+  getTaskTiming,
+  type LearningPlanTask,
+} from '../../app/learningPlan'
+
+export type PlanTaskView = {
+  task: LearningPlanTask
+  kindLabel: '知识' | '测试'
+  statusLabel: '已完成' | '待调整' | '今天' | '待开始'
+  tone: 'complete' | 'overdue' | 'today' | 'upcoming'
+  showReview: boolean
 }
 
-export const PLAN_TASKS: PlanTask[] = [
-  { dayOffset: 0, time: '19:00', title: '图片识别小探索', minutes: 15 },
-  { dayOffset: 1, time: '19:00', title: '声音地图小任务', minutes: 10 },
-  { dayOffset: 2, time: '10:30', title: '提示词小练习', minutes: 12 },
-]
-
-export function dateKey(d: Date) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+export function dateKey(date: Date | string): string {
+  if (typeof date === 'string') return date
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-export function tasksForDate(d: Date) {
-  const key = dateKey(d)
-  const today = new Date()
-  return PLAN_TASKS.filter((t) => {
-    const target = new Date(today.getFullYear(), today.getMonth(), today.getDate() + t.dayOffset)
-    return dateKey(target) === key
-  })
+export function tasksForDate(tasks: LearningPlanTask[], date: Date | string): LearningPlanTask[] {
+  const key = dateKey(date)
+  return tasks
+    .filter((task) => task.date === key)
+    .sort((left, right) => left.order - right.order || left.time.localeCompare(right.time))
 }
 
-export function formatMonthTitle(y: number, m: number) {
-  return `${y} 年 ${m + 1} 月`
+function scheduledTime(task: LearningPlanTask): number {
+  const [year, month, day] = task.date.split('-').map(Number)
+  const [hour, minute] = task.time.split(':').map(Number)
+  return new Date(year, month - 1, day, hour, minute).getTime()
+}
+
+export function getNextPlanTask(
+  tasks: LearningPlanTask[],
+  progress: LearningProgress,
+  now: Date = new Date(),
+): LearningPlanTask | null {
+  const currentMinute = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    now.getHours(),
+    now.getMinutes(),
+  ).getTime()
+  const pending = tasks.filter((task) => getTaskCompletion(task, progress) === 'pending')
+  const upcoming = pending
+    .filter((task) => scheduledTime(task) >= currentMinute)
+    .sort((left, right) => scheduledTime(left) - scheduledTime(right))
+  if (upcoming.length) return upcoming[0]
+
+  return pending.sort((left, right) => scheduledTime(right) - scheduledTime(left))[0] ?? null
+}
+
+export function getPlanTaskView(
+  task: LearningPlanTask,
+  progress: LearningProgress,
+  now: Date = new Date(),
+): PlanTaskView {
+  const completion = getTaskCompletion(task, progress)
+  const timing = getTaskTiming(task, now)
+  if (completion === 'completed') {
+    return {
+      task,
+      kindLabel: task.kind === 'knowledge' ? '知识' : '测试',
+      statusLabel: '已完成',
+      tone: 'complete',
+      showReview: task.review,
+    }
+  }
+  if (timing === 'overdue') {
+    return {
+      task,
+      kindLabel: task.kind === 'knowledge' ? '知识' : '测试',
+      statusLabel: '待调整',
+      tone: 'overdue',
+      showReview: false,
+    }
+  }
+  return {
+    task,
+    kindLabel: task.kind === 'knowledge' ? '知识' : '测试',
+    statusLabel: timing === 'today' ? '今天' : '待开始',
+    tone: timing,
+    showReview: false,
+  }
+}
+
+export function formatPlanTaskDate(task: LearningPlanTask, now: Date = new Date()): string {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const [year, month, day] = task.date.split('-').map(Number)
+  const target = new Date(year, month - 1, day)
+  const offset = Math.round((target.getTime() - today.getTime()) / 86_400_000)
+  if (offset === 0) return '今天'
+  if (offset === 1) return '明天'
+  return `${month} 月 ${day} 日`
+}
+
+export function formatMonthTitle(year: number, month: number) {
+  return `${year} 年 ${month + 1} 月`
+}
+
+export function isActiveBandTask(task: LearningPlanTask, grade: LearningPlanTask['grade']): boolean {
+  return getGradeBand(task.grade) === getGradeBand(grade)
 }
