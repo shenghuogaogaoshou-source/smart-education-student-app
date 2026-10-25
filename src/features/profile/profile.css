@@ -2548,6 +2548,12 @@
   font-size: calc(0.66rem * var(--font-scale));
 }
 
+.calendar-readonly-note {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: calc(0.68rem * var(--font-scale));
+}
+
 /* ===== 资料弹窗增强 ===== */
 /* ===== 全屏个人资料页 ===== */
 .profile-page-header {

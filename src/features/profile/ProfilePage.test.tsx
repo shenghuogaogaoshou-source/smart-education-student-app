@@ -214,6 +214,27 @@ describe('profile dashboard', () => {
     expect(within(completedCard!).getByText('复习')).toBeInTheDocument()
   })
 
+  it('keeps dates outside the editable seven-day window view-only', async () => {
+    const user = userEvent.setup()
+    seedPlan([])
+    const onOpenSchedule = vi.fn()
+    render(
+      <AppStateProvider>
+        <CalendarPage
+          onBack={vi.fn()}
+          onOpenSchedule={onOpenSchedule}
+        />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '上个月' }))
+    await user.click(screen.getByRole('button', { name: '15 日' }))
+
+    expect(screen.getByText('此日期仅查看记录，未来七天内的安排可调整。')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '调整这天的安排' })).not.toBeInTheDocument()
+    expect(onOpenSchedule).not.toHaveBeenCalled()
+  })
+
   it('derives the profile medal count from course progress and earned growth medals', () => {
     const state = createDefaultState()
     state.learningProgress['grade5-6'] = {

@@ -18,6 +18,13 @@ export function dateKey(date: Date | string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+export function isEditablePlanDate(date: Date | string, now: Date = new Date()): boolean {
+  const key = dateKey(date)
+  return Array.from({ length: 7 }, (_, offset) => dateKey(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset),
+  )).includes(key)
+}
+
 export function tasksForDate(tasks: LearningPlanTask[], date: Date | string): LearningPlanTask[] {
   const key = dateKey(date)
   return tasks

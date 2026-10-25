@@ -2,7 +2,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import type { LearningPlanTask } from '../../app/learningPlan'
-import { formatMonthTitle, getPlanTaskView, isActiveBandTask, tasksForDate } from './plan'
+import { formatMonthTitle, getPlanTaskView, isActiveBandTask, isEditablePlanDate, tasksForDate } from './plan'
 import './profile.css'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -40,6 +40,7 @@ export function CalendarPage({ onBack, onStartTask, onOpenSchedule }: Props) {
   const [selectedYear, selectedMonth, selectedDay] = selected.split('-').map(Number)
   const selectedDate = new Date(selectedYear, selectedMonth - 1, selectedDay)
   const selectedTasks = tasksForDate(tasks, selectedDate)
+  const canEditSelectedDate = isEditablePlanDate(selected, now)
   const isCurrentMonth = cursor.y === now.getFullYear() && cursor.m === now.getMonth()
 
   const label = (date: Date) => {
@@ -111,8 +112,13 @@ export function CalendarPage({ onBack, onStartTask, onOpenSchedule }: Props) {
       <section className="calendar-card selected-day-card">
         <div className="section-heading-row">
           <h2>{label(selectedDate)}的安排</h2>
-          {onOpenSchedule && <button className="calendar-adjust" type="button" onClick={() => onOpenSchedule(selected)}>调整这天的安排</button>}
+          {onOpenSchedule && canEditSelectedDate && (
+            <button className="calendar-adjust" type="button" onClick={() => onOpenSchedule(selected)}>调整这天的安排</button>
+          )}
         </div>
+        {!canEditSelectedDate && (
+          <p className="calendar-readonly-note">此日期仅查看记录，未来七天内的安排可调整。</p>
+        )}
         {selectedTasks.length === 0 ? (
           <p className="calendar-empty">这一天暂时没有安排，好好休息吧。</p>
         ) : (

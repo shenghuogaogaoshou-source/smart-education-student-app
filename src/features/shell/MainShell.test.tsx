@@ -189,6 +189,21 @@ describe('main shell navigation', () => {
     expect(screen.getByRole('button', { name: /明天 \d{4}-\d{2}-\d{2}，1 项安排/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('does not open the schedule editor for a date outside the active seven days', async () => {
+    const user = userEvent.setup()
+    seedPlan()
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '打开整月日历' }))
+    await user.click(screen.getByRole('button', { name: '上个月' }))
+    await user.click(screen.getByRole('button', { name: '15 日' }))
+
+    expect(screen.getByText('此日期仅查看记录，未来七天内的安排可调整。')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '调整这天的安排' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '成长安排' })).not.toBeInTheDocument()
+  })
+
   it('opens the exact unlocked test introduction from the next plan card', async () => {
     const user = userEvent.setup()
     seedPlan({
