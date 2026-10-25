@@ -86,6 +86,44 @@ describe('real course learning planner', () => {
     expect(buildFallbackPlan({ grade: 'grade5', course, progress, availability: availability.map((day) => ({ ...day, maxMinutes: 5 })), now })).toEqual([])
   })
 
+  it('skips today when its availability has ended and starts tomorrow at its configured time', () => {
+    const course = getCourseForGrade('grade5')
+    const plan = buildFallbackPlan({
+      grade: 'grade5', course, progress: createEmptyLearningProgress()[course.band],
+      availability, now: new Date(2026, 9, 25, 19, 16),
+    })
+    expect(plan[0]).toMatchObject({ date: dates[1], time: '18:30' })
+    expect(plan.some((item) => item.date === dates[0])).toBe(false)
+  })
+
+  it("starts today's fallback at the current whole minute and skips today if a task no longer fits", () => {
+    const course = getCourseForGrade('grade5')
+    const progress = createEmptyLearningProgress()[course.band]
+    const atMinute = new Date(2026, 9, 25, 18, 40, 59)
+    const plan = buildFallbackPlan({ grade: 'grade5', course, progress, availability, now: atMinute })
+    expect(plan[0]).toMatchObject({ date: dates[0], time: '18:40' })
+
+    const nearClose = buildFallbackPlan({
+      grade: 'grade5', course, progress, availability, now: new Date(2026, 9, 25, 19, 5),
+    })
+    expect(nearClose[0]).toMatchObject({ date: dates[1], time: '18:30' })
+    expect(nearClose.some((item) => item.date === dates[0])).toBe(false)
+  })
+
+  it('rejects past times today, including after the window has ended, but retains tomorrow', () => {
+    const course = getCourseForGrade('grade5')
+    const atMinute = new Date(2026, 9, 25, 18, 40, 59)
+    const candidates = [
+      task({ id: 'past', time: '18:39' }),
+      task({ id: 'current', partId: 'ael-2', time: '18:40' }),
+      task({ id: 'tomorrow', partId: 'ael-3', date: dates[1] }),
+    ]
+    expect(validatePlanTasks(candidates, { course, availability, now: atMinute }).map(({ id }) => id)).toEqual(['current', 'tomorrow'])
+    expect(validatePlanTasks([task(), candidates[2]], {
+      course, availability, now: new Date(2026, 9, 25, 19, 16),
+    }).map(({ id }) => id)).toEqual(['tomorrow'])
+  })
+
   it('filters unknown parts, kinds, grades, duplicates, dates and duration outside 5–90', () => {
     const candidates: unknown[] = [
       task(), task({ id: 'duplicate' }), task({ id: 'unknown', partId: 'ael-100' }),

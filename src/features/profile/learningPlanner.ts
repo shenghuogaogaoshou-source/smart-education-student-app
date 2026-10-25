@@ -42,6 +42,11 @@ function timeFromMinutes(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
+function earliestStart(day: DailyAvailability, now: Date): number {
+  const dayStart = minutesFromTime(day.startTime)!
+  return day.date === dateKey(now) ? Math.max(dayStart, now.getHours() * 60 + now.getMinutes()) : dayStart
+}
+
 function availableDays({ availability, now = new Date() }: Pick<PlanContext, 'availability' | 'now'>): DailyAvailability[] {
   const window = sevenDayDates(now)
   const seen = new Set<string>()
@@ -84,7 +89,7 @@ export function buildFallbackPlan({ grade, course, progress, availability, now =
   const tasks: LearningPlanTask[] = []
   let next = 0
   for (const day of days) {
-    let cursor = minutesFromTime(day.startTime)!
+    let cursor = earliestStart(day, now)
     const end = minutesFromTime(day.endTime)!
     let used = 0
     while (next < candidates.length) {
@@ -128,7 +133,7 @@ export function validatePlanTasks(tasks: unknown, { course, availability, now = 
       || typeof task.createdAt !== 'string' || !Number.isFinite(Date.parse(task.createdAt))
       || typeof task.updatedAt !== 'string' || !Number.isFinite(Date.parse(task.updatedAt))) continue
     const start = minutesFromTime(task.time)
-    const dayStart = minutesFromTime(day.startTime)!
+    const dayStart = earliestStart(day, now)
     const dayEnd = minutesFromTime(day.endTime)!
     const tuple = `${task.date}:${task.partId}:${task.kind}`
     if (start === null || start < dayStart || start + task.minutes! > dayEnd || seen.has(tuple)
