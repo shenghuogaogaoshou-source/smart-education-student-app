@@ -9,9 +9,6 @@ const BAND_BY_GRADE = {
 const REQUEST_TIME = Symbol('scheduleRequestTime')
 const VALID_TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const VALID_DATE = /^\d{4}-\d{2}-\d{2}$/
-const PERSONAL_DATA = /手机号|电话|邮箱|电子邮件|住址|地址|家庭住址|身份证|银行卡|密码|验证码|联系(?:方式|人)|微信|QQ|学校|班级|姓名|名字|我叫|我住|家住|(?:[\u4e00-\u9fa5]{2,4})(?:同学|老师)的|\d{3,4}[-\s]?\d{7,8}|1[3-9]\d{9}|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:省|市|区|县|路|街|巷|号楼|门牌)\S*\d+号?|\b(?:name|address|phone|email|guardian)\s*[:：]/i
-const UNSAFE_COPY = /落后|薄弱|差生|差劲|你真差|真差|不如|比别人|比同学|比其他|比你|比.{0,8}(?:同学|别人|其他人).{0,8}(?:更|好|强|差)|全班第一|排名|赶上|必须|一定要|不得不|赶快|抓紧|再不|否则|不完成就|惩罚|奖励|积分|勋章|骄傲|最棒|真棒|厉害|优秀|笨蛋|愚蠢|垃圾|诊断|治疗|药物|自伤|自杀|暴力|色情/i
-const NEUTRAL_SUMMARY = '按自己的节奏安排学习。'
 
 export const CHILD_SCHEDULE_RULES = '你是面向小学生的学习安排助手。只可使用课程清单中的 ID 与 kind，不得发明课程或测试。仅安排提供的未来七天及启用的时段，遵守每日分钟上限；未完成知识必须在相应测试之前。只返回 JSON 对象，格式为 {"tasks":[{"partId":"...","kind":"knowledge|test","date":"YYYY-MM-DD","time":"HH:mm","minutes":15,"reason":"..."}],"weekSummary":"..."}。表达简短、温和、具体，不使用压力语言、比较评价、奖励承诺或医疗建议，不做排课以外的改变。'
 
@@ -20,16 +17,15 @@ function isRecord(value) { return value !== null && typeof value === 'object' &&
 function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
 function timeMinutes(time) { return Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) }
 function partIsReal(id, band) { return typeof id === 'string' && Object.hasOwn(COURSE_TITLES[band], id) }
-function cleanText(value, length = 120) {
-  if (typeof value !== 'string') return ''
-  const plain = value.replace(/<[^>]*>/g, ' ').replace(/[<>`{}\[\]\\]/g, ' ').replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim()
-  return PERSONAL_DATA.test(plain) || UNSAFE_COPY.test(plain) ? '' : plain.slice(0, length)
+function canonicalTopic(value, catalog) {
+  // The provider sees only server-owned course titles, never client-authored prose.
+  if (typeof value === 'string') return catalog.find((item) => item.title === value)?.title ?? ''
+  if (!isRecord(value)) return ''
+  return catalog.find((item) => item.partId === value.partId && item.kind === value.kind)?.title ?? ''
 }
-function topicText(value) {
-  // Do not interpret arbitrary records or narrative/free-form personal text as a topic.
-  if (typeof value !== 'string' || value.length > 80) return ''
-  const topic = cleanText(value, 80)
-  return topic && !/[.!?。！？\n]/.test(topic) && topic.length <= 40 ? topic : ''
+function taskReason(item, review) {
+  if (review) return `回顾《${item.title}》的相关内容。`
+  return item.kind === 'knowledge' ? `了解《${item.title}》的知识内容。` : `通过《${item.title}》练习回顾相关内容。`
 }
 function minimalTask(value, catalog) {
   if (!isRecord(value) || !VALID_DATE.test(value.date) || !VALID_TIME.test(value.time)
@@ -75,7 +71,7 @@ export function normalizeScheduleRequest(input, now = new Date()) {
   const currentTasks = Array.isArray(input.currentTasks) ? input.currentTasks.slice(0, 80)
     .map((item) => minimalTask(item, catalog)).filter((item) => item && dates.has(item.date)) : []
   const wrongQuestionSummaries = Array.isArray(input.wrongQuestionSummaries)
-    ? input.wrongQuestionSummaries.slice(0, 20).map(topicText).filter(Boolean) : []
+    ? input.wrongQuestionSummaries.slice(0, 20).map((item) => canonicalTopic(item, catalog)).filter(Boolean) : []
   const schedule = { grade: input.grade, gradeBand: band, availability, catalog, progress, currentTasks, wrongQuestionSummaries }
   Object.defineProperty(schedule, REQUEST_TIME, { value: new Date(now.getTime()) })
   return schedule
@@ -118,8 +114,6 @@ export function validateScheduleResponse(provider, request, now = request[REQUES
     const start = timeMinutes(candidate.time)
     const end = start + candidate.minutes
     const key = `${candidate.date}:${candidate.partId}:${candidate.kind}`
-    const reason = cleanText(candidate.reason)
-    if (typeof candidate.reason === 'string' && candidate.reason.trim() && !reason) continue
     if (seen.has(key) || start < timeMinutes(day.startTime) || (candidate.date === dateKey(now) && start < now.getHours() * 60 + now.getMinutes())
       || end > timeMinutes(day.endTime) || (used.get(day.date) ?? 0) + candidate.minutes > day.maxMinutes
       || (intervals.get(day.date) ?? []).some(([from, to]) => start < to && end > from)) continue
@@ -132,12 +126,13 @@ export function validateScheduleResponse(provider, request, now = request[REQUES
     intervals.set(day.date, [...(intervals.get(day.date) ?? []), [start, end]])
     if (candidate.kind === 'knowledge') scheduledKnowledge.set(candidate.partId, moment)
     const order = tasks.filter((item) => item.date === candidate.date).length
+    const review = (candidate.kind === 'knowledge' ? request.progress.knowledgeCompleted : request.progress.testsPassed).includes(candidate.partId)
     tasks.push({ id, grade: request.grade, partId: catalogItem.partId, kind: catalogItem.kind, title: catalogItem.title,
       date: candidate.date, time: candidate.time, minutes: candidate.minutes, order, source: 'ai',
-      review: (candidate.kind === 'knowledge' ? request.progress.knowledgeCompleted : request.progress.testsPassed).includes(candidate.partId),
+      review,
       createdAt: now.toISOString(), updatedAt: now.toISOString() })
-    reasons[id] = reason
+    reasons[id] = taskReason(catalogItem, review)
   }
   if (!tasks.length) throw new Error('invalid_result')
-  return { tasks, weekSummary: cleanText(parsed.weekSummary) || NEUTRAL_SUMMARY, reasons }
+  return { tasks, weekSummary: `本周安排了${tasks.length}项课程学习，可按自己的节奏探索。`, reasons }
 }

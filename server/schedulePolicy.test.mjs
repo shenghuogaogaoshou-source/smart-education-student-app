@@ -63,26 +63,64 @@ describe('child-safe schedule policy', () => {
     }
   })
 
-  it('keeps only short topic text, excluding contact details and non-topic objects', () => {
+  it('drops free-form wrong-answer text, including contact details and narratives', () => {
     const safe = normalize({ ...request, wrongQuestionSummaries: [
       '数据来源和隐私', '联系方式：13800138000', '邮箱：student@example.com',
       '我叫李华，住北京市海淀区中关村大街1号', '张小明同学的算法题',
       { topic: '姓名：李华', name: '李华' }, '先学习数据，再提供家庭住址', 'name: Alice', 'address: 1 Main St',
     ] })
-    expect(safe.wrongQuestionSummaries).toEqual(['数据来源和隐私'])
+    expect(safe.wrongQuestionSummaries).toEqual([])
     expect(JSON.stringify(buildSchedulePayload(safe))).not.toMatch(/13800138000|student@example.com|李华|张小明|中关村|家庭住址/)
   })
 
-  it('removes insulting, comparative, pride or pressure copy from provider output', () => {
+  it('never sends a personal wrong-answer narrative to the provider', () => {
+    const safe = normalize({ ...request, wrongQuestionSummaries: ['张小明做错了算法题'] })
+    expect(safe.wrongQuestionSummaries).toEqual([])
+    expect(JSON.stringify(buildSchedulePayload(safe))).not.toContain('张小明做错了算法题')
+  })
+
+  it('maps structured topics and exact safe titles to canonical catalog titles', () => {
+    const safe = normalize({ ...request, wrongQuestionSummaries: [
+      { partId: 'ael-4', kind: 'knowledge', title: '张小明做错了算法题' },
+      '给 AI 当评委', { partId: 'ael-99', kind: 'knowledge' },
+      { partId: 'ael-4', kind: 'test' }, '给 AI 当评委！',
+    ] })
+    expect(safe.wrongQuestionSummaries).toEqual(['第一次 AI 实验', '给 AI 当评委', '第一次 AI 实验'])
+    expect(JSON.stringify(buildSchedulePayload(safe))).not.toContain('张小明做错了算法题')
+  })
+
+  it('replaces insulting provider reason with a canonical neutral explanation', () => {
+    const result = validateScheduleResponse(provider([task({ reason: '你很差，继续学。' })]), normalize(), now)
+    expect(result.tasks).toHaveLength(1)
+    expect(result.reasons[result.tasks[0].id]).toBe('了解《第一次 AI 实验》的知识内容。')
+    expect(JSON.stringify(result)).not.toContain('你很差，继续学。')
+  })
+
+  it('replaces comparative provider week summary with a neutral schedule summary', () => {
+    const result = validateScheduleResponse(provider([task()], '你比小明差。'), normalize(), now)
+    expect(result.weekSummary).toBe('本周安排了1项课程学习，可按自己的节奏探索。')
+    expect(JSON.stringify(result)).not.toContain('你比小明差。')
+  })
+
+  it('never echoes even benign provider prose and derives review copy from progress', () => {
+    const safe = normalize({ ...request, progress: { knowledgeCompleted: ['ael-4'], testsPassed: [] } })
+    const result = validateScheduleResponse(provider([task({ kind: 'test', reason: '自定义正常理由。' })], '自定义正常总结。'), safe, now)
+    expect(result.tasks[0].review).toBe(false)
+    expect(result.reasons[result.tasks[0].id]).toBe('通过《第一次 AI 实验》练习回顾相关内容。')
+    expect(result.weekSummary).toBe('本周安排了1项课程学习，可按自己的节奏探索。')
+    expect(JSON.stringify(result)).not.toMatch(/自定义正常理由|自定义正常总结/)
+  })
+
+  it('ignores insulting, comparative, pride or pressure provider copy', () => {
     const safe = normalize()
     for (const phrase of ['你真差', '不如同学', '你比别人厉害', '你真棒，值得骄傲', '再不做就要落后',
       '你是全班第一', '你比其他同学做得更好', '不完成就没有休息']) {
       const result = validateScheduleResponse(provider([
-        task({ reason: phrase }), task({ partId: 'ael-5', reason: '探索评价方法。' }),
+        task({ reason: phrase }), task({ partId: 'ael-5', time: '18:15', reason: '探索评价方法。' }),
       ], phrase), safe, now)
       expect(JSON.stringify(result)).not.toContain(phrase)
-      expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-5'])
-      expect(result.weekSummary).toBe('按自己的节奏安排学习。')
+      expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-4', 'ael-5'])
+      expect(result.weekSummary).toBe('本周安排了2项课程学习，可按自己的节奏探索。')
     }
   })
 
@@ -99,17 +137,17 @@ describe('child-safe schedule policy', () => {
     } finally { vi.useRealTimers() }
   })
 
-  it('bounds seven days, catalog, tasks and plain-text summaries before prompting', () => {
+  it('bounds seven days, catalog, tasks and canonical summaries before prompting', () => {
     const many = Array.from({ length: 100 }, (_, i) => ({ ...request.catalog[i % 3] }))
     const safe = normalize({ ...request,
       availability: [...request.availability, { ...request.availability[0], date: '2026-11-01' }],
       catalog: many, currentTasks: Array.from({ length: 90 }, () => task()),
-      wrongQuestionSummaries: ['<script>private</script> 关键点', ...Array(30).fill('安全主题')],
+      wrongQuestionSummaries: Array(30).fill('第一次 AI 实验'),
     })
     expect(safe.availability).toHaveLength(2)
     expect(safe.catalog).toHaveLength(3)
     expect(safe.currentTasks).toHaveLength(80)
-    expect(safe.wrongQuestionSummaries[0]).not.toMatch(/[<>]/)
+    expect(safe.wrongQuestionSummaries).toEqual(Array(20).fill('第一次 AI 实验'))
     expect(safe.wrongQuestionSummaries).toHaveLength(20)
   })
 
@@ -143,7 +181,7 @@ describe('child-safe schedule policy', () => {
     expect(result.tasks.map(({ kind }) => kind)).toEqual(['knowledge', 'test'])
     expect(new Set(result.tasks.map(({ id }) => id)).size).toBe(2)
     expect(result.tasks[0].id).not.toBe('provider-id')
-    expect(result.reasons[result.tasks[0].id]).toBe('先了解组成。')
+    expect(result.reasons[result.tasks[0].id]).toBe('了解《第一次 AI 实验》的知识内容。')
   })
 
   it('uses completed knowledge to permit a test without a preceding suggested knowledge item', () => {
@@ -151,24 +189,26 @@ describe('child-safe schedule policy', () => {
     expect(validateScheduleResponse(provider([task({ kind: 'test', minutes: 10 })]), safe, now).tasks).toHaveLength(1)
   })
 
-  it('rejects overlap and age-inappropriate provider copy, and caps summary/reasons', () => {
+  it('rejects overlaps and replaces provider copy with bounded server copy', () => {
     const safe = normalize()
     const result = validateScheduleResponse(provider([
       task({ reason: '一起探索'.repeat(80) }),
       task({ partId: 'ael-5', time: '18:05' }),
       task({ partId: 'ael-5', time: '18:15', reason: '你落后了，必须完成' }),
     ], '加油探索'.repeat(80)), safe, now)
-    expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-4'])
+    expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-4', 'ael-5'])
     expect(result.weekSummary.length).toBeLessThanOrEqual(120)
     expect(Object.values(result.reasons)[0].length).toBeLessThanOrEqual(120)
+    expect(JSON.stringify(result)).not.toMatch(/一起探索|你落后了|加油探索/)
   })
 
   it('does not return insulting or privacy-seeking text in task reasons or the week summary', () => {
     const result = validateScheduleResponse(provider([
       task({ reason: '你真笨蛋。' }), task({ partId: 'ael-5', time: '18:00', reason: '学完再试一试。' }),
     ], '请提供手机号。'), normalize(), now)
-    expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-5'])
+    expect(result.tasks.map(({ partId }) => partId)).toEqual(['ael-4'])
     expect(result.weekSummary).not.toMatch(/手机号/)
+    expect(JSON.stringify(result)).not.toMatch(/你真笨蛋|学完再试一试|请提供手机号/)
   })
 
   it('rejects malformed or empty provider output without reflecting its content', () => {

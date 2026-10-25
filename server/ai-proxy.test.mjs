@@ -39,7 +39,8 @@ describe('AI companion proxy routes', () => {
     expect(result.status).toBe(200)
     expect(result.body.tasks).toHaveLength(1)
     expect(result.body.tasks[0]).toMatchObject({ partId: 'ael-4', source: 'ai', title: '第一次 AI 实验' })
-    expect(result.body.reasons[result.body.tasks[0].id]).toBe('了解知识。')
+    expect(result.body.reasons[result.body.tasks[0].id]).toBe('了解《第一次 AI 实验》的知识内容。')
+    expect(result.body.weekSummary).toBe('本周安排了1项课程学习，可按自己的节奏探索。')
     expect(fetchImpl).toHaveBeenCalledOnce()
     const [url, init] = fetchImpl.mock.calls[0]
     expect(url).toBe('https://api.deepseek.com/chat/completions')
