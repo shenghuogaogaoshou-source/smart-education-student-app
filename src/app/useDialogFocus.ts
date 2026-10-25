@@ -12,12 +12,20 @@ const FOCUSABLE = [
 function focusableElements(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
     .filter((element) => {
-      const style = window.getComputedStyle(element)
       return element.tabIndex >= 0
-        && style.display !== 'none'
-        && style.visibility !== 'hidden'
         && !element.closest('[hidden], [aria-hidden="true"], [inert], fieldset[disabled]')
+        && !hasHiddenAncestor(element)
     })
+}
+
+function hasHiddenAncestor(element: HTMLElement) {
+  let current: HTMLElement | null = element
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (style.display === 'none' || style.visibility === 'hidden') return true
+    current = current.parentElement
+  }
+  return false
 }
 
 export function useDialogFocus<T extends HTMLElement>(

@@ -13,13 +13,19 @@ function FocusHarness() {
       <div aria-hidden="true">
         <button type="button">辅助隐藏按钮</button>
       </div>
+      <div style={{ display: 'none' }}>
+        <button type="button">CSS 显示隐藏按钮</button>
+      </div>
+      <div style={{ visibility: 'hidden' }}>
+        <button type="button">CSS 可见性隐藏按钮</button>
+      </div>
       <button type="button">可见按钮</button>
     </div>
   )
 }
 
 describe('useDialogFocus', () => {
-  it('skips controls inside hidden or aria-hidden ancestors when choosing initial focus', () => {
+  it('skips controls inside hidden, aria-hidden, and CSS-hidden ancestors when choosing initial focus', () => {
     render(<FocusHarness />)
 
     expect(screen.getByRole('button', { name: '可见按钮' })).toHaveFocus()
