@@ -30,7 +30,7 @@ import { useDialogFocus } from '../../app/useDialogFocus'
 import { getCourseForBand } from '../knowledge/courseCatalog'
 import { AiSchedulePanel } from './AiSchedulePanel'
 import { LearningContentPicker } from './LearningContentPicker'
-import { getPlanCandidates, type PlanCandidate } from './learningPlanner'
+import { getPlanCandidates, getPlanPlacementIssue, type PlanCandidate } from './learningPlanner'
 import './profile.css'
 
 const RELATIVE_DAY_LABELS = ['今天', '明天', '后天']
@@ -224,11 +224,24 @@ export function LearningSchedulePage({
       setEditorError('这一天已经安排过同一项内容了，可以换一项或调整原来的安排。')
       return
     }
-    const timestamp = new Date().toISOString()
     const original = editor.taskId
       ? state.learningPlan.tasks.find((item) => item.id === editor.taskId)
       : undefined
     const sameDay = tasksForDate(editor.date).filter((task) => task.id !== editor.taskId)
+    const placementIssue = getPlanPlacementIssue(
+      { date: editor.date, time: editor.time, minutes },
+      sameDay,
+      state.learningPlan.availability,
+    )
+    if (placementIssue === 'capacity') {
+      setEditorError('当天安排超出了可用时长，可以缩短本次时间或换一天试试。')
+      return
+    }
+    if (placementIssue === 'overlap') {
+      setEditorError('这段时间和已有安排重叠了，可以换个时间试试。')
+      return
+    }
+    const timestamp = new Date().toISOString()
     const task: LearningPlanTask = {
       id: editor.taskId ?? `student-${Date.now()}-${editor.candidate.partId}-${editor.candidate.kind}`,
       grade: state.grade,

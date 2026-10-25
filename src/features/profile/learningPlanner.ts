@@ -24,6 +24,8 @@ export type FallbackPlanInput = PlanContext & {
   progress: BandProgress
 }
 
+export type PlanPlacementIssue = 'capacity' | 'overlap'
+
 function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
@@ -110,12 +112,30 @@ export function buildFallbackPlan({ grade, course, progress, availability, now =
   return tasks
 }
 
+export function getPlanPlacementIssue(
+  task: Pick<LearningPlanTask, 'date' | 'time' | 'minutes'>,
+  tasks: readonly LearningPlanTask[],
+  availability: readonly DailyAvailability[],
+): PlanPlacementIssue | null {
+  const day = availability.find((item) => item.date === task.date)
+  const start = minutesFromTime(task.time)
+  if (!day || start === null) return null
+  const sameDay = tasks.filter((item) => item.date === task.date)
+  const totalMinutes = sameDay.reduce((sum, item) => sum + item.minutes, 0) + task.minutes
+  if (totalMinutes > day.maxMinutes) return 'capacity'
+  const end = start + task.minutes
+  const overlaps = sameDay.some((item) => {
+    const existingStart = minutesFromTime(item.time)
+    return existingStart !== null && start < existingStart + item.minutes && existingStart < end
+  })
+  return overlaps ? 'overlap' : null
+}
+
 export function validatePlanTasks(tasks: unknown, { course, availability, now = new Date() }: PlanContext): LearningPlanTask[] {
   if (!Array.isArray(tasks)) return []
   const days = new Map(availableDays({ availability, now }).map((day) => [day.date, day]))
   const partIds = new Set(course.parts.map((part) => part.id))
   const seen = new Set<string>()
-  const totals = new Map<string, number>()
   const result: LearningPlanTask[] = []
   for (const value of tasks) {
     if (!value || typeof value !== 'object') continue
@@ -137,9 +157,8 @@ export function validatePlanTasks(tasks: unknown, { course, availability, now = 
     const dayEnd = minutesFromTime(day.endTime)!
     const tuple = `${task.date}:${task.partId}:${task.kind}`
     if (start === null || start < dayStart || start + task.minutes! > dayEnd || seen.has(tuple)
-      || (totals.get(day.date) ?? 0) + task.minutes! > day.maxMinutes) continue
+      || getPlanPlacementIssue(task as LearningPlanTask, result, availability) !== null) continue
     seen.add(tuple)
-    totals.set(day.date, (totals.get(day.date) ?? 0) + task.minutes!)
     result.push(task as LearningPlanTask)
   }
   return result

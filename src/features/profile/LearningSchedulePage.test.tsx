@@ -45,6 +45,8 @@ describe('LearningSchedulePage', () => {
     await user.selectOptions(within(dialog).getByLabelText('日期'), localDate(0))
     await user.clear(within(dialog).getByLabelText('学习时间'))
     await user.type(within(dialog).getByLabelText('学习时间'), '18:30')
+    await user.clear(within(dialog).getByLabelText('预计时长'))
+    await user.type(within(dialog).getByLabelText('预计时长'), '10')
     await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
   }
 
@@ -93,12 +95,12 @@ describe('LearningSchedulePage', () => {
     cards = within(screen.getByRole('region', { name: `今天 ${localDate(0)}` })).getAllByRole('listitem')
     expect(cards[0]).toHaveTextContent('数据侦探营')
 
-    await user.click(within(cards[0]).getByRole('button', { name: '编辑 数据侦探营' }))
+    await user.click(within(cards[1]).getByRole('button', { name: '编辑 第一次 AI 实验' }))
     const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
     await user.clear(within(dialog).getByLabelText('预计时长'))
-    await user.type(within(dialog).getByLabelText('预计时长'), '25')
+    await user.type(within(dialog).getByLabelText('预计时长'), '15')
     await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
-    expect(screen.getByText('预计 25 分钟')).toBeInTheDocument()
+    expect(screen.getByText('预计 15 分钟')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '删除 数据侦探营' }))
     expect(screen.getByText('这项安排会从计划中移除，学习进度不会改变。')).toBeInTheDocument()
@@ -236,6 +238,40 @@ describe('LearningSchedulePage', () => {
     await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent('预计时长需要填写 5—90 分钟。')
+    expect(dialog).toBeInTheDocument()
+  })
+
+  it('keeps an over-capacity task in the editor with a gentle explanation', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+
+    await user.click(screen.getByRole('button', { name: '添加学习内容' }))
+    const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
+    await user.click(within(dialog).getByRole('button', { name: /知识：数据侦探营/ }))
+    await user.selectOptions(within(dialog).getByLabelText('日期'), localDate(3))
+    await user.clear(within(dialog).getByLabelText('预计时长'))
+    await user.type(within(dialog).getByLabelText('预计时长'), '31')
+    await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('当天安排超出了可用时长')
+    expect(dialog).toBeInTheDocument()
+  })
+
+  it('keeps an overlapping task in the editor with a gentle explanation', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+
+    await user.click(screen.getByRole('button', { name: '添加学习内容' }))
+    const dialog = screen.getByRole('dialog', { name: '安排学习内容' })
+    await user.click(within(dialog).getByRole('button', { name: /知识：数据侦探营/ }))
+    await user.selectOptions(within(dialog).getByLabelText('日期'), localDate(0))
+    await user.clear(within(dialog).getByLabelText('学习时间'))
+    await user.type(within(dialog).getByLabelText('学习时间'), '18:55')
+    await user.clear(within(dialog).getByLabelText('预计时长'))
+    await user.type(within(dialog).getByLabelText('预计时长'), '10')
+    await user.click(within(dialog).getByRole('button', { name: '保存安排' }))
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('这段时间和已有安排重叠')
     expect(dialog).toBeInTheDocument()
   })
 
