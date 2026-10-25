@@ -35,6 +35,14 @@ describe('learning plan domain', () => {
     expect(result.tasks[0]).not.toBe(validTask)
   })
 
+  it('keeps only tasks from the active grade band', () => {
+    const grade3Task = { ...validTask, id: 'grade3-cxd-4', grade: 'grade3' as const, partId: 'cxd-4' as const }
+    const grade4Task = { ...validTask, id: 'grade4-cxd-5', grade: 'grade4' as const, partId: 'cxd-5' as const }
+    const fallback = { tasks: [], availability: [], lastAiSuggestionAt: null }
+    expect(normalizeLearningPlan({ tasks: [grade3Task, validTask, grade4Task] }, fallback, now, 'grade3').tasks)
+      .toEqual([grade3Task, grade4Task])
+  })
+
   it('derives completion from learning progress rather than a stored flag', () => {
     const progress = createEmptyLearningProgress()
     progress['grade5-6'].knowledgeCompleted = ['ael-4']
@@ -51,6 +59,12 @@ describe('learning plan domain', () => {
     expect(getTaskTiming({ ...validTask, date: '2026-10-25', time: '11:59' }, now)).toBe('overdue')
     expect(getTaskTiming({ ...validTask, date: '2026-10-25', time: '12:00' }, now)).toBe('today')
     expect(getTaskTiming({ ...validTask, date: '2026-10-26' }, now)).toBe('upcoming')
+  })
+
+  it('keeps the scheduled minute as today until the next minute begins', () => {
+    const task = { ...validTask, date: '2026-10-25', time: '12:00' }
+    expect(getTaskTiming(task, new Date(2026, 9, 25, 12, 0, 59, 999))).toBe('today')
+    expect(getTaskTiming(task, new Date(2026, 9, 25, 12, 1, 0, 0))).toBe('overdue')
   })
 
   it('creates a seven-day local availability window and replaces invalid saved days', () => {

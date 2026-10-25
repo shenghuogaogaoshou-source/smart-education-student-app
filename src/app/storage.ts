@@ -1,5 +1,5 @@
 import { COMPANION_CATALOG } from '../features/ai_companion/companionCatalog'
-import { normalizeLearningPlan } from './learningPlan'
+import { createDefaultLearningPlan, normalizeLearningPlan } from './learningPlan'
 import { createEmptyLearningProgress, getPartIdsForBand, PRIMARY_GRADES, type CoursePartId } from './learning'
 import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type ConversationSummary, type DeviceInfo, type GuardianInfo } from './model'
 import type { PointTransaction, RewardKind } from './points'
@@ -48,12 +48,15 @@ function migrateToPrimaryState(fresh: AppState) {
 }
 
 export function normalizePersistedState(parsed: Record<string, unknown>, fresh: AppState = createDefaultState()): AppState {
+  const grade = oneOf(parsed.grade, PRIMARY_GRADES, fresh.grade)
+  const now = new Date()
+  const planFallback = grade === fresh.grade ? fresh.learningPlan : createDefaultLearningPlan(now, grade)
   return {
     stateVersion: APP_STATE_VERSION,
-    grade: oneOf(parsed.grade, PRIMARY_GRADES, fresh.grade),
+    grade,
     isLoggedIn: booleanValue(parsed.isLoggedIn, fresh.isLoggedIn),
     learningProgress: normalizeLearningProgress(parsed.learningProgress, fresh.learningProgress),
-    learningPlan: normalizeLearningPlan(parsed.stateVersion === APP_STATE_VERSION ? parsed.learningPlan : undefined, fresh.learningPlan),
+    learningPlan: normalizeLearningPlan(parsed.stateVersion === APP_STATE_VERSION ? parsed.learningPlan : undefined, planFallback, now, grade),
     transactions: normalizeTransactions(parsed.transactions, fresh.transactions),
     processedRewardIds: stringArray(parsed.processedRewardIds, fresh.processedRewardIds),
     aiPosition: normalizeAiPosition(parsed.aiPosition, fresh.aiPosition),

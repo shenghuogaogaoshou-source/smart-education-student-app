@@ -82,14 +82,14 @@ function validAvailability(value: unknown, expectedDate: string): value is Daily
     && Number.isInteger(value.maxMinutes) && (value.maxMinutes as number) >= 5 && (value.maxMinutes as number) <= 180
 }
 
-export function createGrade5LearningPlanSeed(now: Date = new Date()): LearningPlanTask[] {
-  const parts = getCourseForBand('grade5-6').parts
+export function createLearningPlanSeed(grade: PrimaryGrade, now: Date = new Date()): LearningPlanTask[] {
+  const parts = getCourseForBand(getGradeBand(grade)).parts
   const timestamp = now.toISOString()
   return [4, 5, 6].map((number, index) => {
     const part = parts[number - 1]
     return {
-      id: `seed-grade5-${part.id}`,
-      grade: 'grade5',
+      id: `seed-${grade}-${part.id}`,
+      grade,
       partId: part.id,
       kind: 'knowledge',
       title: part.title,
@@ -105,9 +105,13 @@ export function createGrade5LearningPlanSeed(now: Date = new Date()): LearningPl
   })
 }
 
-export function createDefaultLearningPlan(now: Date = new Date()): LearningPlanState {
+export function createGrade5LearningPlanSeed(now: Date = new Date()): LearningPlanTask[] {
+  return createLearningPlanSeed('grade5', now)
+}
+
+export function createDefaultLearningPlan(now: Date = new Date(), grade: PrimaryGrade = 'grade5'): LearningPlanState {
   return {
-    tasks: createGrade5LearningPlanSeed(now),
+    tasks: createLearningPlanSeed(grade, now),
     availability: Array.from({ length: 7 }, (_, index) => ({
       date: dateAfter(now, index), enabled: true, startTime: '18:30', endTime: '19:30', maxMinutes: 30,
     })),
@@ -115,13 +119,13 @@ export function createDefaultLearningPlan(now: Date = new Date()): LearningPlanS
   }
 }
 
-export function normalizeLearningPlan(value: unknown, fallback: LearningPlanState, now: Date = new Date()): LearningPlanState {
+export function normalizeLearningPlan(value: unknown, fallback: LearningPlanState, now: Date = new Date(), accountGrade: PrimaryGrade = 'grade5'): LearningPlanState {
   const stored = isRecord(value) ? value : {}
   const source = Array.isArray(stored.tasks) ? stored.tasks : fallback.tasks
   const ids = new Set<string>()
   const tasks: LearningPlanTask[] = []
   for (const candidate of source) {
-    if (!validTask(candidate) || ids.has(candidate.id)) continue
+    if (!validTask(candidate) || getGradeBand(candidate.grade) !== getGradeBand(accountGrade) || ids.has(candidate.id)) continue
     ids.add(candidate.id)
     const { id, grade, partId, kind, title, date, time, minutes, order, source, review, createdAt, updatedAt } = candidate
     tasks.push({ id, grade, partId, kind, title, date, time, minutes, order, source, review, createdAt, updatedAt })
@@ -158,6 +162,7 @@ export function getTaskTiming(task: LearningPlanTask, now: Date = new Date()): '
   const [year, month, day] = task.date.split('-').map(Number)
   const [hour, minute] = task.time.split(':').map(Number)
   const planned = new Date(year, month - 1, day, hour, minute)
-  if (planned.getTime() < now.getTime()) return 'overdue'
+  const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())
+  if (planned.getTime() < currentMinute.getTime()) return 'overdue'
   return task.date === localDate(now) ? 'today' : 'upcoming'
 }

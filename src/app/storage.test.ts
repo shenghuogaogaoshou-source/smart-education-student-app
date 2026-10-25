@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
 import { loadState, normalizePersistedState, saveState } from './storage'
@@ -43,9 +43,14 @@ describe('primary-only state migration', () => {
   })
 
   it('falls back safely when stored JSON is broken', () => {
-    localStorage.setItem('student-app-state', '{broken')
-
-    expect(loadState()).toEqual(createDefaultState())
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 25, 12, 0))
+    try {
+      localStorage.setItem('student-app-state', '{broken')
+      expect(loadState()).toEqual(createDefaultState())
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('migrates a v3 account to v4 without retaining three legacy fake tasks', () => {
@@ -70,6 +75,27 @@ describe('primary-only state migration', () => {
     expect(saved.learningPlan.tasks.map((task: { partId: string; title: string }) => [task.partId, task.title])).toEqual(
       migrated.learningPlan.tasks.map((task) => [task.partId, task.title]),
     )
+  })
+
+  it('seeds real tasks from a non-grade-five account band during migration', () => {
+    const migrated = normalizePersistedState({ ...createDefaultState(), stateVersion: 3, grade: 'grade3' })
+    expect(migrated.learningPlan.tasks).toHaveLength(3)
+    expect(migrated.learningPlan.tasks.map(({ grade, partId, title }) => [grade, partId, title])).toEqual([
+      ['grade3', 'cxd-4', '真相侦探社'],
+      ['grade3', 'cxd-5', '教 AI 认世界'],
+      ['grade3', 'cxd-6', '负责任的创想家'],
+    ])
+  })
+
+  it('discards stored tasks from another grade band on current-state load', () => {
+    const defaultState = createDefaultState()
+    const grade3Task = { ...defaultState.learningPlan.tasks[0], id: 'grade3-cxd-4', grade: 'grade3', partId: 'cxd-4' }
+    const loaded = normalizePersistedState({
+      ...defaultState,
+      grade: 'grade3',
+      learningPlan: { ...defaultState.learningPlan, tasks: [grade3Task, ...defaultState.learningPlan.tasks] },
+    })
+    expect(loaded.learningPlan.tasks.map(({ partId }) => partId)).toEqual(['cxd-4'])
   })
 
   it('drops unknown keys and invalid course progress when loading current state', () => {
