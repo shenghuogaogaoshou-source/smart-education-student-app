@@ -1,4 +1,4 @@
-import type { CourseId, CoursePartId, GradeBand } from '../../app/learning'
+import { getGradeBand, type CourseId, type CoursePartId, type GradeBand, type PrimaryGrade } from '../../app/learning'
 import { elementaryHigh, elementaryLow } from './knowledgeData'
 import { GRADE56_PARTS } from './content/grade56Content'
 import { quizCxd, quizQmx } from '../test/quizData'
@@ -141,6 +141,10 @@ export const COURSE_PACKAGES: Record<GradeBand, CoursePackage> = {
 
 export function getCourseForBand(band: GradeBand): CoursePackage {
   return COURSE_PACKAGES[band]
+}
+
+export function getCourseForGrade(grade: PrimaryGrade): CoursePackage {
+  return getCourseForBand(getGradeBand(grade))
 }
 
 export function getQuizForPart(partId: CoursePartId): QuizChapter | undefined {
