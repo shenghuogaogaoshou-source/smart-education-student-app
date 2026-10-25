@@ -6,6 +6,7 @@ import { interpretCompanionIntent } from './companionIntent.mjs'
 import { buildDeepSeekPayload, prepareStudentQuestion, prepareStudentReply } from './companionPolicy.mjs'
 import { recognize } from './recognition.mjs'
 import { synthesizeSpeech } from './tts.mjs'
+import { buildSchedulePayload, normalizeScheduleRequest, validateScheduleResponse } from './schedulePolicy.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
@@ -74,7 +75,7 @@ async function createReply(body, { apiKey = process.env.DEEPSEEK_API_KEY, fetchI
   return prepareStudentReply(content)
 }
 
-async function proxyJsonRequest({ url, apiKey, body, fetchImpl }) {
+async function proxyJsonRequest({ url, apiKey, body, fetchImpl, signal }) {
   if (!apiKey) throw new Error('missing_api_key')
   const upstream = await fetchImpl(url, {
     method: 'POST',
@@ -83,6 +84,7 @@ async function proxyJsonRequest({ url, apiKey, body, fetchImpl }) {
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
+    signal,
   })
   if (!upstream.ok) throw new Error('provider_error')
   return upstream.json()
@@ -100,6 +102,25 @@ export async function handleCompanionApiRequest(
   } = {},
 ) {
   if (method !== 'POST') return { status: 404, body: { error: 'not_found' } }
+  if (path === '/api/companion/schedule') {
+    if (!apiKey) return { status: 503, body: { error: 'missing_api_key' } }
+    try {
+      const schedule = normalizeScheduleRequest(body)
+      const upstream = await proxyJsonRequest({
+        url: 'https://api.deepseek.com/chat/completions',
+        apiKey,
+        body: buildSchedulePayload(schedule),
+        fetchImpl,
+        signal: AbortSignal.timeout(15_000),
+      })
+      return { status: 200, body: validateScheduleResponse(upstream, schedule) }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : ''
+      const safeCode = code === 'invalid_input' ? 'invalid_input'
+        : code === 'invalid_result' || error instanceof SyntaxError ? 'invalid_result' : 'provider_error'
+      return { status: safeCode === 'invalid_input' ? 400 : 502, body: { error: safeCode } }
+    }
+  }
   if (path === '/api/companion/recognize') {
     try {
       return { status: 200, body: { result: await recognizeImage(body) } }
@@ -196,7 +217,9 @@ export function startProxyServer(port = PORT) {
       }
       return
     }
-    const limit = path === '/api/companion/recognize'
+    const limit = path === '/api/companion/schedule'
+      ? 64 * 1024
+      : path === '/api/companion/recognize'
       ? 7 * 1024 * 1024
       : path === '/api/deepseek/chat/completions'
         ? 1024 * 1024
