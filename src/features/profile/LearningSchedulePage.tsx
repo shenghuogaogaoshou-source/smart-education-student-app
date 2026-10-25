@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import {
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
@@ -39,6 +40,13 @@ type EditorState = {
   minutes: string
   candidate: PlanCandidate
   createdAt?: string
+}
+
+type PointerDrag = {
+  pointerId: number
+  sourceId: string
+  targetId: string | null
+  handle: HTMLButtonElement
 }
 
 function dateKey(date: Date) {
@@ -109,6 +117,7 @@ export function LearningSchedulePage({
   const [notice, setNotice] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const pointerDrag = useRef<PointerDrag | null>(null)
   const now = new Date()
   const dates = useMemo(
     () => datesFromToday(now),
@@ -240,6 +249,7 @@ export function LearningSchedulePage({
   }
 
   const clearDragState = () => {
+    pointerDrag.current = null
     setDraggingTaskId(null)
     setDragOverTaskId(null)
   }
@@ -289,26 +299,78 @@ export function LearningSchedulePage({
     event: ReactPointerEvent<HTMLButtonElement>,
     task: LearningPlanTask,
   ) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-    if (event.pointerType !== 'mouse') event.preventDefault()
+    // Mouse dragging already uses the native HTML drag events. Keep pointer
+    // capture for touch and pen so the handle continues to receive moves.
+    if (event.pointerType === 'mouse') return
+    event.preventDefault()
+    const handle = event.currentTarget
+    try {
+      handle.setPointerCapture(event.pointerId)
+    } catch {
+      // Pointer capture can be unavailable in older WebViews.
+    }
+    pointerDrag.current = {
+      pointerId: event.pointerId,
+      sourceId: task.id,
+      targetId: null,
+      handle,
+    }
     setDraggingTaskId(task.id)
     setDragOverTaskId(null)
   }
 
-  const handlePointerEnter = (
-    event: ReactPointerEvent<HTMLLIElement>,
-    task: LearningPlanTask,
-  ) => {
-    if (!draggingTaskId) return
-    const source = state.learningPlan.tasks.find((item) => item.id === draggingTaskId)
-    setDragOverTaskId(source?.date === task.date ? task.id : null)
+  const findPointerDropTarget = (x: number, y: number) => {
+    const drag = pointerDrag.current
+    if (!drag) return null
+    const source = state.learningPlan.tasks.find((task) => task.id === drag.sourceId)
+    if (!source) return null
+    let hit: Element | null = null
+    try {
+      hit = document.elementFromPoint?.(x, y) ?? null
+    } catch {
+      // A defensive fallback for WebViews without hit testing.
+    }
+    const card = hit?.closest<HTMLElement>('[data-plan-task-id]') ?? null
+    const targetId = card?.dataset.planTaskId ?? null
+    const target = targetId
+      ? state.learningPlan.tasks.find((task) => task.id === targetId)
+      : null
+    const sameDayTarget = target?.date === source.date ? target.id : null
+    drag.targetId = sameDayTarget
+    setDragOverTaskId(sameDayTarget)
+    return sameDayTarget
   }
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLLIElement>, task: LearningPlanTask) => {
-    if (!draggingTaskId) return
+  const releasePointerDrag = (pointerId: number) => {
+    const drag = pointerDrag.current
+    if (!drag || drag.pointerId !== pointerId) return
+    try {
+      drag.handle.releasePointerCapture(pointerId)
+    } catch {
+      // Capture may already have been released by the browser.
+    }
+    pointerDrag.current = null
+    setDraggingTaskId(null)
+    setDragOverTaskId(null)
+  }
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (pointerDrag.current?.pointerId !== event.pointerId) return
     event.preventDefault()
-    reorderDraggedTask(draggingTaskId, dragOverTaskId ?? task.id)
-    clearDragState()
+    findPointerDropTarget(event.clientX, event.clientY)
+  }
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = pointerDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const targetId = findPointerDropTarget(event.clientX, event.clientY) ?? drag.targetId
+    releasePointerDrag(event.pointerId)
+    if (targetId) reorderDraggedTask(drag.sourceId, targetId)
+  }
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    releasePointerDrag(event.pointerId)
   }
 
   const confirmDelete = (id: string) => {
@@ -391,9 +453,6 @@ export function LearningSchedulePage({
                         data-plan-task-id={task.id}
                         onDragOver={(event) => handleDragOver(event, task)}
                         onDrop={(event) => handleDrop(event, task)}
-                        onPointerEnter={(event) => handlePointerEnter(event, task)}
-                        onPointerUp={(event) => handlePointerUp(event, task)}
-                        onPointerCancel={clearDragState}
                       >
                         <div className="schedule-card-top">
                           <span className={`schedule-kind schedule-kind--${task.kind}`}>
@@ -407,11 +466,15 @@ export function LearningSchedulePage({
                             className="schedule-grip"
                             type="button"
                             draggable
+                            aria-grabbed={draggingTaskId === task.id}
                             aria-label={`拖动 ${task.title} 排序`}
                             title="拖动调整同一天的学习顺序"
                             onDragStart={(event) => handleDragStart(event, task)}
                             onDragEnd={clearDragState}
                             onPointerDown={(event) => handlePointerDown(event, task)}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerCancel={handlePointerCancel}
                           >
                             <GripVertical aria-hidden="true" size={17} />
                           </button>

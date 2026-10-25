@@ -18,6 +18,22 @@ function renderSchedule(onStartTask = vi.fn()) {
   )
 }
 
+function mockElementFromPoint(element: Element) {
+  const previous = Object.getOwnPropertyDescriptor(document, 'elementFromPoint')
+  const hitTest = vi.fn(() => element)
+  Object.defineProperty(document, 'elementFromPoint', {
+    configurable: true,
+    value: hitTest,
+  })
+  return {
+    hitTest,
+    restore() {
+      if (previous) Object.defineProperty(document, 'elementFromPoint', previous)
+      else Reflect.deleteProperty(document, 'elementFromPoint')
+    },
+  }
+}
+
 describe('LearningSchedulePage', () => {
   beforeEach(() => localStorage.clear())
 
@@ -107,7 +123,7 @@ describe('LearningSchedulePage', () => {
     expect(reordered[1]).toHaveTextContent('第一次 AI 实验')
   })
 
-  it('supports touch-style pointer reordering on the drag handle', async () => {
+  it('supports touch pointer reordering through hit testing on the captured handle', async () => {
     const user = userEvent.setup()
     renderSchedule()
     await addTodayCourse(user)
@@ -115,14 +131,73 @@ describe('LearningSchedulePage', () => {
     const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
     const [firstCard, secondCard] = within(today).getAllByRole('listitem')
     const handle = within(firstCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+    const setPointerCapture = vi.fn()
+    const releasePointerCapture = vi.fn()
+    Object.defineProperties(handle, {
+      setPointerCapture: { configurable: true, value: setPointerCapture },
+      releasePointerCapture: { configurable: true, value: releasePointerCapture },
+    })
+    const hitTest = mockElementFromPoint(secondCard)
 
     fireEvent.pointerDown(handle, { button: 0, pointerId: 1, pointerType: 'touch' })
-    fireEvent.pointerEnter(secondCard, { pointerId: 1, pointerType: 'touch' })
-    fireEvent.pointerUp(secondCard, { pointerId: 1, pointerType: 'touch' })
+    fireEvent.pointerMove(handle, { pointerId: 1, pointerType: 'touch', clientX: 20, clientY: 20 })
+    fireEvent.pointerUp(handle, { pointerId: 1, pointerType: 'touch', clientX: 20, clientY: 20 })
 
     const reordered = within(today).getAllByRole('listitem')
     expect(reordered[0]).toHaveTextContent('数据侦探营')
     expect(reordered[1]).toHaveTextContent('第一次 AI 实验')
+    expect(setPointerCapture).toHaveBeenCalledWith(1)
+    expect(releasePointerCapture).toHaveBeenCalledWith(1)
+    hitTest.restore()
+  })
+
+  it('rejects a touch pointer drop on a card from another date', () => {
+    renderSchedule()
+
+    const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
+    const tomorrow = screen.getByRole('region', { name: `明天 ${localDate(1)}` })
+    const sourceCard = within(today).getAllByRole('listitem')[0]
+    const targetCard = within(tomorrow).getAllByRole('listitem')[0]
+    const handle = within(sourceCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+    Object.defineProperties(handle, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      releasePointerCapture: { configurable: true, value: vi.fn() },
+    })
+    const hitTest = mockElementFromPoint(targetCard)
+
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 2, pointerType: 'touch' })
+    fireEvent.pointerMove(handle, { pointerId: 2, pointerType: 'touch', clientX: 30, clientY: 30 })
+    fireEvent.pointerUp(handle, { pointerId: 2, pointerType: 'touch', clientX: 30, clientY: 30 })
+
+    expect(within(today).getAllByRole('listitem')[0]).toHaveTextContent('第一次 AI 实验')
+    expect(within(tomorrow).getAllByRole('listitem')[0]).toHaveTextContent(targetCard.textContent ?? '')
+    hitTest.restore()
+  })
+
+  it('clears pointer capture state when a touch drag is cancelled', async () => {
+    const user = userEvent.setup()
+    renderSchedule()
+    await addTodayCourse(user)
+
+    const today = screen.getByRole('region', { name: `今天 ${localDate(0)}` })
+    const [firstCard, secondCard] = within(today).getAllByRole('listitem')
+    const handle = within(firstCard).getByRole('button', { name: '拖动 第一次 AI 实验 排序' })
+    const releasePointerCapture = vi.fn()
+    Object.defineProperties(handle, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      releasePointerCapture: { configurable: true, value: releasePointerCapture },
+    })
+    const hitTest = mockElementFromPoint(secondCard)
+
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 3, pointerType: 'touch' })
+    fireEvent.pointerMove(handle, { pointerId: 3, pointerType: 'touch', clientX: 40, clientY: 40 })
+    fireEvent.pointerCancel(handle, { pointerId: 3, pointerType: 'touch' })
+    fireEvent.pointerUp(handle, { pointerId: 3, pointerType: 'touch', clientX: 40, clientY: 40 })
+
+    expect(within(today).getAllByRole('listitem')[0]).toHaveTextContent('第一次 AI 实验')
+    expect(within(today).getAllByRole('listitem')[1]).toHaveTextContent('数据侦探营')
+    expect(releasePointerCapture).toHaveBeenCalledWith(3)
+    hitTest.restore()
   })
 
   it('does not move a task across dates when it is dropped on another day', () => {
