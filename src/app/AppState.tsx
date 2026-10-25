@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { getGradeBand, getPartIdsForBand, type CoursePartId, type PrimaryGrade } from './learning'
 import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type CompanionLoadout, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from './model'
-import { normalizeLearningPlan, type DailyAvailability, type LearningPlanTask } from './learningPlan'
+import { getTaskCompletion, normalizeLearningPlan, type DailyAvailability, type LearningPlanTask } from './learningPlan'
 import { applyTransactionOnce, buildProgressRewardTransactions, getPointsBalance } from './points'
 import { loadAccountState, peekAccountCompanion, saveAccountState } from './companionAccountRepository'
 import { useOptionalSessionCredential } from '../features/auth/sessionCredential'
@@ -160,7 +160,8 @@ function replaceLearningPlan(
   const now = new Date()
   const refreshed = currentPlan(state, now)
   const activeDates = new Set(refreshed.availability.map((day) => day.date))
-  const history = refreshed.tasks.filter((task) => !activeDates.has(task.date))
+  const history = refreshed.tasks.filter((task) =>
+    !activeDates.has(task.date) && getTaskCompletion(task, state.learningProgress) === 'completed')
   const replacement = action.tasks
     .filter((task) => activeDates.has(task.date))
     .map((task) => ({ ...task, source: action.source }))

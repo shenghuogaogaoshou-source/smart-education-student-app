@@ -75,11 +75,12 @@ describe('learning plan state actions', () => {
   beforeEach(() => localStorage.clear())
 
   it('replaces only the active seven-day window and preserves completed history', async () => {
-    const history = makeTask('history', { date: localDate(-8), minutes: 20 })
+    const history = makeTask('history', { partId: 'ael-1', date: localDate(-8), minutes: 20 })
+    const unfinishedHistory = makeTask('unfinished-history', { partId: 'ael-4', date: localDate(-9), minutes: 20 })
     const replacement = makeTask('replacement', { partId: 'ael-5', source: 'fallback' })
     const outsideWindow = makeTask('outside-window', { date: localDate(8) })
     const wrongGradeBand = makeTask('wrong-band', { grade: 'grade3', partId: 'cxd-4' })
-    seedPlan('student_a', [history])
+    seedPlan('student_a', [history, unfinishedHistory])
     const user = userEvent.setup()
 
     render(
@@ -98,7 +99,8 @@ describe('learning plan state actions', () => {
     await user.click(screen.getByRole('button', { name: '登录账号 A' }))
     await user.click(screen.getByRole('button', { name: '采用 AI 预览' }))
 
-    expect(screen.getByLabelText('plan')).toHaveTextContent('history:ael-4:student:0')
+    expect(screen.getByLabelText('plan')).toHaveTextContent('history:ael-1:student:0')
+    expect(screen.getByLabelText('plan')).not.toHaveTextContent('unfinished-history')
     expect(screen.getByLabelText('plan')).toHaveTextContent('replacement:ael-5:ai:0')
     expect(screen.getByLabelText('plan')).not.toHaveTextContent('outside-window')
     expect(screen.getByLabelText('plan')).not.toHaveTextContent('wrong-band')
