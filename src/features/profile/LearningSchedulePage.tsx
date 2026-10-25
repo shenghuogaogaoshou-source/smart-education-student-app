@@ -102,9 +102,11 @@ function statusFor(task: LearningPlanTask, progress: LearningProgress) {
 export function LearningSchedulePage({
   onBack,
   onStartTask,
+  initialDate,
 }: {
   onBack: () => void
   onStartTask?: (task: LearningPlanTask) => void
+  initialDate?: string
 }) {
   const {
     state,
@@ -114,7 +116,11 @@ export function LearningSchedulePage({
     replaceLearningPlan,
     setPlanAvailability,
   } = useAppState()
-  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()))
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date()
+    const availableDates = datesFromToday(today).map(dateKey)
+    return initialDate && availableDates.includes(initialDate) ? initialDate : dateKey(today)
+  })
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [editorError, setEditorError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)

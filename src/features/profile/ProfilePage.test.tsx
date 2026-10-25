@@ -99,7 +99,7 @@ describe('profile dashboard', () => {
 
   it('shows the real next plan task and opens the schedule flow for AI advice', async () => {
     const user = userEvent.setup()
-    const task = planTask()
+    const task = planTask({ review: true })
     seedPlan([task])
     const onStartTask = vi.fn()
     const onOpenSchedule = vi.fn()
@@ -117,6 +117,7 @@ describe('profile dashboard', () => {
     expect(screen.getByRole('heading', { name: '第一次 AI 实验' })).toBeInTheDocument()
     expect(screen.queryByText('图片识别小探索')).not.toBeInTheDocument()
     expect(screen.getByText('知识')).toBeInTheDocument()
+    expect(screen.getByText('复习')).toBeInTheDocument()
     expect(screen.getByText('预计 15 分钟')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '开始学习' }))
@@ -124,6 +125,32 @@ describe('profile dashboard', () => {
 
     await user.click(screen.getByRole('button', { name: 'AI 帮我安排' }))
     expect(onOpenSchedule).toHaveBeenCalledOnce()
+  })
+
+  it('counts following tasks by date, time and order instead of date alone', () => {
+    const earlierSameDay = planTask({
+      id: 'profile-earlier-overdue',
+      partId: 'ael-4',
+      title: '第一次 AI 实验',
+      date: localDate(-1),
+      time: '09:00',
+      order: 0,
+    })
+    const laterSameDay = planTask({
+      id: 'profile-later-overdue',
+      partId: 'ael-5',
+      title: '给 AI 当评委',
+      date: localDate(-1),
+      time: '18:00',
+      order: 1,
+    })
+    seedPlan([earlierSameDay, laterSameDay])
+
+    render(<AppStateProvider><ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} /></AppStateProvider>)
+
+    expect(screen.getByRole('heading', { name: '给 AI 当评委' })).toBeInTheDocument()
+    expect(screen.getByText('这是最近的一项')).toBeInTheDocument()
+    expect(screen.queryByText('之后还有 1 项')).not.toBeInTheDocument()
   })
 
   it('shows an overdue pending task as waiting for adjustment without changing its date', async () => {
@@ -176,7 +203,7 @@ describe('profile dashboard', () => {
     await user.click(screen.getByRole('button', { name: '开始 第一次 AI 实验' }))
     expect(onStartTask).toHaveBeenCalledWith(task)
     await user.click(screen.getByRole('button', { name: '调整这天的安排' }))
-    expect(onOpenSchedule).toHaveBeenCalledOnce()
+    expect(onOpenSchedule).toHaveBeenCalledWith(task.date)
 
     const completedDate = new Date()
     completedDate.setDate(completedDate.getDate() + 2)

@@ -48,7 +48,7 @@ type View =
   | { kind: 'notifications'; id: number }
   | { kind: 'profile-detail'; id: number }
   | { kind: 'profile-edit'; id: number }
-  | { kind: 'schedule'; id: number }
+  | { kind: 'schedule'; id: number; initialDate?: string }
   | { kind: 'calendar'; id: number }
   | { kind: 'wrong-book'; id: number }
   | { kind: 'favorites'; id: number }
@@ -272,7 +272,7 @@ function MainShellBody() {
   if (view.kind === 'schedule') {
     return (
       <main className={shellClassName}>
-        <LearningSchedulePage onBack={pop} onStartTask={startPlanTask} />
+        <LearningSchedulePage onBack={pop} onStartTask={startPlanTask} initialDate={view.initialDate} />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>
@@ -285,7 +285,7 @@ function MainShellBody() {
         <CalendarPage
           onBack={pop}
           onStartTask={startPlanTask}
-          onOpenSchedule={() => push({ kind: 'schedule' })}
+          onOpenSchedule={(initialDate) => push({ kind: 'schedule', initialDate })}
         />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />

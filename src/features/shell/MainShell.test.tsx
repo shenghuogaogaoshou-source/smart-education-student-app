@@ -173,6 +173,22 @@ describe('main shell navigation', () => {
     expect(screen.getByRole('button', { name: '知识' })).toHaveAttribute('aria-current', 'page')
   })
 
+  it('opens the schedule on the date selected in the month calendar', async () => {
+    const user = userEvent.setup()
+    seedPlan()
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '我的' }))
+    await user.click(screen.getByRole('button', { name: '打开整月日历' }))
+
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    await user.click(screen.getByRole('button', { name: `${tomorrow.getDate()} 日，有安排` }))
+    await user.click(screen.getByRole('button', { name: '调整这天的安排' }))
+
+    expect(screen.getByRole('button', { name: /明天 \d{4}-\d{2}-\d{2}，1 项安排/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('opens the exact unlocked test introduction from the next plan card', async () => {
     const user = userEvent.setup()
     seedPlan({

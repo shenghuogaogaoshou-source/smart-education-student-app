@@ -23,7 +23,11 @@ export function GrowthSection({ onStartTask, onOpenSchedule, onOpenCalendar }: P
   const followingCount = nextTask
     ? tasks.filter((task) =>
       task.id !== nextTask.id
-      && task.date >= nextTask.date
+      && (
+        task.date > nextTask.date
+        || (task.date === nextTask.date && task.time > nextTask.time)
+        || (task.date === nextTask.date && task.time === nextTask.time && task.order > nextTask.order)
+      )
       && getPlanTaskView(task, state.learningProgress).statusLabel !== '已完成').length
     : 0
   const lockedTest = nextTask?.kind === 'test' && !isTestUnlocked(progress, nextTask.partId)

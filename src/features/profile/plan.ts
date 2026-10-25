@@ -74,7 +74,7 @@ export function getPlanTaskView(
       kindLabel: task.kind === 'knowledge' ? '知识' : '测试',
       statusLabel: '待调整',
       tone: 'overdue',
-      showReview: false,
+      showReview: task.review,
     }
   }
   return {
@@ -82,7 +82,7 @@ export function getPlanTaskView(
     kindLabel: task.kind === 'knowledge' ? '知识' : '测试',
     statusLabel: timing === 'today' ? '今天' : '待开始',
     tone: timing,
-    showReview: false,
+    showReview: task.review,
   }
 }
 

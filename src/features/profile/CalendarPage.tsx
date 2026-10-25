@@ -10,7 +10,7 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 type Props = {
   onBack: () => void
   onStartTask?: (task: LearningPlanTask) => void
-  onOpenSchedule?: () => void
+  onOpenSchedule?: (date?: string) => void
 }
 
 export function CalendarPage({ onBack, onStartTask, onOpenSchedule }: Props) {
@@ -111,7 +111,7 @@ export function CalendarPage({ onBack, onStartTask, onOpenSchedule }: Props) {
       <section className="calendar-card selected-day-card">
         <div className="section-heading-row">
           <h2>{label(selectedDate)}的安排</h2>
-          {onOpenSchedule && <button className="calendar-adjust" type="button" onClick={onOpenSchedule}>调整这天的安排</button>}
+          {onOpenSchedule && <button className="calendar-adjust" type="button" onClick={() => onOpenSchedule(selected)}>调整这天的安排</button>}
         </div>
         {selectedTasks.length === 0 ? (
           <p className="calendar-empty">这一天暂时没有安排，好好休息吧。</p>
