@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
-import { loadState, saveState } from './storage'
+import { loadState, normalizePersistedState, saveState } from './storage'
 
 describe('primary-only state migration', () => {
   beforeEach(() => localStorage.clear())
@@ -16,7 +16,7 @@ describe('primary-only state migration', () => {
   it('creates the approved guardian-authorized grade-5 account', () => {
     const state = createDefaultState()
 
-    expect(state.stateVersion).toBe(3)
+    expect(state.stateVersion).toBe(4)
     expect(state.grade).toBe('grade5')
     expect(state.guardian.authorised).toBe(true)
     expect(state.learningProgress['grade5-6']).toEqual({
@@ -34,7 +34,7 @@ describe('primary-only state migration', () => {
 
     const migrated = loadState()
 
-    expect(migrated.stateVersion).toBe(3)
+    expect(migrated.stateVersion).toBe(4)
     expect(migrated.grade).toBe('grade5')
     expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
     expect(localStorage.getItem('student-app-primary-v3-migrated')).toBe('1')
@@ -46,6 +46,30 @@ describe('primary-only state migration', () => {
     localStorage.setItem('student-app-state', '{broken')
 
     expect(loadState()).toEqual(createDefaultState())
+  })
+
+  it('migrates a v3 account to v4 without retaining three legacy fake tasks', () => {
+    const v3 = {
+      ...createDefaultState(),
+      stateVersion: 3,
+      learningPlan: {
+        tasks: ['图片识别小探索', '声音地图小任务', '提示词小练习'].map((title, index) => ({
+          id: `legacy-${index}`, title, dayOffset: index, time: '19:00', minutes: 15,
+        })),
+      },
+    }
+    const migrated = normalizePersistedState(v3)
+    expect(migrated.stateVersion).toBe(4)
+    expect(migrated.learningPlan.tasks).toHaveLength(3)
+    expect(migrated.learningPlan.tasks.every((task) => task.partId.startsWith('ael-'))).toBe(true)
+    expect(migrated.learningPlan.tasks.some((task) => task.title === '图片识别小探索')).toBe(false)
+    localStorage.setItem('student-app-state', JSON.stringify(v3))
+    expect(loadState().stateVersion).toBe(4)
+    const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
+    expect(saved.stateVersion).toBe(4)
+    expect(saved.learningPlan.tasks.map((task: { partId: string; title: string }) => [task.partId, task.title])).toEqual(
+      migrated.learningPlan.tasks.map((task) => [task.partId, task.title]),
+    )
   })
 
   it('drops unknown keys and invalid course progress when loading current state', () => {

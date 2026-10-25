@@ -1,4 +1,5 @@
 import { COMPANION_CATALOG } from '../features/ai_companion/companionCatalog'
+import { normalizeLearningPlan } from './learningPlan'
 import { createEmptyLearningProgress, getPartIdsForBand, PRIMARY_GRADES, type CoursePartId } from './learning'
 import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type ConversationSummary, type DeviceInfo, type GuardianInfo } from './model'
 import type { PointTransaction, RewardKind } from './points'
@@ -9,7 +10,7 @@ const MIGRATION_KEY = 'student-app-primary-v3-migrated'
 type PersistedAppState = AppState
 
 const PERSISTED_KEYS: Array<keyof PersistedAppState> = [
-  'stateVersion', 'grade', 'isLoggedIn', 'learningProgress', 'transactions', 'processedRewardIds',
+  'stateVersion', 'grade', 'isLoggedIn', 'learningProgress', 'learningPlan', 'transactions', 'processedRewardIds',
   'aiPosition', 'companion', 'fontScale', 'nickname', 'avatar', 'likes', 'favorites', 'notifications',
   'accountId', 'passwordHint', 'lastPasswordChange', 'twoFactorEnabled', 'guardian', 'familyName',
   'devices', 'aiName', 'aiPersonality', 'aiSkin', 'voiceEnabled', 'autoListenEnabled', 'voiceMode',
@@ -27,7 +28,7 @@ export function loadState(): AppState {
     if (!raw) return fresh
 
     const parsed = JSON.parse(raw) as unknown
-    if (!isRecord(parsed) || (parsed.stateVersion !== 2 && parsed.stateVersion !== APP_STATE_VERSION)) {
+    if (!isRecord(parsed) || (parsed.stateVersion !== 2 && parsed.stateVersion !== 3 && parsed.stateVersion !== APP_STATE_VERSION)) {
       return migrateToPrimaryState(fresh)
     }
 
@@ -52,6 +53,7 @@ export function normalizePersistedState(parsed: Record<string, unknown>, fresh: 
     grade: oneOf(parsed.grade, PRIMARY_GRADES, fresh.grade),
     isLoggedIn: booleanValue(parsed.isLoggedIn, fresh.isLoggedIn),
     learningProgress: normalizeLearningProgress(parsed.learningProgress, fresh.learningProgress),
+    learningPlan: normalizeLearningPlan(parsed.stateVersion === APP_STATE_VERSION ? parsed.learningPlan : undefined, fresh.learningPlan),
     transactions: normalizeTransactions(parsed.transactions, fresh.transactions),
     processedRewardIds: stringArray(parsed.processedRewardIds, fresh.processedRewardIds),
     aiPosition: normalizeAiPosition(parsed.aiPosition, fresh.aiPosition),

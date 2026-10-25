@@ -64,7 +64,7 @@ describe('companion account repository', () => {
 
     const migrated = loadAccountState('chenxi_2026')
 
-    expect(migrated.stateVersion).toBe(3)
+    expect(migrated.stateVersion).toBe(4)
     expect(migrated.nickname).toBe('迁移同学')
     expect(migrated.learningProgress['grade5-6']).toEqual({
       knowledgeCompleted: ['ael-4'],
@@ -104,6 +104,20 @@ describe('companion account repository', () => {
       knowledgeCompleted: ['ael-3'],
       testsPassed: ['ael-2'],
     })
+  })
+
+  it('persists learning plans independently by account and derives no plan rewards', () => {
+    const first = createDefaultState()
+    const second = createDefaultState()
+    first.learningPlan.tasks = [{ ...first.learningPlan.tasks[0], id: 'custom-first', title: '第一账号安排' }]
+    second.learningPlan.tasks = [{ ...second.learningPlan.tasks[0], id: 'custom-second', title: '第二账号安排' }]
+    saveAccountState('first', first)
+    saveAccountState('second', second)
+
+    expect(loadAccountState('first').learningPlan.tasks.map((task) => task.title)).toEqual(['第一账号安排'])
+    expect(loadAccountState('second').learningPlan.tasks.map((task) => task.title)).toEqual(['第二账号安排'])
+    expect(loadAccountState('first').transactions).toEqual(first.transactions)
+    expect(loadAccountState('first').processedRewardIds).toEqual(first.processedRewardIds)
   })
 
   it('keeps only the newest twenty reviewed conversation summaries', () => {

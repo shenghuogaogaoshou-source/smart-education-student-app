@@ -1,7 +1,8 @@
 import type { LearningProgress, PrimaryGrade } from './learning'
 import type { PointTransaction } from './points'
+import { createDefaultLearningPlan, type LearningPlanState } from './learningPlan'
 
-export const APP_STATE_VERSION = 3 as const
+export const APP_STATE_VERSION = 4 as const
 
 export type FontScale = 'standard' | 'large' | 'xlarge'
 
@@ -50,6 +51,7 @@ export type AppState = {
   grade: PrimaryGrade
   isLoggedIn: boolean
   learningProgress: LearningProgress
+  learningPlan: LearningPlanState
   transactions: PointTransaction[]
   processedRewardIds: string[]
   aiPosition: AiPosition
@@ -118,6 +120,7 @@ export function createDefaultState(): AppState {
         testsPassed: ['ael-1', 'ael-2'],
       },
     },
+    learningPlan: createDefaultLearningPlan(),
     transactions: DEMO_TRANSACTIONS.map((transaction) => ({ ...transaction })),
     processedRewardIds: [
       'demo:knowledge', 'demo:tests', 'demo:medals', 'demo:starter',
