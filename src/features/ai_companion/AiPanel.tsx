@@ -1,8 +1,9 @@
-import { ArrowLeft, History, Mic, Send, Settings2, ShieldCheck, Sparkles, Volume2, X } from 'lucide-react'
+import { ArrowLeft, Bookmark, Brain, History, Mic, Send, Settings2, ShieldCheck, Sparkles, Volume2 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useAppState } from '../../app/AppState'
-import type { VoiceReplyMode } from '../../app/model'
+import type { ConversationSummary, VoiceReplyMode } from '../../app/model'
+import { AiLocalSheet } from './AiLocalSheet'
 import { getCompanionItem } from './companionCatalog'
 import { requestCompanionReply } from './companionChat'
 import { startSpeechCapture, speakCompanionReply, type SpeechPlayback } from './browserSpeech'
@@ -34,7 +35,36 @@ function errorMessage(conversation: ConversationSnapshot) {
   return '刚才没有听清楚，可以再说一次吗？'
 }
 
-export function AiPanel({ onClose }: { onClose: () => void }) {
+type ConversationHistoryGroup = {
+  label: '今天' | '昨天' | '更早'
+  items: ConversationSummary[]
+}
+
+function groupConversationSummaries(summaries: ConversationSummary[]): ConversationHistoryGroup[] {
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const groups: ConversationHistoryGroup[] = [
+    { label: '今天', items: [] },
+    { label: '昨天', items: [] },
+    { label: '更早', items: [] },
+  ]
+
+  for (const summary of [...summaries].reverse()) {
+    const date = new Date(summary.occurredAt)
+    if (!Number.isFinite(date.getTime())) continue
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+    const dayOffset = Math.round((startOfToday - startOfDate) / 86_400_000)
+    const groupIndex = dayOffset === 0 ? 0 : dayOffset === 1 ? 1 : 2
+    groups[groupIndex].items.push(summary)
+  }
+
+  return groups.filter((group) => group.items.length > 0)
+}
+
+export function AiPanel({ onClose, onOpenPrivacySettings }: {
+  onClose: () => void
+  onOpenPrivacySettings?: () => void
+}) {
   const app = useAppState()
   const { state } = app
   const command = useOptionalAppCommand()
@@ -50,6 +80,8 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
     errorReason: null,
   })
   const [localPanel, setLocalPanel] = useState<'history' | 'settings' | null>(null)
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
   const messageIdRef = useRef(2)
   const lastQuestionRef = useRef('')
   const lastReplyRef = useRef('')
@@ -60,6 +92,8 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
   const voiceEnabledRef = useRef(state.voiceEnabled)
   const companionIdRef = useRef(state.companion.equipped.appearance ?? 'momo')
   const conversationEndRef = useRef<HTMLDivElement>(null)
+  const historyTriggerRef = useRef<HTMLButtonElement>(null)
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const playbackRef = useRef<SpeechPlayback | null>(null)
   commandRef.current = command
   voiceModeRef.current = state.voiceReplyMode
@@ -184,6 +218,12 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
   const isConversing = messages.length > 1 || conversation.status !== 'idle'
   const busy = conversation.status === 'thinking' || conversation.status === 'speaking'
   const listening = conversation.status === 'listening' || conversation.status === 'transcribing'
+  const historyGroups = groupConversationSummaries(state.conversationSummaries)
+
+  const closeLocalPanel = () => {
+    setLocalPanel(null)
+    setConfirmClear(false)
+  }
 
   const portal = (
     <div className="ai-panel-root" role="presentation">
@@ -192,8 +232,8 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
           <button type="button" aria-label="关闭" onClick={onClose} className="ai-chat-header__button"><ArrowLeft size={21} /></button>
           <div><span>智芽成长伙伴</span><strong>{appearanceName}</strong></div>
           <div className="ai-chat-header__actions">
-            <button type="button" aria-label="历史对话" className="ai-chat-header__button" onClick={() => setLocalPanel('history')}><History size={18} /></button>
-            <button type="button" aria-label="伙伴设置" className="ai-chat-header__button" onClick={() => setLocalPanel('settings')}><Settings2 size={18} /></button>
+            <button ref={historyTriggerRef} type="button" aria-label="历史对话" className="ai-chat-header__button" onClick={() => setLocalPanel('history')}><History size={18} /></button>
+            <button ref={settingsTriggerRef} type="button" aria-label="伙伴设置" className="ai-chat-header__button" onClick={() => setLocalPanel('settings')}><Settings2 size={18} /></button>
           </div>
         </header>
 
@@ -273,57 +313,136 @@ export function AiPanel({ onClose }: { onClose: () => void }) {
         </footer>
 
         {localPanel === 'history' && (
-          <section className="ai-chat-local-panel" role="dialog" aria-modal="true" aria-label="本机对话记录">
-            <header>
-              <span><small>仅保存在当前学习账号</small><strong>本机对话记录</strong></span>
-              <button type="button" aria-label="关闭本机对话记录" onClick={() => setLocalPanel(null)}><X size={18} /></button>
-            </header>
-            {state.conversationSummaries.length > 0 ? (
-              <div className="ai-chat-history-list">
-                {state.conversationSummaries.map((summary) => (
-                  <article key={summary.id}>
-                    <strong>{summary.topic}</strong>
-                    <p>{summary.summary}</p>
-                    <time>{summary.occurredAt}</time>
-                  </article>
+          <AiLocalSheet
+            label="本机对话记录"
+            eyebrow="仅保存在当前学习账号"
+            title="本机对话记录"
+            triggerRef={historyTriggerRef}
+            onClose={closeLocalPanel}
+            footer={(
+              <button
+                type="button"
+                className="ai-local-sheet__clear"
+                disabled={state.conversationSummaries.length === 0}
+                onClick={() => setConfirmClear(true)}
+              >
+                清空记录
+              </button>
+            )}
+          >
+            {confirmClear ? (
+              <section className="ai-local-history-confirm" aria-label="清空记录确认">
+                <History size={24} />
+                <strong>确认清空本机对话记录？</strong>
+                <p>只会删除当前学习账号保存在本设备上的对话摘要。</p>
+                <div>
+                  <button type="button" onClick={() => setConfirmClear(false)}>取消清空</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      app.clearHistory()
+                      setConfirmClear(false)
+                    }}
+                  >
+                    确认清空
+                  </button>
+                </div>
+              </section>
+            ) : historyGroups.length > 0 ? (
+              <div className="ai-history-groups">
+                {historyGroups.map((group) => (
+                  <section key={group.label} className="ai-history-group" aria-label={group.label}>
+                    <h3>{group.label}</h3>
+                    {group.items.map((summary) => {
+                      const expanded = expandedHistoryId === summary.id
+                      return (
+                        <button
+                          key={summary.id}
+                          type="button"
+                          className={`ai-history-card ${expanded ? 'is-expanded' : ''}`}
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedHistoryId(expanded ? null : summary.id)}
+                        >
+                          <span className="ai-history-card__meta">
+                            <time>{new Date(summary.occurredAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time>
+                            <b>{summary.messageCount} 条消息</b>
+                          </span>
+                          <strong>{summary.topic}</strong>
+                          <p>{summary.summary}</p>
+                        </button>
+                      )
+                    })}
+                  </section>
                 ))}
               </div>
             ) : (
-              <div className="ai-chat-empty-state">
+              <div className="ai-chat-empty-state ai-chat-empty-state--compact">
                 <History size={24} />
                 <strong>还没有可回看的对话摘要</strong>
                 <p>开启保存后，重要学习话题会整理在当前设备中，不会伪装成云端记录。</p>
               </div>
             )}
-          </section>
+          </AiLocalSheet>
         )}
 
         {localPanel === 'settings' && (
-          <section className="ai-chat-local-panel" role="dialog" aria-modal="true" aria-label="伙伴设置">
-            <header>
-              <span><small>当前学习账号的本地偏好</small><strong>伙伴设置</strong></span>
-              <button type="button" aria-label="关闭伙伴设置" onClick={() => setLocalPanel(null)}><X size={18} /></button>
-            </header>
-            <div className="ai-chat-setting-list">
+          <AiLocalSheet
+            label="伙伴设置"
+            eyebrow="当前学习账号的本地偏好"
+            title="伙伴设置"
+            triggerRef={settingsTriggerRef}
+            onClose={closeLocalPanel}
+            footer={(
+              <div className="ai-local-settings-footer">
+                <span><ShieldCheck size={15} />设置只属于当前学习账号</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenPrivacySettings?.()
+                    closeLocalPanel()
+                  }}
+                >
+                  管理全部隐私设置
+                </button>
+              </div>
+            )}
+          >
+            <div className="ai-chat-setting-list ai-chat-setting-list--cards">
               <button
                 type="button"
+                role="switch"
                 aria-label="切换语音回复"
-                aria-pressed={state.voiceReplyMode !== 'silent'}
+                aria-checked={state.voiceReplyMode !== 'silent'}
                 onClick={() => app.setVoiceReplyMode(state.voiceReplyMode === 'silent' ? 'voice-only' : 'silent')}
               >
+                <span className="ai-setting-card__icon"><Volume2 size={18} /></span>
                 <span><strong>语音回复</strong><small>长按提问后由伙伴读出回答</small></span>
-                <em>{state.voiceReplyMode === 'silent' ? '已关闭' : '已开启'}</em>
+                <em aria-hidden="true" />
               </button>
-              <button type="button" aria-pressed={state.saveHistory} onClick={() => app.setSaveHistory(!state.saveHistory)}>
+              <button
+                type="button"
+                role="switch"
+                aria-label="保存对话摘要"
+                aria-checked={state.saveHistory}
+                onClick={() => app.setSaveHistory(!state.saveHistory)}
+              >
+                <span className="ai-setting-card__icon"><Bookmark size={18} /></span>
                 <span><strong>保存对话摘要</strong><small>仅保存在当前学习账号与设备</small></span>
-                <em>{state.saveHistory ? '已开启' : '已关闭'}</em>
+                <em aria-hidden="true" />
               </button>
-              <button type="button" aria-pressed={state.aiMemoryEnabled} onClick={() => app.setAiMemory(!state.aiMemoryEnabled)}>
+              <button
+                type="button"
+                role="switch"
+                aria-label="学习记忆"
+                aria-checked={state.aiMemoryEnabled}
+                onClick={() => app.setAiMemory(!state.aiMemoryEnabled)}
+              >
+                <span className="ai-setting-card__icon"><Brain size={18} /></span>
                 <span><strong>学习记忆</strong><small>根据多次谈话整理长期学习偏好</small></span>
-                <em>{state.aiMemoryEnabled ? '已开启' : '已关闭'}</em>
+                <em aria-hidden="true" />
               </button>
             </div>
-          </section>
+          </AiLocalSheet>
         )}
       </section>
     </div>

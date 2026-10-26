@@ -37,6 +37,7 @@ export type ConversationSummary = {
   topic: string
   summary: string
   occurredAt: string
+  messageCount: number
 }
 
 export type WrongAnswerRecord = {

@@ -2,6 +2,8 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { loadAccountState, saveAccountState } from '../../app/companionAccountRepository'
+import { createDefaultState } from '../../app/model'
 import { SessionCredentialProvider } from '../auth/sessionCredential'
 import { AppCommandProvider } from './commands/AppCommandContext'
 import type { InterpretedIntent } from './commands/commandTypes'
@@ -13,12 +15,13 @@ function renderPanel(
     reply: '我还没听明白。',
   }),
   onExecute = vi.fn(),
+  onOpenPrivacySettings?: () => void,
 ) {
   return render(
     <SessionCredentialProvider>
       <AppStateProvider>
         <AppCommandProvider interpret={interpret} onExecute={onExecute}>
-          <AiPanel onClose={vi.fn()} />
+          <AiPanel onClose={vi.fn()} onOpenPrivacySettings={onOpenPrivacySettings} />
         </AppCommandProvider>
       </AppStateProvider>
     </SessionCredentialProvider>,
@@ -105,12 +108,64 @@ describe('AI companion conversation page', () => {
     renderPanel()
 
     await user.click(screen.getByRole('button', { name: '历史对话' }))
-    expect(screen.getByRole('dialog', { name: '本机对话记录' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '本机对话记录' })).toHaveClass('ai-local-sheet')
     await user.click(screen.getByRole('button', { name: '关闭本机对话记录' }))
 
     await user.click(screen.getByRole('button', { name: '伙伴设置' }))
     expect(screen.getByRole('dialog', { name: '伙伴设置' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '切换语音回复' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: '切换语音回复' })).toBeInTheDocument()
+  })
+
+  it('groups local history by day, shows message counts and confirms clearing', async () => {
+    const now = new Date()
+    const timestamp = (offset: number) => new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + offset,
+      9,
+      30,
+    ).toISOString()
+    const state = createDefaultState()
+    state.historyCount = 3
+    state.conversationSummaries = [
+      { id: 'today', topic: '今天的学习', summary: '整理了今天的错题。', occurredAt: timestamp(0), messageCount: 4 },
+      { id: 'yesterday', topic: '昨天的探索', summary: '发现了新的 AI 方法。', occurredAt: timestamp(-1), messageCount: 2 },
+      { id: 'older', topic: '更早的话题', summary: '留下了旧的学习线索。', occurredAt: timestamp(-3), messageCount: 1 },
+    ]
+    saveAccountState(state.accountId, state)
+    const user = userEvent.setup()
+    renderPanel()
+
+    await user.click(screen.getByRole('button', { name: '历史对话' }))
+    expect(screen.getByRole('heading', { name: '今天' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '昨天' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '更早' })).toBeInTheDocument()
+    expect(screen.getByText('4 条消息')).toBeInTheDocument()
+    const card = screen.getByRole('button', { name: /今天的学习/ })
+    await user.click(card)
+    expect(card).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(screen.getByRole('button', { name: '清空记录' }))
+    expect(screen.getByText('确认清空本机对话记录？')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '确认清空' }))
+
+    const saved = loadAccountState(state.accountId)
+    expect(saved.historyCount).toBe(0)
+    expect(saved.conversationSummaries).toEqual([])
+    expect(screen.getByRole('dialog', { name: '本机对话记录' })).toBeInTheDocument()
+    expect(screen.getByText('还没有可回看的对话摘要')).toBeInTheDocument()
+  })
+
+  it('shows three compact preference switches and opens privacy settings', async () => {
+    const onOpenPrivacySettings = vi.fn()
+    const user = userEvent.setup()
+    renderPanel(undefined, vi.fn(), onOpenPrivacySettings)
+
+    await user.click(screen.getByRole('button', { name: '伙伴设置' }))
+    expect(screen.getAllByRole('switch')).toHaveLength(3)
+    expect(screen.getByText('设置只属于当前学习账号')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '管理全部隐私设置' }))
+    expect(onOpenPrivacySettings).toHaveBeenCalledOnce()
   })
 
   it('honors the voice reply mode for text and spoken questions', () => {

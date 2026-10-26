@@ -406,6 +406,7 @@
 }
 
 .ai-panel-full {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: min(100%, 460px);
@@ -414,6 +415,290 @@
   background: #fafbfd;
   color: #1a2233;
   overflow: hidden;
+}
+
+.ai-local-sheet-layer {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.ai-local-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(62, 42, 49, .28);
+  backdrop-filter: blur(3px);
+}
+
+.ai-local-sheet {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  max-height: min(68%, 560px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .88);
+  border-bottom: 0;
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(165deg, #fffaf5 0%, #fff4f3 100%);
+  box-shadow: 0 -24px 60px rgba(83, 51, 60, .22);
+  animation: ai-local-sheet-in 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.ai-local-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(213, 174, 166, .22);
+}
+
+.ai-local-sheet__header span,
+.ai-local-sheet__header small,
+.ai-local-sheet__header strong {
+  display: block;
+}
+
+.ai-local-sheet__header small {
+  margin-bottom: 3px;
+  color: #a17d82;
+  font-size: calc(.62rem * var(--font-scale));
+}
+
+.ai-local-sheet__header strong {
+  color: #573b43;
+  font-size: calc(1.02rem * var(--font-scale));
+}
+
+.ai-local-sheet__header > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(210, 157, 161, .28);
+  border-radius: 12px;
+  background: #fff;
+  color: #986b76;
+}
+
+.ai-local-sheet__body {
+  min-height: 0;
+  padding: 14px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.ai-local-sheet__footer {
+  padding: 10px 18px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(213, 174, 166, .2);
+  background: rgba(255, 250, 245, .94);
+}
+
+.ai-local-sheet__clear {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(177, 92, 104, .24);
+  border-radius: 13px;
+  background: #fff;
+  color: #a04e60;
+  font-weight: 750;
+}
+
+.ai-local-sheet__clear:disabled {
+  color: #bba4a8;
+  opacity: .7;
+}
+
+.ai-history-groups,
+.ai-history-group {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-history-groups {
+  gap: 16px;
+}
+
+.ai-history-group h3 {
+  margin: 0;
+  color: #a17d82;
+  font-size: calc(.65rem * var(--font-scale));
+  letter-spacing: .05em;
+}
+
+.ai-history-card {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid rgba(220, 169, 165, .24);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .86);
+  color: #5b4149;
+  text-align: left;
+}
+
+.ai-history-card__meta {
+  display: flex;
+  justify-content: space-between;
+  color: #aa858e;
+  font-size: calc(.6rem * var(--font-scale));
+}
+
+.ai-history-card__meta b {
+  font-weight: 700;
+}
+
+.ai-history-card strong {
+  font-size: calc(.82rem * var(--font-scale));
+}
+
+.ai-history-card p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #846870;
+  font-size: calc(.68rem * var(--font-scale));
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.ai-history-card.is-expanded p {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.ai-chat-empty-state--compact {
+  min-height: 150px;
+  padding: 18px 10px;
+}
+
+.ai-local-history-confirm {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 12px;
+  color: #8d5d69;
+  text-align: center;
+}
+
+.ai-local-history-confirm p {
+  max-width: 280px;
+  margin: 0;
+  color: #98757d;
+  font-size: calc(.68rem * var(--font-scale));
+  line-height: 1.55;
+}
+
+.ai-local-history-confirm > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.ai-local-history-confirm button {
+  min-height: 38px;
+  border: 1px solid rgba(207, 157, 158, .26);
+  border-radius: 12px;
+  background: #fff;
+  color: #7e5c65;
+  font-weight: 750;
+}
+
+.ai-local-history-confirm button:last-child {
+  border-color: transparent;
+  background: #b75e71;
+  color: #fff;
+}
+
+.ai-chat-setting-list--cards {
+  gap: 9px;
+}
+
+.ai-chat-setting-list--cards button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+}
+
+.ai-setting-card__icon {
+  display: grid !important;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff0ec;
+  color: #a75f70;
+}
+
+.ai-chat-setting-list--cards em {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  background: #ead8d8;
+  transition: background 160ms ease;
+}
+
+.ai-chat-setting-list--cards em::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(82, 59, 65, .18);
+  content: '';
+  transition: transform 160ms ease;
+}
+
+.ai-chat-setting-list--cards button[aria-checked="true"] em {
+  background: #be7180;
+}
+
+.ai-chat-setting-list--cards button[aria-checked="true"] em::after {
+  transform: translateX(16px);
+}
+
+.ai-local-settings-footer {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-local-settings-footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8f7078;
+  font-size: calc(.64rem * var(--font-scale));
+}
+
+.ai-local-settings-footer button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 13px;
+  background: #5d424a;
+  color: #fff;
+  font-weight: 750;
+}
+
+@keyframes ai-local-sheet-in {
+  from { transform: translateY(18px); opacity: .6; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* 顶部栏 */
@@ -1256,5 +1541,12 @@
   .ai-chat-listening > span {
     transition: none !important;
     animation: none !important;
+  }
+
+  .ai-local-sheet,
+  .ai-chat-setting-list--cards em,
+  .ai-chat-setting-list--cards em::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

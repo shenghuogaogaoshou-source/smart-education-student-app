@@ -374,11 +374,17 @@ function normalizeConversationSummaries(value: unknown, fallback: ConversationSu
   const source = Array.isArray(value) ? value : fallback
   return source
     .filter(isConversationSummary)
-    .map(({ id, topic, summary, occurredAt }) => ({ id, topic, summary, occurredAt }))
+    .map(({ id, topic, summary, occurredAt, messageCount }) => ({
+      id,
+      topic,
+      summary,
+      occurredAt,
+      messageCount: Number.isInteger(messageCount) && (messageCount as number) > 0 ? messageCount as number : 1,
+    }))
     .slice(-20)
 }
 
-function isConversationSummary(value: unknown): value is ConversationSummary {
+function isConversationSummary(value: unknown): value is Omit<ConversationSummary, 'messageCount'> & { messageCount?: unknown } {
   return isRecord(value)
     && typeof value.id === 'string'
     && typeof value.topic === 'string'

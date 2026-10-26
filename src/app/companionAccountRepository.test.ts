@@ -193,6 +193,7 @@ describe('companion account repository', () => {
         topic: `话题 ${index}`,
         summary: `已审核摘要 ${index}`,
         occurredAt: `2026-10-${String(index + 1).padStart(2, '0')}`,
+        messageCount: index + 1,
       })
     }
 
@@ -200,6 +201,24 @@ describe('companion account repository', () => {
     expect(loaded.conversationSummaries).toHaveLength(20)
     expect(loaded.conversationSummaries[0]?.id).toBe('summary-2')
     expect(loaded.conversationSummaries[19]?.id).toBe('summary-21')
+  })
+
+  it('normalizes legacy and invalid conversation message counts to one', () => {
+    const state = createDefaultState()
+    localStorage.setItem(accountStorageKey('counts'), JSON.stringify({
+      ...state,
+      conversationSummaries: [
+        { id: 'legacy', topic: '旧摘要', summary: '缺字段', occurredAt: '2026-10-20T09:00:00.000Z' },
+        { id: 'valid', topic: '新摘要', summary: '有字段', occurredAt: '2026-10-21T09:00:00.000Z', messageCount: 7 },
+        { id: 'invalid', topic: '坏字段', summary: '零条', occurredAt: '2026-10-22T09:00:00.000Z', messageCount: 0 },
+      ],
+    }))
+
+    expect(loadAccountState('counts').conversationSummaries.map(({ id, messageCount }) => [id, messageCount])).toEqual([
+      ['legacy', 1],
+      ['valid', 7],
+      ['invalid', 1],
+    ])
   })
 
   it('clears only the selected account', () => {

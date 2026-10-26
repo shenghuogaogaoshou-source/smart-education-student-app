@@ -455,7 +455,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'set-voice-reply-mode': return { ...state, voiceReplyMode: action.mode }
     case 'set-save-history': return { ...state, saveHistory: action.enabled }
     case 'set-ai-memory': return { ...state, aiMemoryEnabled: action.enabled }
-    case 'clear-history': return { ...state, historyCount: 0 }
+    case 'clear-history': return { ...state, historyCount: 0, conversationSummaries: [] }
     case 'set-confirm-dangerous': return { ...state, confirmDangerous: action.enabled }
     case 'set-guardian-approve': return { ...state, guardianApprove: action.enabled }
     case 'set-safe-mode': return { ...state, safeMode: action.mode }
