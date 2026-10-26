@@ -12,6 +12,11 @@ describe('profile rewards', () => {
 
   it('shows earned medals against the fixed 49-course-medal total', () => {
     const state = createDefaultState()
+    state.learningProgress = {
+      'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+      'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+      'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+    }
     state.learningEvents = [
       createLearningEvent({
         accountId: state.accountId,
@@ -41,14 +46,14 @@ describe('profile rewards', () => {
     expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('2 / 49 枚')
   })
 
-  it('starts at zero for the new event-based medal system', () => {
+  it('derives medals from seeded course progress that predates event tracking', () => {
     render(
       <AppStateProvider>
         <RewardsSection />
       </AppStateProvider>,
     )
 
-    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('0 / 49 枚')
+    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('5 / 49 枚')
   })
 
   it('renders totals and records from the same 2000-point ledger', () => {

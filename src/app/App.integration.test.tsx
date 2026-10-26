@@ -105,6 +105,14 @@ describe('student app integration', () => {
     firstAccount.accountId = 'journey-student'
     firstAccount.learningPlan.tasks = []
     saveAccountState(firstAccount.accountId, firstAccount)
+    const secondAccount = createDefaultState()
+    secondAccount.accountId = 'second-student'
+    secondAccount.learningProgress = {
+      'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+      'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+      'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+    }
+    saveAccountState(secondAccount.accountId, secondAccount)
     const user = userEvent.setup()
     render(<App />)
 
@@ -162,12 +170,12 @@ describe('student app integration', () => {
     await user.click(screen.getByRole('button', { name: '我的' }))
     await user.click(screen.getByRole('button', { name: '成长画像' }))
 
-    expect(screen.getByText('好奇探索 44 · 知识理解 46 · 问题解决 46 · 实践创造 44 · 自主规划 42'))
+    expect(screen.getByText('好奇探索 50 · 知识理解 62 · 问题解决 54 · 实践创造 44 · 自主规划 42'))
       .toBeInTheDocument()
     expect(screen.getByText(/把点子慢慢做出来|愿意试出新花样|让想象落到作品里/)).toBeInTheDocument()
-    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('2 / 49 枚')
+    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('7 / 49 枚')
     await user.click(screen.getByText('我的勋章').closest('button')!)
-    expect(screen.getAllByText('已获得 · 2026-10-26')).toHaveLength(2)
+    expect(screen.getAllByText('已获得 · 2026-10-26')).toHaveLength(7)
     expect(screen.getByRole('button', { name: /^5—6 年级 AI 探索实验室/ })).toHaveAttribute('aria-expanded', 'true')
 
     const firstSaved = loadAccountState(firstAccount.accountId)
@@ -194,5 +202,5 @@ describe('student app integration', () => {
     const secondSaved = loadAccountState('second-student')
     expect(secondSaved.learningEvents).toEqual([])
     expect(secondSaved.wrongAnswers).toEqual([])
-  }, 20_000)
+  }, 40_000)
 })

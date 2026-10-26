@@ -52,6 +52,16 @@ describe('medals page', () => {
     expect(screen.getByRole('button', { name: /^5—6 年级 AI 探索实验室/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('shows medals for course progress saved before learning events were tracked', () => {
+    const state = createDefaultState()
+    state.learningEvents = []
+    saveAccountState(state.accountId, state)
+
+    render(<AppStateProvider><MedalsPage onBack={vi.fn()} /></AppStateProvider>)
+
+    expect(screen.getByRole('button', { name: /5\s*已获得/ })).toBeInTheDocument()
+  })
+
   it('keeps other course groups discoverable and expandable', async () => {
     const user = userEvent.setup()
     render(<AppStateProvider><MedalsPage onBack={vi.fn()} /></AppStateProvider>)

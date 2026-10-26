@@ -9,6 +9,7 @@ export default defineConfig({
       '**/dist/**',
       '.worktrees/**',
       'server/devProcesses.test.mjs',
+      'server/devSupervisor.test.mjs',
       'server/recognition.test.mjs',
     ],
   },

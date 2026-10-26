@@ -56,11 +56,10 @@ export function normalizePersistedState(parsed: Record<string, unknown>, fresh: 
   const accountId = fresh.accountId
   const learningProgress = normalizeLearningProgress(parsed.learningProgress, fresh.learningProgress)
   const transactions = normalizeTransactions(parsed.transactions, fresh.transactions)
-  const learningEvents = parsed.stateVersion === 4
-    ? migrateV4LearningEvents(learningProgress, transactions, accountId, now)
-    : parsed.stateVersion === APP_STATE_VERSION
-      ? normalizeLearningEvents(parsed.learningEvents, accountId)
-      : []
+  const savedEvents = parsed.stateVersion === APP_STATE_VERSION
+    ? normalizeLearningEvents(parsed.learningEvents, accountId)
+    : []
+  const learningEvents = backfillCourseEvents(savedEvents, learningProgress, transactions, accountId, now)
   return {
     stateVersion: APP_STATE_VERSION,
     grade,
@@ -198,16 +197,17 @@ function normalizeCoursePartIds(value: unknown, validIds: Set<CoursePartId>, fal
   return value.filter((id): id is CoursePartId => typeof id === 'string' && validIds.has(id as CoursePartId))
 }
 
-function migrateV4LearningEvents(
+function backfillCourseEvents(
+  events: LearningEvent[],
   progress: AppState['learningProgress'],
   transactions: PointTransaction[],
   accountId: string,
   now: Date,
 ): LearningEvent[] {
-  let events: LearningEvent[] = []
+  let current = events
   for (const gradeBand of GRADE_BANDS) {
     for (const contentId of progress[gradeBand].knowledgeCompleted) {
-      events = appendLearningEvent(events, createLearningEvent({
+      current = appendLearningEvent(current, createLearningEvent({
         accountId,
         gradeBand,
         source: 'knowledge',
@@ -218,7 +218,7 @@ function migrateV4LearningEvents(
       }))
     }
     for (const contentId of progress[gradeBand].testsPassed) {
-      events = appendLearningEvent(events, createLearningEvent({
+      current = appendLearningEvent(current, createLearningEvent({
         accountId,
         gradeBand,
         source: 'test',
@@ -229,7 +229,7 @@ function migrateV4LearningEvents(
       }))
     }
   }
-  return events
+  return current
 }
 
 function transactionDate(transactions: PointTransaction[], eventId: string, fallback: Date): string {

@@ -2,6 +2,7 @@
 node_modules/
 
 # Local credentials
+.env.local
 server/.env.local
 
 # Build output

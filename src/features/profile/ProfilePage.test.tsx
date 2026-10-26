@@ -44,6 +44,15 @@ function seedPlan(tasks: LearningPlanTask[]) {
   return state
 }
 
+function withoutDemoProgress(state: ReturnType<typeof createDefaultState>) {
+  state.learningProgress = {
+    'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+    'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+    'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+  }
+  return state
+}
+
 describe('profile dashboard', () => {
   beforeEach(() => localStorage.clear())
 
@@ -100,7 +109,7 @@ describe('profile dashboard', () => {
 
   it('renders live profile scores and the persisted gentle title', async () => {
     const user = userEvent.setup()
-    const state = createDefaultState()
+    const state = withoutDemoProgress(createDefaultState())
     state.learningEvents = [createLearningEvent({
       accountId: state.accountId,
       gradeBand: 'grade5-6',
@@ -263,7 +272,7 @@ describe('profile dashboard', () => {
   })
 
   it('derives the profile medal count from real learning events', () => {
-    const state = createDefaultState()
+    const state = withoutDemoProgress(createDefaultState())
     state.learningEvents = [
       createLearningEvent({
         accountId: state.accountId, gradeBand: 'grade5-6', source: 'knowledge',

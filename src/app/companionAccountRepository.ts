@@ -54,8 +54,9 @@ export function loadAccountState(accountId: string): AppState {
     }
   }
 
-  saveAccountState(normalizedAccountId, fallback)
-  return fallback
+  const normalizedFallback = normalizePersistedState(toPersistedState(fallback), fallback)
+  saveAccountState(normalizedAccountId, normalizedFallback)
+  return normalizedFallback
 }
 
 export function saveAccountState(accountId: string, state: AppState): void {

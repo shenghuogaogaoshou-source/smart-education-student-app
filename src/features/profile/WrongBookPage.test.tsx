@@ -48,13 +48,15 @@ describe('wrong book', () => {
 
     let saved = loadAccountState(createDefaultState().accountId)
     expect(saved.wrongAnswers[0].correctedAt).toBeNull()
-    expect(saved.learningEvents).toEqual([])
+    expect(saved.learningEvents.some((event) => (
+      event.action === 'correction-completed' && event.contentId === wrongAnswer.id
+    ))).toBe(false)
 
     await user.click(screen.getByRole('button', { name: '采集、训练、测试和改进' }))
     await waitFor(() => {
       saved = loadAccountState(createDefaultState().accountId)
       expect(saved.wrongAnswers[0].correctedAt).not.toBeNull()
-      expect(saved.learningEvents).toEqual([
+      expect(saved.learningEvents.filter((event) => event.action === 'correction-completed')).toEqual([
         expect.objectContaining({
           action: 'correction-completed',
           contentId: wrongAnswer.id,
@@ -69,7 +71,7 @@ describe('wrong book', () => {
     await waitFor(() => {
       saved = loadAccountState(createDefaultState().accountId)
       expect(saved.wrongAnswers[0].correctedAt).toBe(correctedAt)
-      expect(saved.learningEvents).toHaveLength(1)
+      expect(saved.learningEvents.filter((event) => event.action === 'correction-completed')).toHaveLength(1)
     })
   })
 

@@ -50,3 +50,38 @@ test('retries truncated provider response and includes extensions', async (t) =>
   assert.equal(calls, 2)
 })
 
+test('uses DashScope qwen3-vl-plus with a 25 second timeout and retries one provider failure', async () => {
+  const calls = []
+  const timeoutValues = []
+  const result = { title: '叶子', output: '这是叶片。', uncertainty: '请对照原图。', evidence: ['能看到叶脉'], steps: [{ title: '观察', detail: '先看形状和叶脉' }], introduction: { overview: '叶片帮助植物制造养分。', funFact: '叶脉还能运输水分。', question: '叶脉像什么形状？' } }
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options })
+    if (calls.length === 1) return new Response('temporary', { status: 503 })
+    return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(result) } }] }), { status: 200 })
+  }
+  const answer = await recognize({ tool: 'object', image: 'data:image/png;base64,AAAA' }, {
+    apiKey: 'fixture',
+    fetchImpl,
+    timeoutSignalFactory: (ms) => { timeoutValues.push(ms); return undefined },
+  })
+  assert.equal(answer.title, '叶子')
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions')
+  assert.equal(JSON.parse(calls[0].options.body).model, 'qwen3-vl-plus')
+  assert.deepEqual(timeoutValues, [25000, 25000])
+})
+
+test('returns a safe local result after both vision attempts fail', async () => {
+  let calls = 0
+  const result = await recognize({ tool: 'ocr', image: 'data:image/png;base64,AAAA' }, {
+    apiKey: 'fixture',
+    fetchImpl: async () => { calls += 1; throw new Error('network down') },
+    timeoutSignalFactory: () => undefined,
+  })
+  assert.equal(calls, 2)
+  assert.match(result.title, /暂时/)
+  assert.match(result.output, /重新拍摄|稍后重试/)
+  assert.equal(result.evidence.length > 0, true)
+  assert.equal(result.steps.length > 0, true)
+})
+

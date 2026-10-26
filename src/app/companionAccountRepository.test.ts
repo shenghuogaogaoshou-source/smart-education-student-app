@@ -178,10 +178,26 @@ describe('companion account repository', () => {
     const loadedFirst = loadAccountState(' first ')
     const loadedSecond = loadAccountState('SECOND')
 
-    expect(loadedFirst.learningEvents).toEqual(first.learningEvents)
+    expect(loadedFirst.learningEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'first:grade5-6:knowledge-completed:ael-4',
+        accountId: 'first',
+      }),
+    ]))
+    expect(loadedFirst.learningEvents).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'second:grade3-4:test-passed:cxd-2' }),
+    ]))
     expect(loadedFirst.wrongAnswers).toEqual(first.wrongAnswers)
     expect(loadedFirst.growthTitle).toEqual(first.growthTitle)
-    expect(loadedSecond.learningEvents).toEqual(second.learningEvents)
+    expect(loadedSecond.learningEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'second:grade3-4:test-passed:cxd-2',
+        accountId: 'second',
+      }),
+    ]))
+    expect(loadedSecond.learningEvents).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'first:grade5-6:knowledge-completed:ael-4' }),
+    ]))
     expect(loadedSecond.wrongAnswers).toEqual(second.wrongAnswers)
     expect(loadedSecond.growthTitle).toEqual(second.growthTitle)
   })

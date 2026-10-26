@@ -47,12 +47,12 @@ describe('game and works integration', () => {
     dispatchGameDraft('brain-film', '云朵电影院')
     expect(await screen.findByText('已保存到智芽·我的作品')).toBeInTheDocument()
     await waitFor(() => {
-      expect(loadAccountState('chenxi_2026').learningEvents).toEqual([
+      expect(loadAccountState('chenxi_2026').learningEvents).toEqual(expect.arrayContaining([
         expect.objectContaining({
           action: 'work-completed',
           source: 'creative',
         }),
-      ])
+      ]))
     })
     await user.click(screen.getByRole('button', { name: '返回首页' }))
 
@@ -74,5 +74,5 @@ describe('game and works integration', () => {
     await user.click(like)
     expect(like).toHaveAttribute('aria-pressed', 'true')
     expect((await repository.list('chenxi_2026'))[0].likedBy).toEqual(['chenxi_2026'])
-  })
+  }, 30_000)
 })

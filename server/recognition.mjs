@@ -29,13 +29,44 @@ export function validateResult(data, tool) {
   return { ...(tool === 'translate' ? { sourceText: data.sourceText } : {}), ...(['object', 'ocr', 'solve', 'translate', 'check'].includes(tool) ? { introduction: { overview: data.introduction.overview, funFact: data.introduction.funFact, question: data.introduction.question } } : {}), title: data.title, output: data.output, evidence: data.evidence, steps: data.steps, uncertainty: data.uncertainty }
 }
 
-export async function recognize(body) {
+function localFallback(input) {
+  const common = {
+    title: '智能识别暂时不可用',
+    output: input.tool === 'scan'
+      ? `已读取到：${input.text || '未识别到有效内容'}。请稍后重试智能解释。`
+      : '暂时没能完成识别。请检查画面是否清晰后重新拍摄，或稍后重试。',
+    evidence: ['本次云端识别连续两次未成功，未根据模糊内容猜测结果。'],
+    steps: [
+      { title: '重新拍摄', detail: '保持光线充足，让主要内容完整出现在画面中。' },
+      { title: '稍后重试', detail: '网络恢复后再次使用同一工具，不会影响其他学习功能。' },
+    ],
+    uncertainty: '当前结果是本地安全提示，不是图片识别结论。',
+  }
+  if (input.tool === 'scan') return common
+  return {
+    ...common,
+    ...(input.tool === 'translate' ? { sourceText: input.text || '[图片内容暂未提取]' } : {}),
+    introduction: {
+      overview: '清晰、完整的图片更容易被识别。拍摄时可以让文字或物体位于画面中央，并避免强烈反光。',
+      funFact: '图像识别会把画面转换成许多数字特征，再从中寻找可能的文字和物体。',
+      question: '你能找到更明亮、更稳定的拍摄角度吗？',
+    },
+  }
+}
+
+export async function recognize(body, {
+  apiKey,
+  fetchImpl = fetch,
+  timeoutSignalFactory = (ms) => AbortSignal.timeout(ms),
+} = {}) {
   const input = validateRecognition(body)
   const vision = Boolean(input.image)
-  const useVisionProvider = vision || Boolean(process.env.VISION_API_KEY)
-  const key = useVisionProvider ? process.env.VISION_API_KEY : process.env.DEEPSEEK_API_KEY
-  const base = useVisionProvider ? process.env.VISION_BASE_URL : 'https://api.deepseek.com/v1'
-  const model = useVisionProvider ? process.env.VISION_MODEL : 'deepseek-chat'
+  const useVisionProvider = vision || Boolean(apiKey ?? process.env.VISION_API_KEY)
+  const key = apiKey ?? (useVisionProvider ? process.env.VISION_API_KEY : process.env.DEEPSEEK_API_KEY)
+  const base = useVisionProvider
+    ? (process.env.VISION_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1')
+    : 'https://api.deepseek.com/v1'
+  const model = useVisionProvider ? (process.env.VISION_MODEL || 'qwen3-vl-plus') : 'deepseek-chat'
   if (!key || !base || !model) throw new Error(vision ? 'vision_not_configured' : 'text_not_configured')
   const prompt = `${tasks[input.tool]} 目标语言：${input.target}。用户材料：${input.text || '见图片'}`
   const messages = [
@@ -44,24 +75,33 @@ export async function recognize(body) {
     ]
   let lastCode = 'invalid_result'
   for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST', signal: AbortSignal.timeout(60000),
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: attempt ? 10000 : 6000, response_format: { type: 'json_object' }, messages }),
-    })
-    if (!response.ok) throw new Error('provider_error')
-    const data = await response.json()
-    const choice = data?.choices?.[0]
-    if (choice?.finish_reason === 'length') lastCode = 'result_too_long'
-    else {
-      try { return parseRecognitionResult(choice?.message?.content, input.tool) }
-      catch { lastCode = 'invalid_result' }
+    let finishReason
+    try {
+      const response = await fetchImpl(`${base.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST', signal: timeoutSignalFactory(25_000),
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: attempt ? 10000 : 6000, response_format: { type: 'json_object' }, messages }),
+      })
+      if (!response.ok) lastCode = 'provider_error'
+      else {
+        const data = await response.json()
+        const choice = data?.choices?.[0]
+        finishReason = choice?.finish_reason
+        if (choice?.finish_reason === 'length') lastCode = 'result_too_long'
+        else {
+          try { return parseRecognitionResult(choice?.message?.content, input.tool) }
+          catch { lastCode = 'invalid_result' }
+        }
+      }
+    } catch {
+      lastCode = 'provider_error'
     }
     // Only diagnostic metadata; never log student material or credentials.
-    console.warn('[recognition]', { tool: input.tool, attempt: attempt + 1, error: lastCode, finishReason: choice?.finish_reason })
+    console.warn('[recognition]', { tool: input.tool, attempt: attempt + 1, error: lastCode, finishReason })
     if (!attempt) messages.push({ role: 'user', content: '上一轮结果格式不完整。请根据原始材料重新生成一个完整JSON对象，严格包含全部要求字段及其类型。不要代码块。保持原文准确；缩短说明和拓展部分，但不要截断原文。' })
   }
-  throw new Error(lastCode)
+  console.warn('[recognition]', { tool: input.tool, attempts: 2, error: lastCode, fallback: true })
+  return localFallback(input)
 }
 
 export function parseRecognitionResult(content, tool) {

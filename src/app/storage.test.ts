@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createLearningEvent } from './learningEvents'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
 import { loadState, normalizePersistedState, saveState } from './storage'
@@ -205,6 +206,26 @@ describe('primary-only state migration', () => {
         transactions: [],
         processedRewardIds: [],
         devices: [],
+        learningEvents: [
+          createLearningEvent({
+            accountId: fresh.accountId,
+            gradeBand: 'grade5-6',
+            source: 'knowledge',
+            contentId: 'ael-1',
+            action: 'knowledge-completed',
+            occurredAt: new Date(2026, 9, 25, 12, 0).toISOString(),
+            migrationVersion: 1,
+          }),
+          createLearningEvent({
+            accountId: fresh.accountId,
+            gradeBand: 'grade5-6',
+            source: 'test',
+            contentId: 'ael-2',
+            action: 'test-passed',
+            occurredAt: new Date(2026, 9, 25, 12, 0).toISOString(),
+            migrationVersion: 1,
+          }),
+        ],
       })
       expect(() => getPointsBalance(loaded.transactions)).not.toThrow()
       expect(getPointsBalance(loaded.transactions)).toBe(0)
@@ -310,6 +331,27 @@ describe('primary-only state migration', () => {
     }
   })
 
+  it('backfills missing v5 course events from saved progress exactly once', () => {
+    const state = {
+      ...createDefaultState(),
+      learningEvents: [],
+    }
+
+    const migrated = normalizePersistedState(state)
+
+    expect(migrated.learningEvents.map(({ action, contentId }) => [action, contentId])).toEqual([
+      ['knowledge-completed', 'ael-1'],
+      ['knowledge-completed', 'ael-2'],
+      ['knowledge-completed', 'ael-3'],
+      ['test-passed', 'ael-1'],
+      ['test-passed', 'ael-2'],
+    ])
+    expect(migrated.learningEvents.every((event) => event.migrationVersion === 1)).toBe(true)
+
+    const reloaded = normalizePersistedState(migrated)
+    expect(reloaded.learningEvents).toEqual(migrated.learningEvents)
+  })
+
   it('uses the matching reward transaction date and falls back to migration time', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-26T10:00:00.000Z'))
@@ -394,6 +436,11 @@ describe('primary-only state migration', () => {
 
     const loaded = normalizePersistedState({
       ...fresh,
+      learningProgress: {
+        'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+        'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+        'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+      },
       learningEvents: [event, { ...event, id: 'forged-id' }, null],
       wrongAnswers: [wrongAnswer, { ...wrongAnswer, selectedIndex: 99 }, null],
       growthTitle,

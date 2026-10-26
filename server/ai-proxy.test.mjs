@@ -1,7 +1,39 @@
 import { describe, expect, it, vi } from 'vitest'
-import { handleCompanionApiRequest, startProxyServer } from './ai-proxy.mjs'
+import { handleCompanionApiRequest, loadLocalEnvironmentFiles, startProxyServer } from './ai-proxy.mjs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 describe('AI companion proxy routes', () => {
+  it('loads the root environment before the server fallback without replacing existing values', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zhiya-env-'))
+    const rootFile = join(dir, 'root.env')
+    const serverFile = join(dir, 'server.env')
+    writeFileSync(rootFile, 'VISION_MODEL=qwen3-vl-plus\nVISION_BASE_URL=https://root.example/v1\n')
+    writeFileSync(serverFile, 'VISION_MODEL=server-model\nDEEPSEEK_MODEL=deepseek-flash\n')
+    const target = {}
+    loadLocalEnvironmentFiles([rootFile, serverFile], target)
+    expect(target).toMatchObject({
+      VISION_MODEL: 'qwen3-vl-plus',
+      VISION_BASE_URL: 'https://root.example/v1',
+      DEEPSEEK_MODEL: 'deepseek-flash',
+    })
+  })
+
+  it('exposes a non-secret health summary even when vision is not configured', async () => {
+    const result = await handleCompanionApiRequest({ method: 'GET', path: '/api/health', body: {} }, {
+      apiKey: '', visionApiKey: '', visionModel: 'qwen3-vl-plus',
+    })
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        ok: true,
+        companion: { configured: false, provider: 'deepseek' },
+        vision: { configured: false, provider: 'dashscope', model: 'qwen3-vl-plus' },
+      },
+    })
+    expect(JSON.stringify(result)).not.toMatch(/sk-|api.?key/i)
+  })
   it('returns 503 for a missing schedule key without exposing details', async () => {
     const result = await handleCompanionApiRequest({ method: 'POST', path: '/api/companion/schedule', body: {} }, { apiKey: '' })
     expect(result).toEqual({ status: 503, body: { error: 'missing_api_key' } })

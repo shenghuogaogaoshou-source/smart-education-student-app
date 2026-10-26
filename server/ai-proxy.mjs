@@ -12,15 +12,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
 const MAX_BODY_BYTES = 16 * 1024
 
-loadLocalEnvironment(join(__dirname, '.env.local'))
+loadLocalEnvironmentFiles([
+  join(__dirname, '..', '.env.local'),
+  join(__dirname, '.env.local'),
+])
 
-function loadLocalEnvironment(path) {
-  if (!existsSync(path)) return
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
-    if (!match || process.env[match[1]]) continue
-    process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '')
+export function loadLocalEnvironmentFiles(paths, target = process.env) {
+  for (const path of paths) {
+    if (!existsSync(path)) continue
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
+      if (!match || target[match[1]]) continue
+      target[match[1]] = match[2].replace(/^['"]|['"]$/g, '')
+    }
   }
+  return target
 }
 
 function sendJson(response, status, body) {
@@ -96,11 +102,23 @@ export async function handleCompanionApiRequest(
     apiKey = process.env.DEEPSEEK_API_KEY,
     arkApiKey = process.env.ARK_API_KEY,
     arkImageModel = process.env.ARK_IMAGE_MODEL || process.env.ARK_MODEL,
+    visionApiKey = process.env.VISION_API_KEY,
+    visionModel = process.env.VISION_MODEL || 'qwen3-vl-plus',
     fetchImpl = fetch,
     interpretIntent = interpretCompanionIntent,
     recognizeImage = recognize,
   } = {},
 ) {
+  if (method === 'GET' && path === '/api/health') {
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        companion: { configured: Boolean(apiKey), provider: 'deepseek' },
+        vision: { configured: Boolean(visionApiKey), provider: 'dashscope', model: visionModel },
+      },
+    }
+  }
   if (method !== 'POST') return { status: 404, body: { error: 'not_found' } }
   if (path === '/api/companion/schedule') {
     if (!apiKey) return { status: 503, body: { error: 'missing_api_key' } }

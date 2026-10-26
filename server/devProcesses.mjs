@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-function processSpec(name, cwd, args, command = process.execPath, env = {}) {
-  return { name, cwd, command, args, env }
+function processSpec(name, cwd, args, command = process.execPath, env = {}, resilient = false) {
+  return { name, cwd, command, args, env, resilient }
 }
 
 function pythonExecutable() {
@@ -21,13 +21,14 @@ export function buildDevProcessSpecs(root, forwardedArgs) {
   const creativeModuleRoot = join(root, 'apps', 'creative-module')
 
   return [
-    processSpec('ai-proxy', root, [join(root, 'server', 'ai-proxy.mjs')]),
+    processSpec('ai-proxy', root, [join(root, 'server', 'ai-proxy.mjs')], process.execPath, {}, true),
     processSpec(
       'brain-api',
       brainFilmRoot,
       ['server.py', '--host', '127.0.0.1', '--port', '8766'],
       pythonExecutable(),
       { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      true,
     ),
     processSpec('zhiya-web', root, [rootVite, ...forwardedArgs]),
     processSpec('brain-film', brainFilmRoot, [

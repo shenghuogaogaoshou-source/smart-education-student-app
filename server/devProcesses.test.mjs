@@ -7,6 +7,8 @@ test('dev 同时启动两个游戏、脑洞后端且不打开浏览器', () => {
   assert.deepEqual(specs.map((item) => item.name), ['ai-proxy', 'brain-api', 'zhiya-web', 'brain-film', 'creative-module'])
   assert.equal(specs.some((item) => item.args.includes('--open')), false)
   const brainApi = specs.find((item) => item.name === 'brain-api')
+  assert.equal(specs.find((item) => item.name === 'ai-proxy').resilient, true)
+  assert.equal(brainApi.resilient, true)
   assert.match(brainApi.args.join(' '), /server\.py.*8766/)
   assert.equal(brainApi.env.PYTHONUTF8, '1')
   assert.equal(brainApi.env.PYTHONIOENCODING, 'utf-8')
