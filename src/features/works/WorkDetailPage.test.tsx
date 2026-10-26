@@ -33,6 +33,8 @@ describe('WorkDetailPage', () => {
     )
 
     expect(await screen.findByRole('heading', { name: '会发光的纸飞机' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '作品互动' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '同学们的留言' })).toBeInTheDocument()
     const like = screen.getByRole('button', { name: '点赞作品' })
     await user.click(like)
     await waitFor(async () => {

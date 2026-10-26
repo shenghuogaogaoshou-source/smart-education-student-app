@@ -1,70 +1,41 @@
-import { ArrowLeft, Image, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, BookmarkCheck, ChevronRight, Image, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
+import { useOptionalWorks } from '../works/WorksProvider'
+import type { WorkSource } from '../works/types'
 import './profile.css'
 
 type FavoriteSource = '全部' | '脑洞放映厅' | '创造模块' | 'AI 创作'
 
-type CommunityWork = {
-  id: string
-  title: string
-  author: string
-  source: Exclude<FavoriteSource, '全部'>
-  tag: string
-  description: string
-  gradient: string
-}
-
-const COMMUNITY_WORKS: CommunityWork[] = [
-  {
-    id: 'community-camera',
-    title: '会分类的照相机',
-    author: '星河同学',
-    source: '创造模块',
-    tag: '创意实验',
-    description: '用图像分类模块做出一台会整理照片的小机器。',
-    gradient: 'linear-gradient(145deg, #DDEEFF, #BAD8F4)',
-  },
-  {
-    id: 'community-library',
-    title: '未来图书馆',
-    author: '小羽同学',
-    source: '脑洞放映厅',
-    tag: '空间想象',
-    description: '把想安静读书的未来空间拍成一段小电影。',
-    gradient: 'linear-gradient(145deg, #F2E6FF, #D8C1EF)',
-  },
-  {
-    id: 'community-voice',
-    title: '声音地图',
-    author: '清禾同学',
-    source: 'AI 创作',
-    tag: '科学表达',
-    description: '记录校园里的不同声音，并整理成一张声音地图。',
-    gradient: 'linear-gradient(145deg, #E5F7EC, #BFE3CF)',
-  },
-  {
-    id: 'community-campus',
-    title: '未来校园小设计',
-    author: '林川同学',
-    source: '创造模块',
-    tag: '生活创想',
-    description: '为校园节能问题设计了一套可以测试的小提示。',
-    gradient: 'linear-gradient(145deg, #FFF0DE, #F5CFA5)',
-  },
-]
-
 const SOURCE_FILTERS: FavoriteSource[] = ['全部', '脑洞放映厅', '创造模块', 'AI 创作']
 
-export function FavoritesPage({ onBack }: { onBack: () => void }) {
+function sourceLabel(source: WorkSource): Exclude<FavoriteSource, '全部'> {
+  if (source === 'brain-film') return '脑洞放映厅'
+  if (source === 'creative-module') return '创造模块'
+  return 'AI 创作'
+}
+
+export function FavoritesPage({
+  onBack,
+  onWorkClick,
+}: {
+  onBack: () => void
+  onWorkClick?: (workId: string) => void
+}) {
+  const worksState = useOptionalWorks()
   const [filter, setFilter] = useState<FavoriteSource>('全部')
-  const [removed, setRemoved] = useState<string[]>([])
-  const visibleWorks = COMMUNITY_WORKS.filter((work) => (
-    !removed.includes(work.id) && (filter === '全部' || work.source === filter)
+  const favorites = useMemo(() => (
+    (worksState?.works ?? []).filter((work) => (
+      work.status === 'published'
+      && (work.creatorId || work.ownerId) !== worksState?.accountId
+      && work.favoritedBy.includes(worksState?.accountId ?? '')
+    ))
+  ), [worksState?.accountId, worksState?.works])
+  const visibleWorks = favorites.filter((work) => (
+    filter === '全部' || sourceLabel(work.source) === filter
   ))
-  const creatorCount = useMemo(
-    () => new Set(COMMUNITY_WORKS.filter((work) => !removed.includes(work.id)).map((work) => work.author)).size,
-    [removed],
-  )
+  const creatorCount = new Set(favorites.map((work) => work.creatorId)).size
+  const sourceCount = new Set(favorites.map((work) => sourceLabel(work.source))).size
 
   return (
     <div className="rewards-page favorites-page">
@@ -79,13 +50,13 @@ export function FavoritesPage({ onBack }: { onBack: () => void }) {
           type="button"
           onClick={() => setFilter('全部')}
         >
-          <Image size={24} /><div><strong>{COMMUNITY_WORKS.length - removed.length}</strong><span>收藏作品</span></div>
+          <BookmarkCheck size={24} /><div><strong>{favorites.length}</strong><span>收藏作品</span></div>
         </button>
         <div className="rewards-stat">
           <Users size={24} /><div><strong>{creatorCount}</strong><span>作品作者</span></div>
         </div>
         <div className="rewards-stat">
-          <Image size={24} /><div><strong>{SOURCE_FILTERS.length - 1}</strong><span>作品来源</span></div>
+          <Image size={24} /><div><strong>{sourceCount}</strong><span>作品来源</span></div>
         </div>
       </div>
 
@@ -106,26 +77,27 @@ export function FavoritesPage({ onBack }: { onBack: () => void }) {
       <div className="fav-work-list">
         {visibleWorks.map((work) => (
           <article key={work.id} className="fav-work-card">
-            <div className="fav-work-cover" style={{ background: work.gradient }}>
-              <Image aria-hidden="true" size={28} />
-            </div>
-            <div className="fav-work-copy">
-              <span>{work.source} · {work.tag}</span>
-              <strong>{work.title}</strong>
-              <p>{work.author}</p>
-              <small>{work.description}</small>
-            </div>
+            <button className="fav-work-open" type="button" onClick={() => onWorkClick?.(work.id)}>
+              <WorkMediaThumbnail work={work} className="fav-work-cover" />
+              <span className="fav-work-copy">
+                <span>{sourceLabel(work.source)} · 已导入作品</span>
+                <strong>{work.title}</strong>
+                <span className="fav-work-author">{work.creatorName}</span>
+                <small>{work.description}</small>
+              </span>
+              <ChevronRight className="fav-work-chevron" aria-hidden="true" size={18} />
+            </button>
             <button
               type="button"
               className="fav-remove-button"
               aria-label={`取消收藏 ${work.title}`}
-              onClick={() => setRemoved((current) => [...current, work.id])}
+              onClick={() => worksState?.toggleFavorite(work.id)}
             >
-              <Trash2 size={15} />
+              <BookmarkCheck size={16} fill="currentColor" />
             </button>
           </article>
         ))}
-        {visibleWorks.length === 0 && (
+        {!worksState?.loading && visibleWorks.length === 0 && (
           <div className="wm-empty">
             <Image size={30} />
             <strong>这里暂时没有收藏作品</strong>

@@ -26,7 +26,7 @@ describe('demo work catalogue', () => {
     }
   })
 
-  it('publishes every work with 8 current-account and 17 multi-author contributions', async () => {
+  it('keeps a realistic mix of published, reviewing and private current-account works', async () => {
     const repository = createMemoryWorkRepository()
     const loadAsset = async (path: string) => new Blob([path], {
       type: path.endsWith('.mp4') ? 'video/mp4' : 'image/png',
@@ -36,8 +36,10 @@ describe('demo work catalogue', () => {
 
     const works = await repository.list('123') as WorkWithCreator[]
     expect(works).toHaveLength(25)
-    expect(works.every((work) => work.status === 'published')).toBe(true)
     expect(works.filter((work) => work.creatorId === '123')).toHaveLength(8)
+    expect(works.filter((work) => work.creatorId === '123' && work.status === 'reviewing')).toHaveLength(1)
+    expect(works.filter((work) => work.creatorId === '123' && work.status === 'private')).toHaveLength(1)
+    expect(works.filter((work) => work.creatorId !== '123').every((work) => work.status === 'published')).toBe(true)
     expect(works.filter((work) => work.creatorId !== '123')).toHaveLength(17)
     expect(new Set(works
       .filter((work) => work.creatorId !== '123')
@@ -48,6 +50,46 @@ describe('demo work catalogue', () => {
       .map((work) => work.creatorName)))
       .toEqual(new Set(['乐乐', '星禾', '米粒', '小宇', '朵朵', '安安']))
     expect(works.every((work) => work.sourceDraftId?.startsWith('demo-'))).toBe(true)
+  })
+
+  it('seeds real interaction lists and a few imported community favorites', async () => {
+    const repository = createMemoryWorkRepository()
+
+    const works = await seedDemoWorks(repository, '123')
+    const published = works.filter((work) => work.status === 'published')
+    const favorites = published.filter((work) => (
+      work.creatorId !== '123' && work.favoritedBy.includes('123')
+    ))
+
+    expect(favorites).toHaveLength(3)
+    expect(new Set(favorites.map((work) => work.creatorId)).size).toBe(3)
+    expect(published.every((work) => work.likes === work.likedBy.length)).toBe(true)
+    expect(published.every((work) => work.favorites === work.favoritedBy.length)).toBe(true)
+    expect(published.every((work) => work.comments.length >= 2)).toBe(true)
+  })
+
+  it('migrates older demo ownership and statuses only once without erasing later user choices', async () => {
+    const repository = createMemoryWorkRepository()
+    const old = await repository.saveDraft('123', {
+      source: 'creative-module',
+      sourceDraftId: 'demo-image-1',
+      creatorId: '123',
+      creatorName: '晨曦同学',
+      title: '旧演示作品',
+      description: '旧数据',
+      aiTools: [],
+      fileName: 'old.webp',
+      blob: new Blob(['old'], { type: 'image/webp' }),
+    })
+    await repository.setStatus('123', old.id, 'published')
+
+    const migrated = await seedDemoWorks(repository, '123')
+    const corrected = migrated.find((work) => work.sourceDraftId === 'demo-image-1')!
+    expect(corrected.creatorId).toBe('virtual-author-lele')
+
+    await repository.setStatus('123', corrected.id, 'private')
+    await seedDemoWorks(repository, '123')
+    expect((await repository.get('123', corrected.id))?.status).toBe('private')
   })
 
   it('anchors published times on first initialization and keeps them stable after refresh', async () => {
@@ -71,15 +113,16 @@ describe('demo work catalogue', () => {
     const oneYearAgo = new Date(anchor)
     oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1)
 
-    expect(first.filter((work) => (
+    const firstPublished = first.filter((work) => work.status === 'published')
+    expect(firstPublished.filter((work) => (
       new Date(work.publishedAt!).getTime() >= oneDayAgo
     )).length).toBeGreaterThan(0)
-    expect(first.filter((work) => (
+    expect(firstPublished.filter((work) => (
       new Date(work.publishedAt!).getTime() >= sevenDaysAgo
     )).length).toBeGreaterThan(0)
-    expect(first.filter((work) => (
+    expect(firstPublished.filter((work) => (
       new Date(work.publishedAt!).getTime() >= oneYearAgo.getTime()
-    ))).toHaveLength(25)
+    ))).toHaveLength(23)
     expect(second.map((work) => [work.id, work.publishedAt]))
       .toEqual([...firstTimes.entries()])
     expect(second.map((work) => [work.id, work.publishedAt]))

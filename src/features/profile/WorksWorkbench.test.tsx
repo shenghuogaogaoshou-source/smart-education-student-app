@@ -22,9 +22,9 @@ describe('WorksWorkbench', () => {
 
     const section = await screen.findByRole('region', { name: '我的作品' })
     expect(within(section).getByRole('button', { name: /0\s*草稿/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /0\s*审核中/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /8\s*已发布/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /0\s*仅自己/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /1\s*审核中/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /6\s*已发布/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /1\s*仅自己/ })).toBeInTheDocument()
     expect(within(section).queryByText('正在创作')).not.toBeInTheDocument()
     const previews = within(section).getAllByRole('img')
     expect(previews).toHaveLength(1)

@@ -1,4 +1,4 @@
-import type { WorkRecord, PreviewKind, WorkRepository, WorkSource } from './types'
+import type { WorkComment, WorkRecord, PreviewKind, WorkRepository, WorkSource, WorkStatus } from './types'
 
 export type DemoWorkSpec = {
   id: string
@@ -12,7 +12,11 @@ export type DemoWorkSpec = {
   creatorName: string
   publishedOffsetMs: number
   aiTools: string[]
+  status: WorkStatus
+  initiallyFavorited?: boolean
 }
+
+const DEMO_WORK_SEED_VERSION = 2
 
 const videoTitles = [
   ['clockwork-morning', '会呼吸的时钟', '老时钟在晨光里轻轻转动，时间也有了自己的故事。'],
@@ -102,6 +106,7 @@ const videoWorks: DemoWorkSpec[] = videoTitles.map(([slug, title, description], 
   creatorName: currentAccountCreator.name,
   publishedOffsetMs: publishedOffsets[index],
   aiTools: ['智芽创意助手'],
+  status: index === 6 ? 'reviewing' : index === 7 ? 'private' : 'published',
 }))
 
 const imageWorks: DemoWorkSpec[] = imageTitles.map(([slug, title, description], index) => {
@@ -117,6 +122,8 @@ const imageWorks: DemoWorkSpec[] = imageTitles.map(([slug, title, description], 
     creatorName: creator.name,
     publishedOffsetMs: publishedOffsets[videoTitles.length + index],
     aiTools: ['智芽创意助手'],
+    status: 'published',
+    initiallyFavorited: [0, 1, 3].includes(index),
   }
 })
 
@@ -135,6 +142,29 @@ export type DemoAssetLoader = (assetPath: string) => Promise<Blob>
 async function createDemoAssetPlaceholder(assetPath: string) {
   return new Blob([assetPath], {
     type: assetPath.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+  })
+}
+
+const commentSamples = [
+  ['星芽', '这个想法好有画面感，我也想试试看！'],
+  ['小满', '颜色和故事配得很温柔，继续加油呀。'],
+  ['林林', '我最喜欢里面的小细节，看了还想再看一遍。'],
+] as const
+
+function seededIds(prefix: string, count: number) {
+  return Array.from({ length: count }, (_, index) => `${prefix}-${index + 1}`)
+}
+
+function seededComments(spec: DemoWorkSpec, index: number, publishedAt: string): WorkComment[] {
+  return Array.from({ length: 2 }, (_, commentIndex) => {
+    const sample = commentSamples[(index + commentIndex) % commentSamples.length]
+    return {
+      id: `demo-comment-${spec.id}-${commentIndex + 1}`,
+      authorId: `demo-commenter-${(index + commentIndex) % commentSamples.length + 1}`,
+      authorName: sample[0],
+      text: sample[1],
+      createdAt: new Date(new Date(publishedAt).getTime() + (commentIndex + 1) * HOUR).toISOString(),
+    }
   })
 }
 
@@ -166,11 +196,7 @@ export async function seedDemoWorks(
       initializedAt.getTime() - spec.publishedOffsetMs,
     ).toISOString()
     let record = existingBySourceDraft.get(spec.id)
-    const needsMigration = !record
-      || record.status !== 'published'
-      || !record.publishedAt
-      || !record.creatorId
-      || !record.creatorName
+    const needsMigration = !record || record.demoSeedVersion !== DEMO_WORK_SEED_VERSION
 
     if (!record) {
       const blob = await loadAsset(spec.assetPath)
@@ -189,13 +215,30 @@ export async function seedDemoWorks(
 
     if (!needsMigration) continue
 
-    const published = await repository.setStatus(accountId, record.id, 'published')
-    await repository.update(accountId, published.id, {
+    const statusRecord = await repository.setStatus(accountId, record.id, spec.status)
+    const likeCount = 18 + (index * 7) % 83
+    const favoriteCount = 6 + (index * 5) % 37
+    const likedBy = [...new Set([
+      ...seededIds(`demo-like-${spec.id}`, likeCount),
+      ...record.likedBy.filter((id) => !id.startsWith('demo-like-')),
+    ])]
+    const favoritedBy = [...new Set([
+      ...seededIds(`demo-favorite-${spec.id}`, favoriteCount - (spec.initiallyFavorited ? 1 : 0)),
+      ...(spec.initiallyFavorited ? [accountId] : []),
+      ...record.favoritedBy.filter((id) => !id.startsWith('demo-favorite-')),
+    ])]
+    const comments = [
+      ...seededComments(spec, index, desiredPublishedAt),
+      ...record.comments.filter((comment) => !comment.id.startsWith(`demo-comment-${spec.id}-`)),
+    ]
+    await repository.update(accountId, statusRecord.id, {
       creatorId,
       creatorName: spec.creatorName,
-      publishedAt: desiredPublishedAt,
-      likes: 18 + (index * 7) % 83,
-      favorites: 6 + (index * 5) % 37,
+      publishedAt: spec.status === 'published' ? desiredPublishedAt : undefined,
+      likedBy,
+      favoritedBy,
+      comments,
+      demoSeedVersion: DEMO_WORK_SEED_VERSION,
     })
   }
 

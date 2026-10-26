@@ -1,16 +1,28 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { createMemoryWorkRepository } from '../works/memoryRepository'
+import { WorksProvider } from '../works/WorksProvider'
 import { FavoritesPage } from './FavoritesPage'
 
 describe('favorites page', () => {
-  it('shows only works shared by other learners', () => {
-    render(<AppStateProvider><FavoritesPage onBack={() => undefined} /></AppStateProvider>)
+  it('shows favorited imported works and opens the real work detail target', async () => {
+    const user = userEvent.setup()
+    const repository = createMemoryWorkRepository()
+    const onWorkClick = vi.fn()
+    render(
+      <AppStateProvider>
+        <WorksProvider accountId="123" repository={repository}>
+          <FavoritesPage onBack={() => undefined} onWorkClick={onWorkClick} />
+        </WorksProvider>
+      </AppStateProvider>,
+    )
 
-    expect(screen.getByText('会分类的照相机')).toBeInTheDocument()
-    expect(screen.getByText('未来图书馆')).toBeInTheDocument()
-    expect(screen.getAllByText(/同学/).length).toBeGreaterThanOrEqual(2)
-    expect(screen.queryByText('知识卡片')).not.toBeInTheDocument()
-    expect(screen.queryByText('光合作用与呼吸作用的区别')).not.toBeInTheDocument()
+    const title = await screen.findByText('银发小小探索家')
+    expect(screen.getByText('樱花下的小仓鼠')).toBeInTheDocument()
+    expect(screen.getByText('溪边的小黄鸭')).toBeInTheDocument()
+    await user.click(title.closest('button')!)
+    expect(onWorkClick).toHaveBeenCalledWith(expect.stringMatching(/^memory-/))
   })
 })

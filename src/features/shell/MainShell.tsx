@@ -8,7 +8,7 @@ import type { CompanionCommand } from '../ai_companion/commands/commandTypes'
 import { EmbeddedGamePage } from '../games/EmbeddedGamePage'
 import { getLastPlayedGame, rememberLastPlayedGame, type GameId } from '../games/gameRegistry'
 import { HomePage } from '../home/HomePage'
-import { NotificationsPage, type NotificationTarget } from '../home/NotificationsPage'
+import { NotificationsPage, resolveNotificationWorkId, type NotificationTarget } from '../home/NotificationsPage'
 import { AiCenterPage } from '../profile/AiCenterPage'
 import { CalendarPage } from '../profile/CalendarPage'
 import { FavoritesPage } from '../profile/FavoritesPage'
@@ -27,6 +27,7 @@ import { WorksManagePage } from '../profile/WorksManagePage'
 import { SettingsPage } from '../settings/SettingsPage'
 import { WorksGalleryPage } from '../works/WorksGalleryPage'
 import { WorkDetailPage } from '../works/WorkDetailPage'
+import { useOptionalWorks } from '../works/WorksProvider'
 import { CourseContentPage } from '../knowledge/CourseContentPage'
 import { KnowledgePage } from '../knowledge/KnowledgePage'
 import { getCourseForBand } from '../knowledge/courseCatalog'
@@ -71,6 +72,7 @@ export function MainShell() {
 
 function MainShellBody() {
   const { state } = useAppState()
+  const worksState = useOptionalWorks()
   const commandContext = useAppCommand()
   const shellClassName = `main-shell main-shell--${getGradeBand(state.grade)}`
   const [activeTab, setActiveTab] = useState<MainTab>('home')
@@ -162,7 +164,10 @@ function MainShellBody() {
         openProfileView({ kind: 'medals' })
         return
       case 'work':
-        push({ kind: 'work', workId: target.workId })
+        push({
+          kind: 'work',
+          workId: resolveNotificationWorkId(worksState?.works ?? [], target.workId) ?? target.workId,
+        })
         return
       case 'ai-advice':
         openProfileView({ kind: 'ai-center' })
@@ -399,7 +404,7 @@ function MainShellBody() {
   if (view.kind === 'favorites') {
     return (
       <main className={shellClassName}>
-        <FavoritesPage onBack={pop} />
+        <FavoritesPage onBack={pop} onWorkClick={(workId) => push({ kind: 'work', workId })} />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>

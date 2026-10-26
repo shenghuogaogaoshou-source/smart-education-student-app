@@ -2,6 +2,7 @@ import { Bookmark, Bot, ChevronRight, History, NotebookPen } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { getGradeBand } from '../../app/learning'
 import { getCourseForBand } from '../knowledge/courseCatalog'
+import { useOptionalWorks } from '../works/WorksProvider'
 
 export function LearningTools({
   onOpenTools,
@@ -17,9 +18,15 @@ export function LearningTools({
   onOpenAiCenter?: () => void
 }) {
   const { state } = useAppState()
+  const worksState = useOptionalWorks()
   const course = getCourseForBand(getGradeBand(state.grade))
   const wrongQuestionCount = Math.min(6, course.quizzes.length)
   const pendingWrongCount = Math.ceil(wrongQuestionCount * 2 / 3)
+  const favoriteCount = (worksState?.works ?? []).filter((work) => (
+    work.status === 'published'
+    && (work.creatorId || work.ownerId) !== worksState?.accountId
+    && work.favoritedBy.includes(worksState?.accountId ?? '')
+  )).length
 
   return (
     <section className="profile-section tools-section" aria-labelledby="tools-title">
@@ -43,7 +50,7 @@ export function LearningTools({
         <button type="button" onClick={onOpenFavorites}>
           <Bookmark aria-hidden="true" />
           <span>我的收藏</span>
-          <strong>4 部作品</strong>
+          <strong>{favoriteCount} 部作品</strong>
         </button>
         <button type="button" onClick={onOpenHistory}>
           <History aria-hidden="true" />

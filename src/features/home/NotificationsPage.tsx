@@ -8,6 +8,7 @@ import {
   Palette,
   Trophy,
 } from 'lucide-react'
+import type { WorkRecord } from '../works/types'
 
 export type NotificationTarget =
   | { kind: 'schedule' }
@@ -81,6 +82,10 @@ const grouped = [
   { label: '今天', items: notifications.slice(0, 4) },
   { label: '昨天', items: notifications.slice(4, 6) },
 ]
+
+export function resolveNotificationWorkId(works: WorkRecord[], reference: string) {
+  return works.find((work) => work.id === reference || work.sourceDraftId === reference)?.id
+}
 
 export function NotificationsPage({
   onBack,

@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { NotificationTarget } from './NotificationsPage'
-import { NotificationsPage } from './NotificationsPage'
+import { NotificationsPage, resolveNotificationWorkId } from './NotificationsPage'
+import type { WorkRecord } from '../works/types'
 
 describe('NotificationsPage', () => {
   it('shows six useful project notifications and opens the matching destination', async () => {
@@ -26,5 +27,14 @@ describe('NotificationsPage', () => {
       expect(onOpenTarget).toHaveBeenLastCalledWith(target)
     }
     expect(onOpenTarget).toHaveBeenCalledTimes(6)
+  })
+
+  it('resolves a stable demo source reference to the repository work id', () => {
+    const work = {
+      id: 'database-work-42',
+      sourceDraftId: 'demo-video-1',
+    } as WorkRecord
+
+    expect(resolveNotificationWorkId([work], 'demo-video-1')).toBe('database-work-42')
   })
 })

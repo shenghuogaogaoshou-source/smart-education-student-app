@@ -36,6 +36,7 @@ export type WorkRecord = {
   favoritedBy: string[]
   comments: WorkComment[]
   reviewMessage?: string
+  demoSeedVersion?: number
 }
 
 export type SaveWorkDraftInput = {
@@ -66,6 +67,7 @@ export type WorkUpdatePatch = Partial<Pick<
   | 'likedBy'
   | 'favoritedBy'
   | 'comments'
+  | 'demoSeedVersion'
 >>
 
 export interface WorkRepository {

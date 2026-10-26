@@ -197,6 +197,214 @@
 .gallery-empty p { margin: 0; font-size: .76rem; }
 .work-tools-line { margin-top: 10px; color: #8c6b5a; font-size: .72rem; }
 
+/* ===== 作品详情：沿用智芽暖色卡片体系，互动数据直接连接作品仓库 ===== */
+.work-detail-page {
+  min-height: 100dvh;
+  padding-bottom: 118px;
+  background:
+    radial-gradient(circle at 92% 4%, rgb(255 198 151 / 28%), transparent 25%),
+    linear-gradient(180deg, #fffaf3 0%, #fffdf9 45%, #fff8ef 100%);
+  color: #50392f;
+}
+
+.work-detail-header {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 68px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgb(212 155 120 / 16%);
+  background: rgb(255 251 245 / 88%);
+  backdrop-filter: blur(16px);
+}
+
+.work-detail-header > div { min-width: 0; }
+.work-detail-header small { display: block; color: #b17a60; font-size: .58rem; font-weight: 800; letter-spacing: .08em; }
+.work-detail-header h1 { margin: 1px 0 0; color: #543b31; font-size: .92rem; }
+
+.work-detail-back {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(215 155 118 / 26%);
+  border-radius: 14px;
+  background: #fff7ec;
+  color: #a85e42;
+  box-shadow: 0 6px 14px rgb(121 73 50 / 8%);
+}
+
+.work-detail-content {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px 0;
+}
+
+.work-detail-intro {
+  display: grid;
+  gap: 8px;
+  padding: 3px 4px 0;
+}
+
+.work-source-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #fff0e2;
+  color: #c46847;
+  font-size: .61rem;
+  font-weight: 850;
+}
+
+.work-title {
+  margin: 0;
+  color: #4b342b;
+  font-size: clamp(1.35rem, 6vw, 1.85rem);
+  line-height: 1.18;
+}
+
+.work-author {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #8d6b5a;
+  font-size: .7rem;
+}
+
+.work-author > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffc99e, #f58c74);
+  color: #fff;
+  font-size: .64rem;
+  font-weight: 900;
+  box-shadow: 0 3px 9px rgb(157 85 57 / 18%);
+}
+
+.work-preview {
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid rgb(215 161 126 / 18%);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(105 65 45 / 10%);
+}
+
+.work-preview .work-asset-media { max-height: min(58dvh, 520px); border-radius: 18px; }
+
+.work-info-section,
+.work-interaction-section,
+.comment-section {
+  padding: 17px;
+  border: 1px solid rgb(211 157 123 / 18%);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 84%);
+  box-shadow: 0 9px 24px rgb(109 70 49 / 7%);
+}
+
+.work-info-section h3,
+.work-section-heading h3,
+.comment-section-title { margin: 0; color: #50382f; font-size: .92rem; }
+.work-info-section p { margin: 9px 0; color: #735548; font-size: .73rem; line-height: 1.75; }
+.work-info-section > small { color: #a37b67; font-size: .62rem; }
+
+.work-section-heading,
+.comment-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.work-section-heading small,
+.comment-section-heading small { display: block; margin-bottom: 2px; color: #b17c62; font-size: .57rem; font-weight: 750; }
+.work-section-heading > svg { color: #e98768; }
+
+.work-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat-button {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 7px;
+  border: 1px solid #f0d8ca;
+  border-radius: 16px;
+  background: #fff8f1;
+  color: #9b6a57;
+  font: inherit;
+}
+
+button.stat-button { cursor: pointer; transition: transform .16s ease, color .16s ease, background .16s ease; }
+button.stat-button:active { transform: scale(.96); }
+.stat-button[aria-pressed='true'] { border-color: #f1a187; background: linear-gradient(145deg, #fff0e6, #ffe4dd); color: #e36455; }
+.stat-button > span { display: grid; text-align: left; }
+.stat-button strong { color: currentColor; font-size: .78rem; line-height: 1; }
+.stat-button small { margin-top: 4px; color: currentColor; font-size: .55rem; opacity: .82; }
+.stat-display { cursor: default; }
+
+.comment-section-heading > span {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff0e3;
+  color: #c56b4c;
+  font-size: .66rem;
+  font-weight: 850;
+}
+
+.comment-list-inline { display: grid; gap: 9px; }
+.comment-item-inline { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 9px; padding: 10px; border-radius: 15px; background: #fff9f3; }
+.comment-avatar-inline { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 12px; background: linear-gradient(145deg, #ffd5b6, #ff9d83); color: #fff; font-size: .67rem; font-weight: 900; }
+.comment-content-inline { min-width: 0; }
+.comment-author-inline { color: #6b4b3e; font-size: .65rem; font-weight: 850; }
+.comment-text-inline { margin-top: 3px; color: #806052; font-size: .68rem; line-height: 1.55; overflow-wrap: anywhere; }
+.comment-empty { margin: 0; padding: 15px; border-radius: 14px; background: #fff9f2; color: #9c7967; font-size: .67rem; text-align: center; }
+
+.comment-input-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 13px;
+  padding: 5px;
+  border: 1px solid #efd6c7;
+  border-radius: 16px;
+  background: #fffaf5;
+}
+
+.comment-input-inline input { min-width: 0; padding: 10px 9px; border: 0; outline: 0; background: transparent; color: #543c32; font: inherit; font-size: .7rem; }
+.comment-submit-inline { display: inline-flex; min-width: 72px; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #f49370, #ef6f64); color: #fff; font: inherit; font-size: .64rem; font-weight: 850; }
+.comment-submit-inline:disabled { opacity: .42; }
+
+@media (max-width: 380px) {
+  .work-detail-content { padding-inline: 12px; }
+  .stat-button { gap: 5px; }
+  .comment-submit-inline { min-width: 44px; padding-inline: 10px; }
+  .comment-submit-inline span { display: none; }
+}
+
 .gallery-header {
   display: flex;
   align-items: center;

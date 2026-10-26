@@ -4274,24 +4274,45 @@
 }
 
 .fav-work-card {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) auto;
+  position: relative;
+  display: block;
   align-items: center;
-  gap: 14px;
-  padding: 13px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: 20px;
   background: color-mix(in srgb, var(--glass-bg) 94%, #fff);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
-.fav-work-cover {
+.fav-work-open {
   display: grid;
+  width: 100%;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 48px 13px 13px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fav-work-open:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  outline-offset: -3px;
+}
+
+.fav-work-cover {
   width: 92px;
   aspect-ratio: 1;
-  place-items: center;
   border-radius: 16px;
-  color: color-mix(in srgb, var(--ink) 62%, #fff);
+}
+
+.fav-work-cover.work-media-thumbnail {
+  height: 92px;
 }
 
 .fav-work-copy {
@@ -4319,7 +4340,20 @@
   line-height: 1.45;
 }
 
+.fav-work-copy .fav-work-author {
+  color: var(--muted);
+  font-size: calc(.64rem * var(--font-scale));
+  font-weight: 750;
+}
+
+.fav-work-chevron {
+  color: var(--primary-deep);
+}
+
 .fav-remove-button {
+  position: absolute;
+  top: 50%;
+  right: 11px;
   display: grid;
   width: 34px;
   height: 34px;
@@ -4329,6 +4363,7 @@
   background: color-mix(in srgb, var(--surface) 86%, #fff);
   color: var(--muted);
   cursor: pointer;
+  transform: translateY(-50%);
 }
 
 /* ===== 学习记录页 ===== */
