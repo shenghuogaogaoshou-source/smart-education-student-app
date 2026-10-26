@@ -29,6 +29,19 @@ function seedEmptyProgress(grade: PrimaryGrade, completedPartIds: CoursePartId[]
   saveAccountState(state.accountId, state)
 }
 
+function seedKnowledge(grade: PrimaryGrade, completedPartIds: CoursePartId[]) {
+  const state = createDefaultState()
+  state.grade = grade
+  state.learningProgress = {
+    'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+    'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+    'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
+  }
+  state.learningProgress[getGradeBand(grade)].knowledgeCompleted = completedPartIds
+  state.processedRewardIds = state.transactions.map((tx) => tx.eventId)
+  saveAccountState(state.accountId, state)
+}
+
 function Harness({ grade, partId, title, lockedPartId }: {
   grade: PrimaryGrade
   partId: CoursePartId
@@ -45,6 +58,57 @@ function Harness({ grade, partId, title, lockedPartId }: {
       <button type="button" onClick={() => app.completeKnowledge(partId, title)}>完成知识</button>
       <button type="button" onClick={() => app.passTest(partId, title)}>通过测试</button>
       <button type="button" onClick={() => app.passTest(lockedPartId, '未学知识')}>越过知识直接测试</button>
+      <button
+        type="button"
+        onClick={() => app.submitQuizResult(partId, title, {
+          score: 4,
+          total: 5,
+          wrongAnswers: [{
+            questionId: `${partId}-q5`,
+            prompt: '测试错题',
+            options: ['正确答案', '我的选择'],
+            selectedIndex: 1,
+            answerIndex: 0,
+            explanation: '选择正确答案。',
+          }],
+        })}
+      >
+        提交带错题测试
+      </button>
+      <button
+        type="button"
+        onClick={() => app.submitQuizResult(partId, title, {
+          score: 2,
+          total: 5,
+          wrongAnswers: [{
+            questionId: `${partId}-q5`,
+            prompt: '失败测试错题',
+            options: ['正确答案', '我的选择'],
+            selectedIndex: 1,
+            answerIndex: 0,
+            explanation: '选择正确答案。',
+          }],
+        })}
+      >
+        提交未通过测试
+      </button>
+      <button
+        type="button"
+        onClick={() => app.submitQuizResult(lockedPartId, '未学知识', {
+          score: 2,
+          total: 5,
+          wrongAnswers: [{
+            questionId: `${lockedPartId}-q5`,
+            prompt: '锁定测试错题',
+            options: ['正确答案', '我的选择'],
+            selectedIndex: 1,
+            answerIndex: 0,
+            explanation: '选择正确答案。',
+          }],
+        })}
+      >
+        越过知识提交测试
+      </button>
       <button type="button" onClick={() => app.setGrade(pairedGrade[grade])}>切换同段年级</button>
     </>
   )
@@ -106,6 +170,134 @@ describe('learning progress actions', () => {
     saved = loadAccountState(createDefaultState().accountId)
     expect(saved.transactions.filter((tx: { eventId: string }) => tx.eventId.endsWith(`:${partId}`))).toHaveLength(3)
     expect(screen.getByLabelText('balance')).toHaveTextContent('2100')
+  })
+
+  it('records knowledge and its matching schedule event once in one transition', async () => {
+    seedEmptyProgress('grade5')
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '完成知识' }))
+    await user.click(screen.getByRole('button', { name: '完成知识' }))
+
+    const saved = loadAccountState(createDefaultState().accountId)
+    expect(saved.learningEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: 'knowledge-completed',
+        contentId: 'ael-4',
+        source: 'knowledge',
+      }),
+      expect.objectContaining({
+        action: 'schedule-completed',
+        contentId: 'seed-grade5-ael-4',
+        source: 'schedule',
+      }),
+    ]))
+    expect(saved.learningEvents.filter((event) => (
+      event.action === 'knowledge-completed' && event.contentId === 'ael-4'
+    ))).toHaveLength(1)
+    expect(saved.learningEvents.filter((event) => event.action === 'schedule-completed')).toHaveLength(1)
+  })
+
+  it('stores the latest real wrong answer after a passing quiz and records one test event', async () => {
+    seedKnowledge('grade5', ['ael-4'])
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '提交带错题测试' }))
+    await user.click(screen.getByRole('button', { name: '提交带错题测试' }))
+
+    const saved = loadAccountState(createDefaultState().accountId)
+    expect(saved.learningProgress['grade5-6'].testsPassed).toEqual(['ael-4'])
+    expect(saved.learningEvents.filter((event) => (
+      event.action === 'test-passed' && event.contentId === 'ael-4'
+    ))).toHaveLength(1)
+    expect(saved.wrongAnswers).toEqual([
+      expect.objectContaining({
+        id: 'grade5-6:ael-4:ael-4-q5',
+        questionId: 'ael-4-q5',
+        selectedIndex: 1,
+        answerIndex: 0,
+        correctedAt: null,
+      }),
+    ])
+  })
+
+  it('stores a failed quiz answer without completing the test or awarding points', async () => {
+    seedKnowledge('grade5', ['ael-4'])
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+    const balanceBefore = getPointsBalance(loadAccountState(createDefaultState().accountId).transactions)
+
+    await user.click(screen.getByRole('button', { name: '提交未通过测试' }))
+
+    const saved = loadAccountState(createDefaultState().accountId)
+    expect(saved.learningProgress['grade5-6'].testsPassed).toEqual([])
+    expect(saved.learningEvents.some((event) => event.action === 'test-passed')).toBe(false)
+    expect(saved.wrongAnswers[0]).toMatchObject({ questionId: 'ael-4-q5', prompt: '失败测试错题' })
+    expect(getPointsBalance(saved.transactions)).toBe(balanceBefore)
+  })
+
+  it('records a matching planned test completion once', async () => {
+    const state = createDefaultState()
+    state.grade = 'grade5'
+    state.learningProgress = {
+      'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+      'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+      'grade5-6': { knowledgeCompleted: ['ael-4'], testsPassed: [] },
+    }
+    state.learningPlan.tasks = [{
+      ...state.learningPlan.tasks[0],
+      id: 'planned-test-ael-4',
+      partId: 'ael-4',
+      kind: 'test',
+      title: '第一次 AI 实验闯关',
+    }]
+    state.processedRewardIds = state.transactions.map((tx) => tx.eventId)
+    saveAccountState(state.accountId, state)
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '提交带错题测试' }))
+    await user.click(screen.getByRole('button', { name: '提交带错题测试' }))
+
+    const saved = loadAccountState(createDefaultState().accountId)
+    expect(saved.learningEvents.filter((event) => (
+      event.action === 'schedule-completed' && event.contentId === 'planned-test-ael-4'
+    ))).toHaveLength(1)
+  })
+
+  it('ignores a quiz result for a locked test', async () => {
+    seedEmptyProgress('grade5')
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '越过知识提交测试' }))
+
+    const saved = loadAccountState(createDefaultState().accountId)
+    expect(saved.learningProgress['grade5-6'].testsPassed).toEqual([])
+    expect(saved.learningEvents).toEqual([])
+    expect(saved.wrongAnswers).toEqual([])
   })
 
   it.each(cases)('persists the final chapter and band reward once for %s', async (grade) => {

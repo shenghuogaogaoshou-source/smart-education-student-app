@@ -7,16 +7,19 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { getGradeBand, getPartIdsForBand, type CoursePartId, type PrimaryGrade } from './learning'
-import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type CompanionLoadout, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from './model'
+import { defaultState, type AiPersonality, type AiPosition, type AppState, type CompanionCategory, type CompanionLoadout, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode, type WrongAnswerRecord } from './model'
 import { getTaskCompletion, normalizeLearningPlan, type DailyAvailability, type LearningPlanTask } from './learningPlan'
 import { applyTransactionOnce, buildProgressRewardTransactions, getPointsBalance } from './points'
 import { loadAccountState, peekAccountCompanion, saveAccountState } from './companionAccountRepository'
+import { appendLearningEvent, createLearningEvent } from './learningEvents'
 import { useOptionalSessionCredential } from '../features/auth/sessionCredential'
+import type { QuizResult, QuizWrongAnswer } from '../features/test/QuizModal'
 
 type Action =
   | { type: 'set-grade'; grade: PrimaryGrade }
   | { type: 'complete-knowledge'; partId: CoursePartId; title: string; occurredAt: string }
   | { type: 'pass-test'; partId: CoursePartId; title: string; occurredAt: string }
+  | { type: 'submit-quiz-result'; partId: CoursePartId; title: string; occurredAt: string; result: QuizResult }
   | { type: 'replace-learning-plan'; tasks: LearningPlanTask[]; source: 'student' | 'ai' | 'fallback' }
   | { type: 'upsert-plan-task'; task: LearningPlanTask }
   | { type: 'remove-plan-task'; id: string }
@@ -87,9 +90,43 @@ function updateProgress(
   if (action.type === 'pass-test' && !before.knowledgeCompleted.includes(action.partId)) return state
 
   const after = { ...before, [field]: [...before[field], action.partId] }
+  const pendingPlanTasks = state.learningPlan.tasks.filter((task) => (
+    task.partId === action.partId
+    && task.kind === (action.type === 'complete-knowledge' ? 'knowledge' : 'test')
+    && getTaskCompletion(task, state.learningProgress) === 'pending'
+  ))
+  const completionEvent = action.type === 'complete-knowledge'
+    ? createLearningEvent({
+        accountId: state.accountId,
+        gradeBand: band,
+        source: 'knowledge',
+        contentId: action.partId,
+        action: 'knowledge-completed',
+        occurredAt: action.occurredAt,
+      })
+    : createLearningEvent({
+        accountId: state.accountId,
+        gradeBand: band,
+        source: 'test',
+        contentId: action.partId,
+        action: 'test-passed',
+        occurredAt: action.occurredAt,
+      })
+  let learningEvents = appendLearningEvent(state.learningEvents, completionEvent)
+  for (const task of pendingPlanTasks) {
+    learningEvents = appendLearningEvent(learningEvents, createLearningEvent({
+      accountId: state.accountId,
+      gradeBand: band,
+      source: 'schedule',
+      contentId: task.id,
+      action: 'schedule-completed',
+      occurredAt: action.occurredAt,
+    }))
+  }
   let next = {
     ...state,
     learningProgress: { ...state.learningProgress, [band]: after },
+    learningEvents,
   }
   for (const transaction of buildProgressRewardTransactions(
     before,
@@ -108,6 +145,71 @@ function updateProgress(
     })
   }
   return next
+}
+
+function submitQuizResult(
+  state: AppState,
+  action: Extract<Action, { type: 'submit-quiz-result' }>,
+) {
+  const band = getGradeBand(state.grade)
+  if (!state.learningProgress[band].knowledgeCompleted.includes(action.partId)) return state
+
+  const withWrongAnswers = upsertWrongAnswers(state, action.result.wrongAnswers, band, action.partId, action.occurredAt)
+  const passed = action.result.total > 0 && action.result.score / action.result.total >= 0.6
+  if (!passed) return withWrongAnswers
+  return updateProgress(withWrongAnswers, {
+    type: 'pass-test',
+    partId: action.partId,
+    title: action.title,
+    occurredAt: action.occurredAt,
+  })
+}
+
+function upsertWrongAnswers(
+  state: AppState,
+  answers: QuizWrongAnswer[],
+  band: ReturnType<typeof getGradeBand>,
+  partId: CoursePartId,
+  occurredAt: string,
+): AppState {
+  if (answers.length === 0) return state
+
+  const records = new Map(state.wrongAnswers.map((record) => [record.id, record]))
+  for (const answer of answers) {
+    if (!isQuizWrongAnswer(answer)) continue
+    const id = `${band}:${partId}:${answer.questionId}`
+    const record: WrongAnswerRecord = {
+      id,
+      gradeBand: band,
+      partId,
+      questionId: answer.questionId,
+      prompt: answer.prompt,
+      options: [...answer.options],
+      selectedIndex: answer.selectedIndex,
+      answerIndex: answer.answerIndex,
+      explanation: answer.explanation,
+      occurredAt,
+      correctedAt: null,
+    }
+    records.set(id, record)
+  }
+  return { ...state, wrongAnswers: [...records.values()] }
+}
+
+function isQuizWrongAnswer(answer: QuizWrongAnswer): boolean {
+  return typeof answer.questionId === 'string'
+    && answer.questionId.length > 0
+    && typeof answer.prompt === 'string'
+    && Array.isArray(answer.options)
+    && answer.options.every((option) => typeof option === 'string')
+    && Number.isInteger(answer.selectedIndex)
+    && Number.isInteger(answer.answerIndex)
+    && answer.selectedIndex !== answer.answerIndex
+    && answer.selectedIndex >= 0
+    && answer.selectedIndex < answer.options.length
+    && answer.answerIndex >= 0
+    && answer.answerIndex < answer.options.length
+    && typeof answer.explanation === 'string'
 }
 
 function purchase(
@@ -226,6 +328,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'set-grade': return { ...state, grade: action.grade }
     case 'complete-knowledge':
     case 'pass-test': return updateProgress(state, action)
+    case 'submit-quiz-result': return submitQuizResult(state, action)
     case 'replace-learning-plan': return replaceLearningPlan(state, action)
     case 'upsert-plan-task': return upsertPlanTask(state, action)
     case 'remove-plan-task': {
@@ -326,6 +429,7 @@ type AppStateContextValue = {
   setGrade: (grade: PrimaryGrade) => void
   completeKnowledge: (partId: CoursePartId, title: string) => void
   passTest: (partId: CoursePartId, title: string) => void
+  submitQuizResult: (partId: CoursePartId, title: string, result: QuizResult) => void
   replaceLearningPlan: (tasks: LearningPlanTask[], source: 'student' | 'ai' | 'fallback') => void
   upsertPlanTask: (task: LearningPlanTask) => void
   removePlanTask: (id: string) => void
@@ -397,6 +501,13 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setGrade: (grade) => dispatch({ type: 'set-grade', grade }),
     completeKnowledge: (partId, title) => dispatch({ type: 'complete-knowledge', partId, title, occurredAt: new Date().toISOString() }),
     passTest: (partId, title) => dispatch({ type: 'pass-test', partId, title, occurredAt: new Date().toISOString() }),
+    submitQuizResult: (partId, title, result) => dispatch({
+      type: 'submit-quiz-result',
+      partId,
+      title,
+      result,
+      occurredAt: new Date().toISOString(),
+    }),
     replaceLearningPlan: (tasks, source) => dispatch({ type: 'replace-learning-plan', tasks, source }),
     upsertPlanTask: (task) => dispatch({ type: 'upsert-plan-task', task }),
     removePlanTask: (id) => dispatch({ type: 'remove-plan-task', id }),

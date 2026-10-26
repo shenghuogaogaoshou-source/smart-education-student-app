@@ -2,12 +2,22 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRight, BookOpen, Check, RotateCcw, Trophy, X, XCircle } from 'lucide-react'
 import { useDialogFocus } from '../../app/useDialogFocus'
+import type { WrongAnswerRecord } from '../../app/model'
 import type { QuizChapter } from '../knowledge/courseCatalog'
 import './quiz-modal.css'
 
-type QuizResult = {
+export type QuizWrongAnswer = Pick<
+  WrongAnswerRecord,
+  'questionId' | 'prompt' | 'options' | 'selectedIndex' | 'answerIndex' | 'explanation'
+>
+
+export type QuizResult = {
   score: number
   total: number
+  wrongAnswers: QuizWrongAnswer[]
+}
+
+type QuizDisplayResult = QuizResult & {
   passed: boolean
 }
 
@@ -15,9 +25,9 @@ type Props = {
   levelTitle: string
   chapter: QuizChapter
   partNumber: number
-  result: QuizResult | null
+  result: QuizDisplayResult | null
   onClose: () => void
-  onComplete: (score: number, total: number) => void
+  onComplete: (result: QuizResult) => void
   onRetry: () => void
   onReviewKnowledge: () => void
 }
@@ -61,7 +71,19 @@ export function QuizModal({
     const score = chapter.questions.reduce((total, question, index) => (
       total + (answers[index] === question.answerIndex ? 1 : 0)
     ), 0)
-    onComplete(score, chapter.questions.length)
+    const wrongAnswers = chapter.questions.flatMap((question, index): QuizWrongAnswer[] => {
+      const selectedIndex = answers[index]
+      if (selectedIndex === null || selectedIndex === question.answerIndex) return []
+      return [{
+        questionId: question.id,
+        prompt: question.prompt,
+        options: [...question.options],
+        selectedIndex,
+        answerIndex: question.answerIndex,
+        explanation: question.explanation,
+      }]
+    })
+    onComplete({ score, total: chapter.questions.length, wrongAnswers })
   }
 
   function retry() {

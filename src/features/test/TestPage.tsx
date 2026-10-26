@@ -5,14 +5,12 @@ import { GRADE_BAND_LABELS, getGradeBand, isTestUnlocked, type CoursePartId, typ
 import { useDialogFocus } from '../../app/useDialogFocus'
 import { AiCompanion } from '../ai_companion/AiCompanion'
 import { getCourseForBand, type CoursePart } from '../knowledge/courseCatalog'
-import { QuizModal } from './QuizModal'
+import { QuizModal, type QuizResult } from './QuizModal'
 import { TestLevelNode, type TestLevelStatus } from './TestLevelNode'
 import { getCurrentPartId, getMapNodes } from './testMapData'
 import './test.css'
 
-type ChallengeResult = {
-  score: number
-  total: number
+type ChallengeResult = QuizResult & {
   passed: boolean
 }
 
@@ -22,7 +20,7 @@ type Props = {
 }
 
 export function TestPage({ onReviewKnowledge, initialPartId }: Props = {}) {
-  const { state, passTest } = useAppState()
+  const { state, submitQuizResult } = useAppState()
   const band = getGradeBand(state.grade as PrimaryGrade)
   const course = getCourseForBand(band)
   const progress = state.learningProgress[band]
@@ -103,10 +101,10 @@ export function TestPage({ onReviewKnowledge, initialPartId }: Props = {}) {
     setResult(null)
   }
 
-  function handleComplete(score: number, total: number) {
-    const passed = total > 0 && score / total >= 0.6
-    if (passed && activePart) passTest(activePart.id, activePart.title)
-    setResult({ score, total, passed })
+  function handleComplete(quizResult: QuizResult) {
+    const passed = quizResult.total > 0 && quizResult.score / quizResult.total >= 0.6
+    if (activePart) submitQuizResult(activePart.id, activePart.title, quizResult)
+    setResult({ ...quizResult, passed })
   }
 
   function reviewKnowledge() {

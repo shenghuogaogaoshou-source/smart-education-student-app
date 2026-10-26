@@ -191,6 +191,9 @@ describe('TestPage', () => {
     expect(saved.transactions.filter((item) => item.eventId === 'medal:ael-3')).toEqual([
       expect.objectContaining({ amount: 20 }),
     ])
+    expect(saved.learningEvents.filter((event) => (
+      event.action === 'test-passed' && event.contentId === 'ael-3'
+    ))).toHaveLength(1)
     expect(getPointsBalance(saved.transactions)).toBe(balanceBefore + 70)
   })
 
@@ -219,6 +222,15 @@ describe('TestPage', () => {
     expect(saved.transactions).toHaveLength(transactionCountBefore)
     expect(saved.transactions.some((item) => item.eventId === 'test:ael-3')).toBe(false)
     expect(saved.transactions.some((item) => item.eventId === 'medal:ael-3')).toBe(false)
+    expect(saved.learningEvents.some((event) => event.action === 'test-passed' && event.contentId === 'ael-3')).toBe(false)
+    expect(saved.wrongAnswers).toHaveLength(5)
+    expect(saved.wrongAnswers[0]).toMatchObject({
+      id: expect.stringMatching(/^grade5-6:ael-3:/),
+      partId: 'ael-3',
+      selectedIndex: 1,
+      answerIndex: 0,
+      correctedAt: null,
+    })
   })
 
   it.each([
