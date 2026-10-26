@@ -57,6 +57,7 @@ export type WorkUpdatePatch = Partial<Pick<
   | 'title'
   | 'description'
   | 'aiTools'
+  | 'source'
   | 'creatorId'
   | 'creatorName'
   | 'thumbnailUrl'

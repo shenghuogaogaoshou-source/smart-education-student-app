@@ -16,6 +16,28 @@ const draft = (title: string, draftId: string) => ({
 })
 
 describe('WorksManagePage', () => {
+  it('labels imported and supplied AI works as AI creations', async () => {
+    const repository = createMemoryWorkRepository()
+    await repository.saveDraft('student-a', {
+      source: 'external-upload',
+      sourceDraftId: 'external-work-1',
+      title: '未来图书馆',
+      description: '使用其他 AI 工具完成',
+      aiTools: ['豆包'],
+      fileName: 'library.webp',
+      blob: new Blob(['library'], { type: 'image/webp' }),
+    })
+
+    render(
+      <WorksProvider accountId="student-a" repository={repository}>
+        <WorksManagePage onBack={vi.fn()} />
+      </WorksProvider>,
+    )
+
+    const card = (await screen.findByText('未来图书馆')).closest('.wm-card') as HTMLElement
+    expect(within(card).getByText(/AI 创作/)).toBeInTheDocument()
+  })
+
   it('只显示仓库记录，并让四种状态可操作', async () => {
     const user = userEvent.setup()
     const repository = createMemoryWorkRepository()

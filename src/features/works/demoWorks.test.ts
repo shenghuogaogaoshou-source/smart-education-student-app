@@ -17,6 +17,10 @@ describe('demo work catalogue', () => {
     expect(DEMO_WORK_SPECS.some((work) => work.assetPath.endsWith('/wonder-map.webp'))).toBe(false)
   })
 
+  it('labels supplied and imported demo works as AI creations', () => {
+    expect(DEMO_WORK_SPECS.every((work) => work.source === 'external-upload')).toBe(true)
+  })
+
   it('uses browser-safe media paths and provides a poster for every video', () => {
     for (const work of DEMO_WORK_SPECS) {
       expect(work.assetPath).toMatch(/^\/demo-works\/(images|videos)\//)
@@ -86,10 +90,38 @@ describe('demo work catalogue', () => {
     const migrated = await seedDemoWorks(repository, '123')
     const corrected = migrated.find((work) => work.sourceDraftId === 'demo-image-1')!
     expect(corrected.creatorId).toBe('virtual-author-lele')
+    expect(corrected.source).toBe('external-upload')
 
     await repository.setStatus('123', corrected.id, 'private')
     await seedDemoWorks(repository, '123')
     expect((await repository.get('123', corrected.id))?.status).toBe('private')
+  })
+
+  it('keeps works actually generated in the creative games under their real source', async () => {
+    const repository = createMemoryWorkRepository()
+    const realFilm = await repository.saveDraft('123', {
+      source: 'brain-film',
+      sourceDraftId: 'brain-film-db:f1792422741163',
+      title: '改项目',
+      description: '真正由脑洞放映厅生成',
+      aiTools: ['脑洞放映厅'],
+      fileName: 'film.mp4',
+      blob: new Blob(['film'], { type: 'video/mp4' }),
+    })
+    const realModule = await repository.saveDraft('123', {
+      source: 'creative-module',
+      sourceDraftId: 'creative-level-1',
+      title: '光线感应器',
+      description: '真正由创造模块生成',
+      aiTools: ['创造模块'],
+      fileName: 'module.png',
+      blob: new Blob(['module'], { type: 'image/png' }),
+    })
+
+    await seedDemoWorks(repository, '123')
+
+    expect((await repository.get('123', realFilm.id))?.source).toBe('brain-film')
+    expect((await repository.get('123', realModule.id))?.source).toBe('creative-module')
   })
 
   it('anchors published times on first initialization and keeps them stable after refresh', async () => {

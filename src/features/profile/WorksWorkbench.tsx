@@ -59,7 +59,7 @@ export function WorksWorkbench({
           <div className="draft-work" onClick={() => onWorkClick?.(draft.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
             <WorkMediaThumbnail work={draft} className="draft-media" />
             <div className="draft-copy">
-              <div className="draft-head"><span>正在创作</span><small>{draft.source === 'brain-film' ? '脑洞放映厅' : draft.source === 'creative-module' ? '创造模块' : '外部 AI 作品'}</small></div>
+              <div className="draft-head"><span>正在创作</span><small>{draft.source === 'brain-film' ? '脑洞放映厅' : draft.source === 'creative-module' ? '创造模块' : 'AI 创作'}</small></div>
               <h3>{draft.title}</h3>
               <p>{draft.description || '这份草稿还在等你继续完成'}</p>
               <div className="draft-action">

@@ -4,7 +4,7 @@ export type DemoWorkSpec = {
   id: string
   title: string
   description: string
-  source: Exclude<WorkSource, 'external-upload'>
+  source: WorkSource
   previewKind: Extract<PreviewKind, 'image' | 'video'>
   assetPath: string
   posterPath?: string
@@ -16,7 +16,7 @@ export type DemoWorkSpec = {
   initiallyFavorited?: boolean
 }
 
-const DEMO_WORK_SEED_VERSION = 2
+const DEMO_WORK_SEED_VERSION = 3
 
 const videoTitles = [
   ['clockwork-morning', '会呼吸的时钟', '老时钟在晨光里轻轻转动，时间也有了自己的故事。'],
@@ -98,7 +98,7 @@ const videoWorks: DemoWorkSpec[] = videoTitles.map(([slug, title, description], 
   id: `demo-video-${index + 1}`,
   title,
   description,
-  source: index % 2 === 0 ? 'brain-film' : 'creative-module',
+  source: 'external-upload',
   previewKind: 'video',
   assetPath: `/demo-works/videos/${slug}.mp4`,
   posterPath: `/demo-works/posters/${slug}.jpg`,
@@ -115,7 +115,7 @@ const imageWorks: DemoWorkSpec[] = imageTitles.map(([slug, title, description], 
     id: `demo-image-${index + 1}`,
     title,
     description,
-    source: index % 2 === 0 ? 'creative-module' : 'brain-film',
+    source: 'external-upload',
     previewKind: 'image',
     assetPath: `/demo-works/images/${slug}.webp`,
     creatorId: creator.id,
@@ -232,6 +232,7 @@ export async function seedDemoWorks(
       ...record.comments.filter((comment) => !comment.id.startsWith(`demo-comment-${spec.id}-`)),
     ]
     await repository.update(accountId, statusRecord.id, {
+      source: spec.source,
       creatorId,
       creatorName: spec.creatorName,
       publishedAt: spec.status === 'published' ? desiredPublishedAt : undefined,

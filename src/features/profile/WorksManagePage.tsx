@@ -24,7 +24,7 @@ const statusMeta: Record<WorkStatus, { color: string; dot: string; Icon: typeof 
 const sourceLabels: Record<WorkRecord['source'], string> = {
   'brain-film': '脑洞放映厅',
   'creative-module': '创造模块',
-  'external-upload': '外部 AI 作品',
+  'external-upload': 'AI 创作',
 }
 
 function displayDate(value: string) {
