@@ -6,7 +6,8 @@ import {
 } from './model'
 import { LEGACY_STORAGE_KEY, normalizePersistedState, toPersistedState } from './storage'
 
-const DEFAULT_DEMO_ACCOUNT = 'chenxi_2026'
+export const DEMO_ACCOUNT_ID = '123'
+const PREVIOUS_DEMO_ACCOUNT_ID = 'chenxi_2026'
 const ACCOUNT_STORAGE_PREFIX = 'zhizya:demo-account:'
 
 export function normalizeAccountId(accountId: string): string {
@@ -44,7 +45,14 @@ export function loadAccountState(accountId: string): AppState {
     return state
   }
 
-  if (normalizedAccountId === DEFAULT_DEMO_ACCOUNT) {
+  if (normalizedAccountId === DEMO_ACCOUNT_ID) {
+    const previousDemoAccount = localStorage.getItem(accountStorageKey(PREVIOUS_DEMO_ACCOUNT_ID))
+    if (previousDemoAccount !== null) {
+      const migrated = { ...parseAccountState(previousDemoAccount, fallback), accountId: normalizedAccountId }
+      saveAccountState(normalizedAccountId, migrated)
+      return migrated
+    }
+
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (legacy !== null) {
       const migrated = { ...parseAccountState(legacy, fallback), accountId: normalizedAccountId }
@@ -73,10 +81,13 @@ export function peekAccountCompanion(accountId: string): CompanionLoadout {
   const normalizedAccountId = normalizeAccountId(accountId)
   const fallback = createAccountDefault(normalizedAccountId)
   const accountRaw = localStorage.getItem(accountStorageKey(normalizedAccountId))
-  const legacyRaw = normalizedAccountId === DEFAULT_DEMO_ACCOUNT
+  const previousDemoRaw = normalizedAccountId === DEMO_ACCOUNT_ID
+    ? localStorage.getItem(accountStorageKey(PREVIOUS_DEMO_ACCOUNT_ID))
+    : null
+  const legacyRaw = normalizedAccountId === DEMO_ACCOUNT_ID
     ? localStorage.getItem(LEGACY_STORAGE_KEY)
     : null
-  const { companion } = parseAccountState(accountRaw ?? legacyRaw, fallback)
+  const { companion } = parseAccountState(accountRaw ?? previousDemoRaw ?? legacyRaw, fallback)
   return {
     ...companion,
     owned: {

@@ -5,7 +5,7 @@ import { BRAND } from '../../app/brand'
 import { LOGIN_COMPANION_HANDOFF_KEY, LoginCompanion } from '../ai_companion/LoginCompanion'
 import type { HandoffSnapshot } from '../ai_companion/CompanionHandoff'
 import { AuthLayout } from './AuthLayout'
-import { useSessionCredential } from './sessionCredential'
+import { DEMO_ACCOUNT_ID, useSessionCredential, verifyDemoCredential } from './sessionCredential'
 
 type LoginPageProps = {
   onNavigate: (page: 'register' | 'forgot') => void
@@ -55,10 +55,14 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
       setError('请填写学习账号和密码')
       return
     }
+    if (!verifyDemoCredential(account, password)) {
+      setError('学习账号或密码不正确')
+      return
+    }
     setError('')
     captureCompanionHandoff()
-    sessionCredential.establish(account, password)
-    login(account)
+    sessionCredential.establish(DEMO_ACCOUNT_ID, password)
+    login(DEMO_ACCOUNT_ID)
   }
 
   return (

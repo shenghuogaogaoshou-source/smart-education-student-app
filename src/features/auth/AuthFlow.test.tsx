@@ -46,7 +46,7 @@ describe('authentication flow', () => {
     expect(screen.queryByText('小学一至六年级')).not.toBeInTheDocument()
   })
 
-  it('requires both account and password without persisting credentials', async () => {
+  it('logs in only with 123 / 123 without persisting credentials', async () => {
     const user = userEvent.setup()
     renderLogin()
 
@@ -57,8 +57,17 @@ describe('authentication flow', () => {
     await user.type(screen.getByLabelText('密码'), 'demo-pass')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
-    expect(loadAccountState('xiaoyu').isLoggedIn).toBe(true)
-    expect(JSON.stringify(localStorage)).not.toContain('demo-pass')
+    expect(screen.getByRole('alert')).toHaveTextContent('学习账号或密码不正确')
+    expect(loadAccountState('xiaoyu').isLoggedIn).toBe(false)
+
+    await user.clear(screen.getByLabelText('学习账号／学习码'))
+    await user.clear(screen.getByLabelText('密码'))
+    await user.type(screen.getByLabelText('学习账号／学习码'), '123')
+    await user.type(screen.getByLabelText('密码'), '123')
+    await user.click(screen.getByRole('button', { name: '进入学习世界' }))
+
+    expect(loadAccountState('123').isLoggedIn).toBe(true)
+    expect(JSON.stringify(localStorage)).not.toContain('"password":"123"')
   })
 
   it('captures the equipped companion bounds immediately before a successful login', async () => {
@@ -76,8 +85,8 @@ describe('authentication flow', () => {
     const user = userEvent.setup()
     renderLogin()
 
-    await user.type(screen.getByLabelText('学习账号／学习码'), 'demo-2026')
-    await user.type(screen.getByLabelText('密码'), 'secret-pass')
+    await user.type(screen.getByLabelText('学习账号／学习码'), '123')
+    await user.type(screen.getByLabelText('密码'), '123')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
     expect(JSON.parse(sessionStorage.getItem('student-app-login-companion-bounds') ?? '{}')).toEqual({

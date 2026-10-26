@@ -163,7 +163,7 @@ export function createDefaultState(): AppState {
     likes: [],
     favorites: [],
     notifications: 'important',
-    accountId: 'chenxi_2026',
+    accountId: '123',
     passwordHint: '上次修改：30 天前',
     lastPasswordChange: '2026-08-05',
     twoFactorEnabled: false,

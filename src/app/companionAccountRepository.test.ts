@@ -37,7 +37,7 @@ describe('companion account repository', () => {
     expect(loadAccountState('XIAOYU').companion.equipped.appearance).toBe('cloudbloom')
   })
 
-  it('migrates the default demo account from the legacy key without losing learning data', () => {
+  it('migrates the default demo account from the legacy key into account 123 without losing learning data', () => {
     const legacy = createDefaultState()
     localStorage.setItem('student-app-state', JSON.stringify({
       ...legacy,
@@ -62,7 +62,7 @@ describe('companion account repository', () => {
       },
     }))
 
-    const migrated = loadAccountState('chenxi_2026')
+    const migrated = loadAccountState('123')
 
     expect(migrated.stateVersion).toBe(5)
     expect(migrated.nickname).toBe('迁移同学')
@@ -73,7 +73,43 @@ describe('companion account repository', () => {
     expect(migrated.companion.owned.outfit).toContain('cloud-backpack')
     expect(migrated.companion.equipped).toEqual({ appearance: 'momo', outfit: null, decoration: null })
     expect(localStorage.getItem('student-app-state')).toBeNull()
-    expect(localStorage.getItem(accountStorageKey('chenxi_2026'))).not.toBeNull()
+    expect(localStorage.getItem(accountStorageKey('123'))).not.toBeNull()
+  })
+
+  it('migrates the previous chenxi_2026 account into 123 exactly once', () => {
+    const legacyAccount = createDefaultState()
+    saveAccountState('chenxi_2026', {
+      ...legacyAccount,
+      nickname: '旧演示同学',
+      learningProgress: {
+        ...legacyAccount.learningProgress,
+        'grade5-6': { knowledgeCompleted: ['ael-4'], testsPassed: ['ael-4'] },
+      },
+    })
+
+    const first = loadAccountState('123')
+    const firstSaved = localStorage.getItem(accountStorageKey('123'))
+    const second = loadAccountState('123')
+
+    expect(first.nickname).toBe('旧演示同学')
+    expect(first.accountId).toBe('123')
+    expect(first.learningProgress['grade5-6']).toEqual({
+      knowledgeCompleted: ['ael-4'],
+      testsPassed: ['ael-4'],
+    })
+    expect(second).toEqual(first)
+    expect(localStorage.getItem(accountStorageKey('123'))).toBe(firstSaved)
+  })
+
+  it('does not overwrite an existing 123 account while checking legacy data', () => {
+    const existing = createDefaultState()
+    saveAccountState('123', { ...existing, nickname: '当前 123 同学' })
+    saveAccountState('chenxi_2026', { ...existing, nickname: '旧演示同学' })
+
+    const loaded = loadAccountState('123')
+
+    expect(loaded.nickname).toBe('当前 123 同学')
+    expect(loaded.accountId).toBe('123')
   })
 
   it('removes retired companion ids without clearing valid learning data', () => {

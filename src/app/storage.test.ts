@@ -410,8 +410,8 @@ describe('primary-only state migration', () => {
   it('normalizes events, wrong answers and growth title without one corrupt sibling clearing valid data', () => {
     const fresh = createDefaultState()
     const event = {
-      id: 'chenxi_2026:grade5-6:knowledge-completed:ael-4',
-      accountId: 'chenxi_2026',
+      id: '123:grade5-6:knowledge-completed:ael-4',
+      accountId: '123',
       gradeBand: 'grade5-6',
       source: 'knowledge',
       contentId: 'ael-4',

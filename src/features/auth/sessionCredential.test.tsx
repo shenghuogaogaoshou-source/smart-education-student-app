@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useState, type PropsWithChildren } from 'react'
 import { AppStateProvider, useAppState } from '../../app/AppState'
-import { SessionCredentialProvider, useSessionCredential } from './sessionCredential'
+import {
+  DEMO_ACCOUNT_ID,
+  SessionCredentialProvider,
+  useSessionCredential,
+  verifyDemoCredential,
+} from './sessionCredential'
 
 function wrapper({ children }: PropsWithChildren) {
   return <SessionCredentialProvider>{children}</SessionCredentialProvider>
@@ -27,6 +32,14 @@ describe('session credential', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
+  })
+
+  it('accepts only the fixed 123 / 123 demonstration credential', () => {
+    expect(DEMO_ACCOUNT_ID).toBe('123')
+    expect(verifyDemoCredential('123', '123')).toBe(true)
+    expect(verifyDemoCredential(' 123 ', '123')).toBe(true)
+    expect(verifyDemoCredential('chenxi_2026', '123')).toBe(false)
+    expect(verifyDemoCredential('123', 'wrong-pass')).toBe(false)
   })
 
   it('verifies only the current in-memory account password and clears it', () => {

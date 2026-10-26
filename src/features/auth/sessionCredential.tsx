@@ -6,7 +6,13 @@ import {
   useRef,
   type PropsWithChildren,
 } from 'react'
-import { normalizeAccountId } from '../../app/companionAccountRepository'
+import { DEMO_ACCOUNT_ID, normalizeAccountId } from '../../app/companionAccountRepository'
+
+export { DEMO_ACCOUNT_ID }
+
+export function verifyDemoCredential(accountId: string, password: string): boolean {
+  return normalizeAccountId(accountId) === DEMO_ACCOUNT_ID && password === '123'
+}
 
 type SessionCredential = {
   accountId: string
