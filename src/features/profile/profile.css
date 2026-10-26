@@ -1024,6 +1024,108 @@
   gap: 10px;
 }
 
+.achievement-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.achievement-group {
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+}
+
+.achievement-group.current {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--glass-border));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.achievement-group-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.achievement-group-header span {
+  display: grid;
+  gap: 2px;
+}
+
+.achievement-group-header small {
+  color: var(--muted);
+  font-size: calc(0.6rem * var(--font-scale));
+  font-weight: 700;
+}
+
+.achievement-group-header strong {
+  font-size: calc(0.9rem * var(--font-scale));
+  font-weight: 850;
+}
+
+.achievement-group-header b {
+  color: var(--primary-deep);
+  font-size: calc(0.68rem * var(--font-scale));
+}
+
+.achievement-group-header svg {
+  transition: transform 180ms ease;
+}
+
+.achievement-group-header[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.achievement-group-content {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 14px;
+}
+
+.achievement-pair-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.achievement-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.achievement-pair .medal-card {
+  min-width: 0;
+}
+
+.achievement-finale {
+  grid-template-columns: 1fr;
+}
+
+.achievement-empty {
+  margin: 0;
+  padding: 18px 12px;
+  color: var(--muted);
+  font-size: calc(0.66rem * var(--font-scale));
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievement-group-header svg {
+    transition: none;
+  }
+}
+
 .medal-card {
   display: grid;
   place-items: center;

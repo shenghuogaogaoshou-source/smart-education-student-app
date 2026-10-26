@@ -1,33 +1,54 @@
-import { ArrowLeft, Medal, Star } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, ChevronDown, Medal, Star } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useAppState } from '../../app/AppState'
-import { getGradeBand, type PrimaryGrade } from '../../app/learning'
-import { getCourseForBand } from '../knowledge/courseCatalog'
-import { getMedalSummary, growthMedals } from './medalsData'
-import { MedalIcon } from './MedalIcon'
+import { GRADE_BAND_LABELS, getGradeBand, type GradeBand, type PrimaryGrade } from '../../app/learning'
+import { COURSE_PACKAGES } from '../knowledge/courseCatalog'
+import {
+  GRADE_BANDS,
+  deriveCourseAchievementGroups,
+  getAchievementSummary,
+  type CourseAchievement,
+} from './courseAchievements'
 import './profile.css'
 
 type MedalFilter = '全部' | '已获得' | '待解锁'
 
+function matchesFilter(achievement: CourseAchievement, filter: MedalFilter) {
+  return filter === '全部'
+    || (filter === '已获得' && achievement.earned)
+    || (filter === '待解锁' && !achievement.earned)
+}
+
+function AchievementCard({ achievement }: { achievement: CourseAchievement }) {
+  return (
+    <article className={`medal-card ${achievement.earned ? 'earned' : 'locked'}`}>
+      <div className="medal-icon" aria-hidden="true">{achievement.icon}</div>
+      <strong>{achievement.name}</strong>
+      <small>{achievement.description}</small>
+      <span className="lock-tag">{achievement.statusText}</span>
+    </article>
+  )
+}
+
 export function MedalsPage({ onBack }: { onBack: () => void }) {
   const { state } = useAppState()
+  const currentBand = getGradeBand(state.grade as PrimaryGrade)
   const [filter, setFilter] = useState<MedalFilter>('全部')
-  const band = getGradeBand(state.grade as PrimaryGrade)
-  const course = getCourseForBand(band)
-  const progress = state.learningProgress[band]
-  const {
-    courseMedals,
-    courseEarnedCount,
-    finaleEarned,
-    earnedCount,
-    totalCount,
-  } = getMedalSummary(course, progress)
-  const matchesFilter = (earned: boolean) => (
-    filter === '全部' || (filter === '已获得' ? earned : !earned)
+  const [expandedBands, setExpandedBands] = useState<Set<GradeBand>>(() => new Set([currentBand]))
+  const groups = useMemo(
+    () => deriveCourseAchievementGroups(state.learningEvents, state.accountId, state.wrongAnswers),
+    [state.accountId, state.learningEvents, state.wrongAnswers],
   )
+  const summary = getAchievementSummary(groups)
 
-  const filteredCourseMedals = courseMedals.filter((medal) => matchesFilter(medal.earned))
-  const filteredGrowthMedals = growthMedals.filter((medal) => matchesFilter(medal.earned))
+  function toggleBand(band: GradeBand) {
+    setExpandedBands((current) => {
+      const next = new Set(current)
+      if (next.has(band)) next.delete(band)
+      else next.add(band)
+      return next
+    })
+  }
 
   return (
     <div className="rewards-page medals-page">
@@ -39,89 +60,99 @@ export function MedalsPage({ onBack }: { onBack: () => void }) {
       </header>
 
       <div className="rewards-summary">
-        <div
+        <button
           className={`rewards-stat clickable ${filter === '已获得' ? 'active' : ''}`}
-          role="button"
-          tabIndex={0}
+          type="button"
           onClick={() => setFilter(filter === '已获得' ? '全部' : '已获得')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFilter(filter === '已获得' ? '全部' : '已获得') }}
         >
           <Medal size={24} />
-          <div>
-            <strong>{earnedCount}</strong>
-            <span>已获得</span>
-          </div>
-        </div>
-        <div
+          <div><strong>{summary.earnedCount}</strong><span>已获得</span></div>
+        </button>
+        <button
           className={`rewards-stat clickable ${filter === '待解锁' ? 'active' : ''}`}
-          role="button"
-          tabIndex={0}
+          type="button"
           onClick={() => setFilter(filter === '待解锁' ? '全部' : '待解锁')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFilter(filter === '待解锁' ? '全部' : '待解锁') }}
         >
           <Star size={24} />
-          <div>
-            <strong>{totalCount - earnedCount}</strong>
-            <span>待解锁</span>
-          </div>
-        </div>
+          <div><strong>{summary.totalCount - summary.earnedCount}</strong><span>待解锁</span></div>
+        </button>
       </div>
 
       <div className="wb-filter-row">
-        {(['全部', '已获得', '待解锁'] as MedalFilter[]).map((f) => (
+        {(['全部', '已获得', '待解锁'] as MedalFilter[]).map((item) => (
           <button
-            key={f}
+            key={item}
             type="button"
-            className={`wb-filter-chip ${filter === f ? 'active' : ''}`}
-            onClick={() => setFilter(f)}
+            className={`wb-filter-chip ${filter === item ? 'active' : ''}`}
+            onClick={() => setFilter(item)}
           >
-            {f}
+            {item}
           </button>
         ))}
       </div>
 
-      <h3 className="detail-section-title">
-        课程徽章
-        <span style={{ color: 'var(--muted)', fontSize: '0.7em', marginLeft: '8px', fontWeight: 500 }}>
-          已获得 {courseEarnedCount} 枚课程徽章
-        </span>
-      </h3>
-      <ul className="medal-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {filteredCourseMedals.map((medal) => (
-          <li key={medal.partId} className={`medal-card ${medal.earned ? 'earned' : 'locked'}`}>
-            <div className="medal-icon" aria-hidden="true">{medal.icon}</div>
-            <strong>{medal.name}</strong>
-            <small>{medal.description}</small>
-            <span className="lock-tag">{medal.progressText}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="achievement-groups">
+        {GRADE_BANDS.map((band) => {
+          const course = COURSE_PACKAGES[band]
+          const achievements = groups[band]
+          const expanded = expandedBands.has(band)
+          const earnedInGroup = achievements.filter((achievement) => achievement.earned).length
+          const visible = achievements.filter((achievement) => matchesFilter(achievement, filter))
+          const partGroups = course.parts.map((part) => (
+            visible.filter((achievement) => achievement.partId === part.id)
+          ))
+          const finale = visible.find((achievement) => achievement.kind === 'finale')
 
-      <h3 className="detail-section-title">终章勋章</h3>
-      {matchesFilter(finaleEarned) && (
-        <ul className="medal-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          <li className={`medal-card ${finaleEarned ? 'earned' : 'locked'}`}>
-            <div className="medal-icon" aria-hidden="true">🏆</div>
-            <strong>{course.finaleMedal.name}</strong>
-            <small>{course.finaleMedal.description}</small>
-            <span className="lock-tag">
-              {finaleEarned ? '已点亮' : '完成全部课程知识与测试后点亮'}
-            </span>
-          </li>
-        </ul>
-      )}
+          return (
+            <section
+              key={band}
+              id={`achievement-group-${band}`}
+              className={`achievement-group ${band === currentBand ? 'current' : ''}`}
+              aria-label={`${course.name}勋章`}
+            >
+              <button
+                type="button"
+                className="achievement-group-header"
+                aria-expanded={expanded}
+                aria-controls={`achievement-group-content-${band}`}
+                aria-label={`${GRADE_BAND_LABELS[band]} ${course.name}，获得 ${earnedInGroup} / ${achievements.length} 枚`}
+                onClick={() => toggleBand(band)}
+              >
+                <span>
+                  <small>{GRADE_BAND_LABELS[band]}</small>
+                  <strong>{course.name}</strong>
+                </span>
+                <b>{earnedInGroup} / {achievements.length}</b>
+                <ChevronDown aria-hidden="true" size={18} />
+              </button>
 
-      <h3 className="detail-section-title">成长勋章</h3>
-      <ul className="medal-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {filteredGrowthMedals.map((medal) => (
-          <li key={medal.id} className={`medal-card ${medal.earned ? 'earned' : 'locked'}`}>
-            <MedalIcon medal={medal} />
-            <strong>{medal.name}</strong>
-            <small>{medal.desc}</small>
-            {!medal.earned && <span className="lock-tag">未解锁</span>}
-          </li>
-        ))}
-      </ul>
+              {expanded && (
+                <div id={`achievement-group-content-${band}`} className="achievement-group-content">
+                  <ul className="achievement-pair-list">
+                    {partGroups.map((pair, index) => (
+                      pair.length > 0 && (
+                        <li key={course.parts[index].id} className="achievement-pair">
+                          {pair.map((achievement) => (
+                            <AchievementCard key={achievement.id} achievement={achievement} />
+                          ))}
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                  {finale && (
+                    <div className="medal-grid achievement-finale">
+                      <AchievementCard achievement={finale} />
+                    </div>
+                  )}
+                  {visible.length === 0 && (
+                    <p className="achievement-empty">这个筛选下暂时没有勋章。</p>
+                  )}
+                </div>
+              )}
+            </section>
+          )
+        })}
+      </div>
     </div>
   )
 }

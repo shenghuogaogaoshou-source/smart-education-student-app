@@ -262,33 +262,47 @@ describe('profile dashboard', () => {
     expect(onOpenSchedule).not.toHaveBeenCalled()
   })
 
-  it('derives the profile medal count from course progress and earned growth medals', () => {
+  it('derives the profile medal count from real learning events', () => {
     const state = createDefaultState()
-    state.learningProgress['grade5-6'] = {
-      knowledgeCompleted: ['ael-1'],
-      testsPassed: ['ael-1'],
-    }
-    localStorage.setItem('student-app-state', JSON.stringify(state))
+    state.learningEvents = [
+      createLearningEvent({
+        accountId: state.accountId, gradeBand: 'grade5-6', source: 'knowledge',
+        contentId: 'ael-1', action: 'knowledge-completed', occurredAt: '2026-10-20T09:00:00.000Z',
+      }),
+      createLearningEvent({
+        accountId: state.accountId, gradeBand: 'grade5-6', source: 'test',
+        contentId: 'ael-1', action: 'test-passed', occurredAt: '2026-10-21T09:00:00.000Z',
+      }),
+    ]
+    saveAccountState(state.accountId, state)
 
     render(<AppStateProvider><ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} /></AppStateProvider>)
 
-    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('7 枚')
+    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('2 / 49 枚')
   })
 
-  it('updates the profile-detail medal count when course and finale progress changes', () => {
+  it('updates the profile-detail medal count when all course events earn the finale', () => {
     const state = createDefaultState()
     const allPartIds = [
       'ael-1', 'ael-2', 'ael-3', 'ael-4', 'ael-5',
       'ael-6', 'ael-7', 'ael-8', 'ael-9',
     ] as const
-    state.learningProgress['grade5-6'] = {
-      knowledgeCompleted: [...allPartIds],
-      testsPassed: [...allPartIds],
-    }
-    localStorage.setItem('student-app-state', JSON.stringify(state))
+    state.learningEvents = allPartIds.flatMap((partId, index) => [
+      createLearningEvent({
+        accountId: state.accountId, gradeBand: 'grade5-6', source: 'knowledge',
+        contentId: partId, action: 'knowledge-completed',
+        occurredAt: `2026-10-${String(20 + index).padStart(2, '0')}T09:00:00.000Z`,
+      }),
+      createLearningEvent({
+        accountId: state.accountId, gradeBand: 'grade5-6', source: 'test',
+        contentId: partId, action: 'test-passed',
+        occurredAt: `2026-10-${String(20 + index).padStart(2, '0')}T10:00:00.000Z`,
+      }),
+    ])
+    saveAccountState(state.accountId, state)
 
     render(<AppStateProvider><ProfileDetailPage onBack={vi.fn()} onEdit={vi.fn()} /></AppStateProvider>)
 
-    expect(screen.getByText('获得勋章').parentElement).toHaveTextContent('16 枚')
+    expect(screen.getByText('获得勋章').parentElement).toHaveTextContent('19 枚')
   })
 })

@@ -2,17 +2,15 @@ import { ArrowLeft, ChevronRight, UserRound } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
 import { getPointsBalance } from '../../app/points'
-import { getCourseForBand } from '../knowledge/courseCatalog'
-import { getMedalSummary } from './medalsData'
+import { deriveCourseAchievementGroups, getAchievementSummary } from './courseAchievements'
 
 export function ProfileDetailPage({ onBack, onEdit }: { onBack: () => void; onEdit: () => void }) {
   const { state } = useAppState()
   const grade = state.grade as PrimaryGrade
   const band = getGradeBand(grade)
   const pointsBalance = getPointsBalance(state.transactions)
-  const { earnedCount: earnedMedalCount } = getMedalSummary(
-    getCourseForBand(band),
-    state.learningProgress[band],
+  const { earnedCount: earnedMedalCount } = getAchievementSummary(
+    deriveCourseAchievementGroups(state.learningEvents, state.accountId, state.wrongAnswers),
   )
 
   const infoRows = [
