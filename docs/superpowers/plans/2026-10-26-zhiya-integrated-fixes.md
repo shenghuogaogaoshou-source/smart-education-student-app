@@ -32,8 +32,8 @@
 **Interfaces:**
 - Produces: 任意当前账号均能读取公共演示作品，同时账号私有写操作仍隔离。
 
-- [ ] **Step 1:** 运行三组作品测试，确认已验证状态仍为绿色。
-- [ ] **Step 2:** 独立提交这四个文件，提交信息 `fix: show demo works for every account`。
+- [x] **Step 1:** 运行三组作品测试，确认已验证状态仍为绿色。
+- [x] **Step 2:** 独立提交这四个文件，提交信息 `fix: show demo works for every account`。
 
 ### Task 2: DashScope 视觉识别与安全降级
 
@@ -47,11 +47,11 @@
 **Interfaces:**
 - Produces: `loadLocalEnvironmentFiles(paths)`、`recognize(body, dependencies?)`；`GET /api/health` 返回不含密钥的配置状态。
 
-- [ ] **Step 1:** 新增失败测试：根目录 `.env.local` 优先加载、DashScope 默认配置、25 秒超时、一次重试、最终降级、健康端点不暴露密钥。
-- [ ] **Step 2:** 运行 `npm run test:server -- --run` 并确认测试因缺少行为失败。
-- [ ] **Step 3:** 实现根目录和 server 目录环境加载、依赖注入式视觉请求、DashScope 默认值、两次尝试及按工具生成的本地降级结构。
-- [ ] **Step 4:** 实现健康端点，仅返回 provider、configured、model 和服务状态。
-- [ ] **Step 5:** 重跑服务器测试直至通过。
+- [x] **Step 1:** 新增失败测试：根目录 `.env.local` 优先加载、DashScope 默认配置、25 秒超时、一次重试、最终降级、健康端点不暴露密钥。
+- [x] **Step 2:** 运行 `npm run test:server -- --run` 并确认测试因缺少行为失败。
+- [x] **Step 3:** 实现根目录和 server 目录环境加载、依赖注入式视觉请求、DashScope 默认值、两次尝试及按工具生成的本地降级结构。
+- [x] **Step 4:** 实现健康端点，仅返回 provider、configured、model 和服务状态。
+- [x] **Step 5:** 重跑服务器测试直至通过。
 
 ### Task 3: 开发服务隔离与恢复
 
@@ -65,10 +65,10 @@
 **Interfaces:**
 - Produces: `createDevSupervisor(specs, options)`；AI 代理异常自动限次重启，主应用与游戏不被终止。
 
-- [ ] **Step 1:** 新增失败测试覆盖 AI 代理退出后重启、重启失败不停止其他服务、核心前端退出时安全停止。
-- [ ] **Step 2:** 运行服务器测试确认失败。
-- [ ] **Step 3:** 提取可测试的进程监督器并替换 `server/dev.mjs` 的一次性启动逻辑。
-- [ ] **Step 4:** 重跑测试并确认通过。
+- [x] **Step 1:** 新增失败测试覆盖 AI 代理退出后重启、重启失败不停止其他服务、核心前端退出时安全停止。
+- [x] **Step 2:** 运行服务器测试确认失败。
+- [x] **Step 3:** 提取可测试的进程监督器并替换 `server/dev.mjs` 的一次性启动逻辑。
+- [x] **Step 4:** 重跑测试并确认通过。
 
 ### Task 4: 唯一演示凭据与账号数据迁移
 
