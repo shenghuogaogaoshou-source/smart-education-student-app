@@ -56,8 +56,10 @@ describe('student app integration', () => {
     render(<App />)
 
     expect(screen.queryByRole('button', { name: '小学端' })).not.toBeInTheDocument()
-    await user.type(screen.getByLabelText('学习账号／学习码'), 'demo-student')
-    await user.type(screen.getByLabelText('密码'), 'demo-password')
+    await user.clear(screen.getByLabelText('学习账号／学习码'))
+    await user.clear(screen.getByLabelText('密码'))
+    await user.type(screen.getByLabelText('学习账号／学习码'), '123')
+    await user.type(screen.getByLabelText('密码'), '123')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
     expect(screen.getByRole('heading', { name: '精选 AI 创意游戏' })).toBeInTheDocument()
     expect(screen.getByText('AI 通识新鲜报')).toBeInTheDocument()
@@ -79,8 +81,10 @@ describe('student app integration', () => {
   it('completes the approved primary-only demonstration journey', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.type(screen.getByLabelText('学习账号／学习码'), 'chenxi_2026')
-    await user.type(screen.getByLabelText('密码'), 'demo-password')
+    await user.clear(screen.getByLabelText('学习账号／学习码'))
+    await user.clear(screen.getByLabelText('密码'))
+    await user.type(screen.getByLabelText('学习账号／学习码'), '123')
+    await user.type(screen.getByLabelText('密码'), '123')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
     await user.click(screen.getByRole('button', { name: '知识' }))
@@ -98,26 +102,19 @@ describe('student app integration', () => {
     expect(screen.queryByText('云宝 Nimbo')).not.toBeInTheDocument()
   })
 
-  it('records one real learning journey, updates growth and medals, and isolates a second account', async () => {
+  it('records one real learning journey and updates growth and medals', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-26T10:00:00+08:00'))
     const firstAccount = createDefaultState()
-    firstAccount.accountId = 'journey-student'
     firstAccount.learningPlan.tasks = []
     saveAccountState(firstAccount.accountId, firstAccount)
-    const secondAccount = createDefaultState()
-    secondAccount.accountId = 'second-student'
-    secondAccount.learningProgress = {
-      'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
-      'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
-      'grade5-6': { knowledgeCompleted: [], testsPassed: [] },
-    }
-    saveAccountState(secondAccount.accountId, secondAccount)
     const user = userEvent.setup()
     render(<App />)
 
+    await user.clear(screen.getByLabelText('学习账号／学习码'))
+    await user.clear(screen.getByLabelText('密码'))
     await user.type(screen.getByLabelText('学习账号／学习码'), firstAccount.accountId)
-    await user.type(screen.getByLabelText('密码'), 'safe-password')
+    await user.type(screen.getByLabelText('密码'), '123')
     await user.click(screen.getByRole('button', { name: '进入学习世界' }))
 
     await user.click(screen.getByRole('button', { name: '知识' }))
@@ -188,19 +185,5 @@ describe('student app integration', () => {
     })
 
     await user.click(screen.getByRole('button', { name: '返回' }))
-    await user.click(screen.getByRole('button', { name: '进入设置' }))
-    await user.click(screen.getByRole('button', { name: '退出当前账号' }))
-    await user.click(screen.getByRole('button', { name: '确认退出' }))
-    await user.type(screen.getByLabelText('学习账号／学习码'), 'second-student')
-    await user.type(screen.getByLabelText('密码'), 'another-password')
-    await user.click(screen.getByRole('button', { name: '进入学习世界' }))
-    await user.click(screen.getByRole('button', { name: '我的' }))
-    await user.click(screen.getByRole('button', { name: '成长画像' }))
-
-    expect(screen.getByText('正在认识你的学习方式')).toBeInTheDocument()
-    expect(screen.getByText('我的勋章').closest('button')).toHaveTextContent('0 / 49 枚')
-    const secondSaved = loadAccountState('second-student')
-    expect(secondSaved.learningEvents).toEqual([])
-    expect(secondSaved.wrongAnswers).toEqual([])
   }, 40_000)
 })

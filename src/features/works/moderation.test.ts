@@ -55,13 +55,18 @@ describe('local work moderation', () => {
     expect(result.message).not.toContain('识别画面')
   })
 
-  it('每日榜只包含当天发布作品并按热度排序', () => {
+  it('每日榜只包含最近 24 小时发布作品并按热度排序', () => {
     const works = [
       work('today-new', '2026-10-20T11:00:00+08:00', 1),
       work('today-popular', '2026-10-20T09:00:00+08:00', 5, 2, 1),
-      work('yesterday', '2026-10-19T18:00:00+08:00', 9),
+      work('within-yesterday', '2026-10-19T18:00:00+08:00', 9),
+      work('too-old', '2026-10-18T20:00:00+08:00', 12),
     ]
     const ranked = rankPublishedWorks(works, 'day', new Date('2026-10-20T12:00:00+08:00'))
-    expect(ranked.map((item) => item.id)).toEqual(['today-popular', 'today-new'])
+    expect(ranked.map((item) => item.id)).toEqual([
+      'within-yesterday',
+      'today-popular',
+      'today-new',
+    ])
   })
 })

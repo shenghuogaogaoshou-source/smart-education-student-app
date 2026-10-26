@@ -12,7 +12,7 @@ import { WorksProvider } from '../features/works/WorksProvider'
 function IntegratedTestApp({ repository }: { repository: WorkRepository }) {
   return (
     <AppStateProvider>
-      <WorksProvider accountId="chenxi_2026" repository={repository}>
+      <WorksProvider accountId="123" repository={repository}>
         <MainShell />
       </WorksProvider>
     </AppStateProvider>
@@ -47,7 +47,7 @@ describe('game and works integration', () => {
     dispatchGameDraft('brain-film', '云朵电影院')
     expect(await screen.findByText('已保存到智芽·我的作品')).toBeInTheDocument()
     await waitFor(() => {
-      expect(loadAccountState('chenxi_2026').learningEvents).toEqual(expect.arrayContaining([
+      expect(loadAccountState('123').learningEvents).toEqual(expect.arrayContaining([
         expect.objectContaining({
           action: 'work-completed',
           source: 'creative',
@@ -63,7 +63,7 @@ describe('game and works integration', () => {
     await user.click(card.querySelector('button.wm-action-ghost') as HTMLButtonElement)
 
     await waitFor(async () => {
-      const works = await repository.list('chenxi_2026')
+      const works = await repository.list('123')
       expect(works[0]).toMatchObject({ title: '云朵电影院', status: 'published' })
     })
 
@@ -73,6 +73,6 @@ describe('game and works integration', () => {
     const like = within(homeCard).getByRole('button', { name: '点赞作品' })
     await user.click(like)
     expect(like).toHaveAttribute('aria-pressed', 'true')
-    expect((await repository.list('chenxi_2026'))[0].likedBy).toEqual(['chenxi_2026'])
+    expect((await repository.list('123'))[0].likedBy).toEqual(['123'])
   }, 30_000)
 })

@@ -34,7 +34,7 @@ function CompanionStateHarness() {
       <button type="button" onClick={() => context.setAiPosition({ x: 0.2, y: 0.3 })}>移动伙伴</button>
       <button type="button" onClick={() => context.resetAiPosition()}>重置伙伴位置</button>
       <button type="button" onClick={() => context.login('luna_2026')}>切换露娜账号</button>
-      <button type="button" onClick={() => context.login('chenxi_2026')}>切换晨曦账号</button>
+      <button type="button" onClick={() => context.login('123')}>切回演示账号</button>
     </div>
   )
 }
@@ -128,7 +128,7 @@ describe('companion loadout actions', () => {
 
     expect(screen.getByLabelText('ai position')).toHaveTextContent('0.88,0.84')
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem(accountStorageKey('chenxi_2026')) ?? '{}')
+      const saved = JSON.parse(localStorage.getItem(accountStorageKey('123')) ?? '{}')
       expect(saved.aiPosition).toEqual({ x: 0.88, y: 0.84 })
     })
   })
@@ -147,7 +147,7 @@ describe('companion loadout actions', () => {
     expect(screen.getByLabelText('owned appearances')).not.toHaveTextContent('yunduo')
     expect(screen.getByLabelText('balance')).toHaveTextContent('2000')
 
-    await user.click(screen.getByRole('button', { name: '切换晨曦账号' }))
+    await user.click(screen.getByRole('button', { name: '切回演示账号' }))
     expect(screen.getByLabelText('equipped appearance')).toHaveTextContent('yunduo')
     expect(screen.getByLabelText('balance')).toHaveTextContent('1640')
   })

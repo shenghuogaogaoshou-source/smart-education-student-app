@@ -201,8 +201,8 @@
 **Interfaces:**
 - Produces: 可复现的本机配置和启动说明，不包含任何密钥。
 
-- [ ] **Step 1:** 运行 `npm run test:all`，修复所有回归。
-- [ ] **Step 2:** 运行 `npm run build`。
-- [ ] **Step 3:** 检查 Git diff 不包含 `sk-`、真实 Key 或 `.env.local`。
-- [ ] **Step 4:** 启动项目并检查 5173、5191、5192、8787 健康状态。
-- [ ] **Step 5:** 记录验证结果并提交本轮改动。
+- [x] **Step 1:** 运行 `npm run test:all`，修复所有回归。
+- [x] **Step 2:** 运行 `npm run build`。
+- [x] **Step 3:** 检查 Git diff 不包含 `sk-`、真实 Key 或 `.env.local`。
+- [x] **Step 4:** 启动项目并检查 5173、5191、5192、8787 健康状态。
+- [x] **Step 5:** 记录验证结果并提交本轮改动。

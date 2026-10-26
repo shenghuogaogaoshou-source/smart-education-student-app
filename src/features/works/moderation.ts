@@ -48,15 +48,15 @@ export function reviewForLocalDemo(work: WorkRecord) {
 function periodStart(period: RankingPeriod, now: Date) {
   const start = new Date(now)
   if (period === 'day') {
-    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 1)
     return start
   }
   if (period === 'week') {
-    start.setDate(start.getDate() - 6)
-    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 7)
     return start
   }
-  return new Date(now.getFullYear(), 0, 1)
+  start.setFullYear(start.getFullYear() - 1)
+  return start
 }
 
 export function rankPublishedWorks(works: WorkRecord[], period: RankingPeriod, now = new Date()) {
