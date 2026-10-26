@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "sourceDraftId": "brain-film-db:f1792422741163",
+  "originalSourceId": "f1792422741163",
+  "title": "改项目",
+  "description": "有一个五个志同道合的同伴,住在实验室。有一天,五个志同道合的同伴同伴们给导师展示项目。好在和蔼可亲的导师一直陪着它。它们还带上了一台笔记本和一个显示器。可是没想到,导师有三个不满意的地方。",
+  "aiTools": [
+    "脑洞放映厅",
+    "doubao-seedance-1-0-pro-fast-251015 + glm-tts 配音"
+  ],
+  "fileName": "film-20261019-214652-855.mp4",
+  "mimeType": "video/mp4",
+  "byteSize": 17591762,
+  "assetPath": "/brain-film-import/film-20261019-214652-855.mp4",
+  "thumbnailUrl": "/brain-film-import/f1792422741163-poster.jpg",
+  "publishedAt": "2026-10-25T02:53:23.000Z",
+  "director": "桥川",
+  "style": "蜡笔涂鸦"
+}

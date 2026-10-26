@@ -25,6 +25,7 @@ export type WorkRecord = {
   fileName: string
   mimeType: string
   byteSize: number
+  thumbnailUrl?: string
   previewKind: PreviewKind
   createdAt: string
   updatedAt: string
@@ -46,6 +47,7 @@ export type SaveWorkDraftInput = {
   description: string
   aiTools: string[]
   fileName: string
+  thumbnailUrl?: string
   blob: Blob
 }
 
@@ -56,6 +58,7 @@ export type WorkUpdatePatch = Partial<Pick<
   | 'aiTools'
   | 'creatorId'
   | 'creatorName'
+  | 'thumbnailUrl'
   | 'reviewMessage'
   | 'publishedAt'
   | 'likes'

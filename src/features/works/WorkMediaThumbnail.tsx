@@ -10,7 +10,9 @@ export function WorkMediaThumbnail({
   className?: string
 }) {
   const demo = getDemoWorkSpec(work.sourceDraftId)
-  const source = demo?.previewKind === 'video' ? demo.posterPath : demo?.assetPath
+  const source = work.thumbnailUrl
+    ?? (demo?.previewKind === 'video' ? demo.posterPath : demo?.assetPath)
+  const isVideo = work.previewKind === 'video'
 
   return (
     <div className={`work-media-thumbnail ${className}`.trim()}>
@@ -19,7 +21,7 @@ export function WorkMediaThumbnail({
       ) : (
         <span className="work-media-placeholder" aria-hidden="true"><FileImage /></span>
       )}
-      {demo?.previewKind === 'video' && (
+      {isVideo && (
         <span className="work-media-kind"><Play aria-hidden="true" size={11} fill="currentColor" />视频</span>
       )}
     </div>

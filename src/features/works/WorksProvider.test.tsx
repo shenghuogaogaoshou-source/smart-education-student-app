@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_DEMO_WORK_ACCOUNT } from './demoWorks'
+import type { ImportedBrainFilmManifest } from './importedWorks'
 import { createMemoryWorkRepository } from './memoryRepository'
 import type { SaveWorkDraftInput } from './types'
 import { useWorks, WorksProvider } from './WorksProvider'
@@ -110,5 +111,56 @@ describe('WorksProvider', () => {
       source: 'external-upload',
       status: 'published',
     })
+  })
+
+  it('adds the completed brain-film export once after the demo catalogue', async () => {
+    const repository = createMemoryWorkRepository()
+    const importedWork: ImportedBrainFilmManifest = {
+      schemaVersion: 1,
+      sourceDraftId: 'brain-film-db:f1792422741163',
+      originalSourceId: 'f1792422741163',
+      title: '改项目',
+      description: '五个同伴在实验室里一起修改项目。',
+      aiTools: ['脑洞放映厅'],
+      fileName: 'film.mp4',
+      mimeType: 'video/mp4',
+      byteSize: 5,
+      assetPath: '/brain-film-import/film.mp4',
+      thumbnailUrl: '/brain-film-import/film-poster.jpg',
+      publishedAt: '2026-10-25T02:53:23.000Z',
+    }
+    const view = render(
+      <WorksProvider
+        accountId={DEFAULT_DEMO_WORK_ACCOUNT}
+        repository={repository}
+        importedWorkManifest={importedWork}
+        importedAssetLoader={async () => new Blob(['film'], { type: 'video/mp4' })}
+        demoAssetLoader={async (path) => new Blob([path], {
+          type: path.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+        })}
+      >
+        <Probe />
+      </WorksProvider>,
+    )
+
+    expect(await screen.findByText('改项目')).toBeInTheDocument()
+    expect(screen.getByLabelText('作品总数')).toHaveTextContent('26')
+    view.unmount()
+
+    render(
+      <WorksProvider
+        accountId={DEFAULT_DEMO_WORK_ACCOUNT}
+        repository={repository}
+        importedWorkManifest={importedWork}
+        importedAssetLoader={async () => new Blob(['film'], { type: 'video/mp4' })}
+        demoAssetLoader={async (path) => new Blob([path], {
+          type: path.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+        })}
+      >
+        <Probe />
+      </WorksProvider>,
+    )
+    expect(await screen.findByText('改项目')).toBeInTheDocument()
+    expect(screen.getByLabelText('作品总数')).toHaveTextContent('26')
   })
 })

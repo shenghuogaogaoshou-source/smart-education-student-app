@@ -7,7 +7,18 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react'
-import { seedDemoWorks, type DemoAssetLoader } from './demoWorks'
+import {
+  DEFAULT_DEMO_WORK_ACCOUNT,
+  seedDemoWorks,
+  type DemoAssetLoader,
+} from './demoWorks'
+import {
+  fetchImportedAsset,
+  fetchImportedBrainFilmManifest,
+  seedImportedBrainFilmWork,
+  type ImportedAssetLoader,
+  type ImportedBrainFilmManifest,
+} from './importedWorks'
 import { createIndexedDbWorkRepository } from './repository'
 import { localDemoModeration, reviewComment, WorkCommentRejected } from './moderation'
 import type {
@@ -55,11 +66,17 @@ export function WorksProvider({
   accountId,
   repository,
   demoAssetLoader,
+  importedWorkManifest,
+  importedAssetLoader,
+  autoImportBrainFilm,
   children,
 }: PropsWithChildren<{
   accountId: string
   repository?: WorkRepository
   demoAssetLoader?: DemoAssetLoader
+  importedWorkManifest?: ImportedBrainFilmManifest
+  importedAssetLoader?: ImportedAssetLoader
+  autoImportBrainFilm?: boolean
 }>) {
   const [fallbackRepository] = useState(() => createIndexedDbWorkRepository())
   const activeRepository = repository ?? fallbackRepository
@@ -72,7 +89,27 @@ export function WorksProvider({
     setLoading(true)
     setError('')
     setWorks([])
-    const records = seedDemoWorks(activeRepository, accountId, demoAssetLoader)
+    const records = (async () => {
+      let next = await seedDemoWorks(activeRepository, accountId, demoAssetLoader)
+      const shouldImport = accountId === DEFAULT_DEMO_WORK_ACCOUNT
+        && (Boolean(importedWorkManifest) || (autoImportBrainFilm ?? !repository))
+      if (!shouldImport) return next
+
+      const manifest = importedWorkManifest ?? await fetchImportedBrainFilmManifest()
+      if (manifest) {
+        try {
+          next = await seedImportedBrainFilmWork(
+            activeRepository,
+            accountId,
+            manifest,
+            importedAssetLoader ?? fetchImportedAsset,
+          )
+        } catch (reason) {
+          if (import.meta.env.DEV) console.warn('[works] brain film import skipped', reason)
+        }
+      }
+      return next
+    })()
     records
       .then((records) => {
         if (cancelled) return
@@ -94,7 +131,15 @@ export function WorksProvider({
     return () => {
       cancelled = true
     }
-  }, [accountId, activeRepository, demoAssetLoader])
+  }, [
+    accountId,
+    activeRepository,
+    autoImportBrainFilm,
+    demoAssetLoader,
+    importedAssetLoader,
+    importedWorkManifest,
+    repository,
+  ])
 
   const run = useCallback(async <T,>(operation: () => Promise<T>) => {
     setError('')

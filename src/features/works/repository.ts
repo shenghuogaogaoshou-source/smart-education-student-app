@@ -105,6 +105,7 @@ export function buildWorkRecord({
     fileName: input.fileName,
     mimeType: input.blob.type || '',
     byteSize: input.blob.size,
+    thumbnailUrl: input.thumbnailUrl ?? existing?.thumbnailUrl,
     previewKind: detectPreviewKind(input.blob.type || '', input.fileName),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
