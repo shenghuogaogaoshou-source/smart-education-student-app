@@ -1,6 +1,6 @@
 # Growth, Medals, Brand, and AI Panels Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 让智芽的成长画像和三组课程勋章由真实学习动作实时驱动，统一品牌信息，并把 AI 对话页的两个辅助功能改成适配 APP 内容区的无障碍底部抽屉。
 
@@ -53,7 +53,7 @@
 - Produces in `AppState`: `learningEvents: LearningEvent[]`, `wrongAnswers: WrongAnswerRecord[]`, `growthTitle: GrowthTitle | null`.
 - Consumes: `GradeBand` and `CoursePartId` from `src/app/learning.ts`.
 
-- [ ] **Step 1: Write failing event and migration tests**
+- [x] **Step 1: Write failing event and migration tests**
 
 Add tests proving exact deltas, 100-point caps at selector level, stable IDs, duplicate suppression, account/band isolation, hostile record rejection, and one-time v4 migration:
 
@@ -79,13 +79,13 @@ it('migrates v4 progress into events without changing points', () => {
 })
 ```
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
 Run: `npm test -- --run src/app/learningEvents.test.ts src/app/storage.test.ts src/app/companionAccountRepository.test.ts`
 
 Expected: FAIL because `learningEvents.ts`, state v5 fields and v4 migration do not exist.
 
-- [ ] **Step 3: Implement the event model and safe normalizer**
+- [x] **Step 3: Implement the event model and safe normalizer**
 
 Use these exact public shapes and approved mapping:
 
@@ -118,7 +118,7 @@ export const LEARNING_EVENT_DELTAS: Record<LearningEventAction, GrowthScores> = 
 
 `eventKey()` must return `${accountId}:${gradeBand}:${action}:${contentId}`; `createLearningEvent()` copies the matching mapping and uses that key as `id`; `appendLearningEvent()` returns the original array when the ID already exists. `normalizeLearningEvents()` must accept only known sources/actions, current account, valid ISO dates, five finite non-negative deltas and unique IDs.
 
-- [ ] **Step 4: Upgrade `AppState` and migrate v4 data**
+- [x] **Step 4: Upgrade `AppState` and migrate v4 data**
 
 Set `APP_STATE_VERSION = 5`, add these exact types, and initialize empty records in `createDefaultState()` before normalization:
 
@@ -133,13 +133,13 @@ export type GrowthTitle = { text: string; description: string; eventId: string }
 
 In `normalizePersistedState()`, retain support for state versions 2, 3 and 4. For v4 only, create migrated knowledge/test events from validated `learningProgress` using the record date when available and otherwise `new Date().toISOString()`, set `migrationVersion: 1`, leave `transactions` and `processedRewardIds` byte-for-byte equivalent after normalization, and save the v5 result once. Normalize `wrongAnswers`, `learningEvents` and `growthTitle` independently so one corrupt item cannot discard valid siblings.
 
-- [ ] **Step 5: Run tests and verify persistence/account isolation**
+- [x] **Step 5: Run tests and verify persistence/account isolation**
 
 Run: `npm test -- --run src/app/learningEvents.test.ts src/app/storage.test.ts src/app/companionAccountRepository.test.ts`
 
 Expected: PASS; existing v2/v3 migration tests still pass after expected version assertions change from 4 to 5.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/learningEvents.ts src/app/learningEvents.test.ts src/app/model.ts src/app/storage.ts src/app/storage.test.ts src/app/companionAccountRepository.test.ts
@@ -162,7 +162,7 @@ git commit -m "feat: add account-scoped learning events"
 - Produces: `QuizWrongAnswer = Pick<WrongAnswerRecord, 'questionId' | 'prompt' | 'options' | 'selectedIndex' | 'answerIndex' | 'explanation'>`.
 - Produces in `useAppState()`: `submitQuizResult(partId, title, result)`; existing `completeKnowledge(partId, title)` remains public.
 
-- [ ] **Step 1: Write failing reducer and quiz-result tests**
+- [x] **Step 1: Write failing reducer and quiz-result tests**
 
 Cover real completion, duplicates, locked tests, wrong answers, and schedule completion in the same state transition:
 
@@ -187,17 +187,17 @@ it('reports the selected wrong option to the page', async () => {
 })
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 Run: `npm test -- --run src/app/learningState.actions.test.tsx src/app/learningPlanState.actions.test.tsx src/features/test/TestPage.test.tsx`
 
 Expected: FAIL because quiz answers are not returned and no learning events are recorded.
 
-- [ ] **Step 3: Return structured quiz results**
+- [x] **Step 3: Return structured quiz results**
 
 Export `QuizResult` and `QuizWrongAnswer`. In `QuizModal`, store the chosen option index for every question, then build `wrongAnswers` only where `selectedIndex !== answerIndex`. Change `onComplete` from `(score, total) => void` to `(result: QuizResult) => void`. No event is emitted from the modal itself.
 
-- [ ] **Step 4: Record progress, wrong answers, events and existing point rewards atomically**
+- [x] **Step 4: Record progress, wrong answers, events and existing point rewards atomically**
 
 Replace `passTest()` usage in `TestPage` with:
 
@@ -215,13 +215,13 @@ The reducer must:
 6. Before changing progress, collect pending `LearningPlanTask` entries matching the current part and kind; after valid completion append one `schedule-completed` event per newly completed matching task using its task ID as `contentId`.
 7. Do not use question prompt, typed text or AI chat text as an event `contentId`.
 
-- [ ] **Step 5: Run focused and regression tests**
+- [x] **Step 5: Run focused and regression tests**
 
 Run: `npm test -- --run src/app/learningState.actions.test.tsx src/app/learningPlanState.actions.test.tsx src/features/test/TestPage.test.tsx src/features/knowledge/CourseContentPage.test.tsx`
 
 Expected: PASS, including existing point totals and locked-test behavior.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/AppState.tsx src/app/learningState.actions.test.tsx src/app/learningPlanState.actions.test.tsx src/features/test/QuizModal.tsx src/features/test/TestPage.tsx src/features/test/TestPage.test.tsx
@@ -244,7 +244,7 @@ git commit -m "feat: record real learning and quiz events"
 - Consumes: `WrongAnswerRecord`, `createLearningEvent()`, `appendLearningEvent()`.
 - Changes `GameWorkBridge` prop to `onWorkSaved?: (record: WorkRecord) => void` without changing its postMessage protocol.
 
-- [ ] **Step 1: Write failing correction and work-event tests**
+- [x] **Step 1: Write failing correction and work-event tests**
 
 ```ts
 it('only completes correction after the child chooses the right answer', async () => {
@@ -262,27 +262,27 @@ it('records one creative event after a game draft is saved', async () => {
 })
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 Run: `npm test -- --run src/features/profile/WrongBookPage.test.tsx src/features/games/GameWorkBridge.test.tsx src/app/gameWorks.integration.test.tsx`
 
 Expected: FAIL because wrong-book data is synthetic and saved works do not emit learning events.
 
-- [ ] **Step 3: Replace synthetic wrong-book entries with `state.wrongAnswers`**
+- [x] **Step 3: Replace synthetic wrong-book entries with `state.wrongAnswers`**
 
 Render only the current account's persisted records. “重做” expands the original options; an incorrect retry shows the gentle local message and changes no state. Choosing `answerIndex` calls `completeCorrection(id)`, sets `correctedAt`, and appends a `correction-completed` event with the wrong-answer ID as `contentId`. Repeating the correct answer keeps the same timestamp and event. Keep “全部／待复习／已复习” filtering and remove the delete action so a completed correction remains traceable.
 
-- [ ] **Step 4: Emit creative events only for the two embedded games**
+- [x] **Step 4: Emit creative events only for the two embedded games**
 
 Call `onWorkSaved(record)` after `saveDraft()` resolves. In `EmbeddedGamePage`, pass a callback that invokes `recordCreativeWork(record.id, record.createdAt)` only when `record.source` is `brain-film` or `creative-module`. External uploads and gallery interactions must not emit events. `recordCreativeWork()` uses `work-completed`, so repeated save messages for the same record do not increase growth twice.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `npm test -- --run src/features/profile/WrongBookPage.test.tsx src/features/games/GameWorkBridge.test.tsx src/app/gameWorks.integration.test.tsx`
 
 Expected: PASS and no work repository test changes are required.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/AppState.tsx src/features/profile/WrongBookPage.tsx src/features/profile/WrongBookPage.test.tsx src/features/games/GameWorkBridge.tsx src/features/games/GameWorkBridge.test.tsx src/features/games/EmbeddedGamePage.tsx src/app/gameWorks.integration.test.tsx
@@ -306,7 +306,7 @@ git commit -m "feat: connect corrections and game works to growth"
 - Produces: `chooseNextGrowthTitle(event, previous): GrowthTitle`.
 - Uses a neutral base of 40 for each dimension and clamps each result with `Math.min(100, Math.max(0, value))`.
 
-- [ ] **Step 1: Write failing selector/title tests**
+- [x] **Step 1: Write failing selector/title tests**
 
 ```ts
 it('derives a neutral profile and caps growth at one hundred', () => {
@@ -325,31 +325,31 @@ it('chooses a different, non-comparative title for consecutive events', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run: `npm test -- --run src/features/profile/growthProfile.test.ts src/features/profile/ProfilePage.test.tsx`
 
 Expected: FAIL because the selectors do not exist and UI values are hard-coded.
 
-- [ ] **Step 3: Implement the pure growth and title selectors**
+- [x] **Step 3: Implement the pure growth and title selectors**
 
 Filter by exact `accountId`, sum event deltas over the neutral base, and cap every dimension. Define at least three ordered candidates per dominant action; examples include “愿意多问一步的小探索家”“把新知识慢慢连起来的小研究员”“愿意回头检查的小侦探”“把点子慢慢做出来的小创客”“会为明天留位置的小规划员”. `chooseNextGrowthTitle()` selects by the latest event's largest delta, then rotates to the next candidate when the first equals `previous.text`; descriptions name the observed action, never rank ability.
 
-- [ ] **Step 4: Update the title in the same reducer transition as each new event**
+- [x] **Step 4: Update the title in the same reducer transition as each new event**
 
 Centralize event appending in an `applyLearningEvent(state, event)` helper. If `appendLearningEvent()` returns a new array, call `chooseNextGrowthTitle(event, state.growthTitle)` and store both together. Duplicate events return the original state and cannot rotate the title.
 
-- [ ] **Step 5: Drive the radar and copy from current account data**
+- [x] **Step 5: Drive the radar and copy from current account data**
 
 Change `GrowthRadar` to accept `scores: GrowthScores`; render the same five labels and SVG geometry using selector values. In `GrowthSection`, compute the profile from `state.learningEvents` and `state.accountId`. When `hasEvidence` is false, show “正在认识你的学习方式” plus neutral explanatory copy; otherwise show `state.growthTitle`. Preserve “只和自己的近期相比” and “AI 对话不会进入画像数据”.
 
-- [ ] **Step 6: Run focused tests and visual-state assertions**
+- [x] **Step 6: Run focused tests and visual-state assertions**
 
 Run: `npm test -- --run src/features/profile/growthProfile.test.ts src/features/profile/ProfilePage.test.tsx src/app/learningState.actions.test.tsx`
 
 Expected: PASS; profile values update immediately after a simulated completion action.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/profile/growthProfile.ts src/features/profile/growthProfile.test.ts src/app/AppState.tsx src/features/profile/GrowthRadar.tsx src/features/profile/GrowthSection.tsx src/features/profile/ProfilePage.test.tsx src/features/profile/profile.css
@@ -373,7 +373,7 @@ git commit -m "feat: derive live growth portrait and titles"
 - Produces: `CourseAchievement = { id; band; kind: 'knowledge' | 'challenge' | 'finale'; partId?: CoursePartId; name; icon; description; earned; earnedAt: string | null; statusText }`.
 - Produces: `deriveCourseAchievementGroups(events, accountId): Record<GradeBand, CourseAchievement[]>` and `getAchievementSummary(groups)`.
 
-- [ ] **Step 1: Write failing 49-medal derivation tests**
+- [x] **Step 1: Write failing 49-medal derivation tests**
 
 ```ts
 it('builds the approved 17, 13 and 19 achievement groups', () => {
@@ -391,13 +391,13 @@ it('earns paired medals and finale from exact events with dates', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run: `npm test -- --run src/features/profile/courseAchievements.test.ts src/features/profile/rewards.test.tsx`
 
 Expected: FAIL because current code has one combined medal per part plus eight unrelated demonstration medals.
 
-- [ ] **Step 3: Implement exact paired achievements and statuses**
+- [x] **Step 3: Implement exact paired achievements and statuses**
 
 For every course part, create `${partId}:knowledge` from `knowledge-completed` and `${partId}:challenge` from `test-passed`. Reuse each course medal's icon for its knowledge pair and use a consistent star/shield icon token for the challenge pair. The finale is earned only when every part has both event types; `earnedAt` is the latest prerequisite event date. Status copy must be exactly selected from:
 
@@ -410,21 +410,21 @@ For every course part, create `${partId}:knowledge` from `knowledge-completed` a
 
 Use current unresolved `wrongAnswers` only to choose the third status; earned logic remains event-based. Delete `growthMedals` and the `growthEarnedCount` branch from `medalsData.ts`.
 
-- [ ] **Step 4: Rebuild the medals page into three accessible groups**
+- [x] **Step 4: Rebuild the medals page into three accessible groups**
 
 Initialize expanded state with only the current band. Each group header shows course name, earned/total count and an accessible expand button with `aria-expanded`. Pair knowledge and challenge cards by part inside each group, then render the finale. Apply the global filter to all groups without collapsing the current group. Show dates for earned cards. Other groups remain discoverable and expandable.
 
-- [ ] **Step 5: Update profile summary to all 49 medals**
+- [x] **Step 5: Update profile summary to all 49 medals**
 
 `RewardsSection` must use `getAchievementSummary()` over all three groups, not demo medal constants. The profile card displays total earned out of 49 and keeps its existing navigation behavior.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `npm test -- --run src/features/profile/courseAchievements.test.ts src/features/profile/MedalsPage.test.tsx src/features/profile/rewards.test.tsx src/features/profile/ProfilePage.test.tsx`
 
 Expected: PASS for grouping, default expansion, filters, dates, finale rules and total count.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/profile/courseAchievements.ts src/features/profile/courseAchievements.test.ts src/features/profile/medalsData.ts src/features/profile/MedalsPage.tsx src/features/profile/MedalsPage.test.tsx src/features/profile/RewardsSection.tsx src/features/profile/rewards.test.tsx src/features/profile/profile.css
@@ -447,7 +447,7 @@ git commit -m "feat: add three course achievement groups"
 - Produces: `BRAND = { name; positioning; version; browserTitle; copyright; logoSrc; logoAlt } as const`.
 - Consumes: `/brand/zhinya-mark.png` already used by the login page.
 
-- [ ] **Step 1: Write failing brand consistency tests**
+- [x] **Step 1: Write failing brand consistency tests**
 
 ```ts
 it('defines the single approved 智芽 brand source', () => {
@@ -462,29 +462,29 @@ it('defines the single approved 智芽 brand source', () => {
 
 Extend the settings test to assert the logo image, `智芽`, `学生端 v1.1.0` and copyright, and to reject visible `数智学习世界`.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run: `npm test -- --run src/app/brand.test.ts src/features/settings/SettingsPage.test.tsx src/features/auth/AuthFlow.test.tsx`
 
 Expected: FAIL because the About section and login heading still contain the old brand.
 
-- [ ] **Step 3: Add `BRAND` and consume it in visible brand surfaces**
+- [x] **Step 3: Add `BRAND` and consume it in visible brand surfaces**
 
 Use the exact object above. `AuthLayout` and `LoginPage` must read the name, positioning, logo source and alt text from `BRAND`; keep the approved login layout otherwise unchanged. Replace the About book emoji with `<img src={BRAND.logoSrc} alt={BRAND.logoAlt} />`, render the approved version/copyright, and leave agreement/privacy/legal behavior intact. Set `<title>智芽｜小学生 AI 学习成长伙伴</title>` in `index.html` and assert it equals `BRAND.browserTitle` in the test.
 
-- [ ] **Step 4: Scan and classify legacy visible brand strings**
+- [x] **Step 4: Scan and classify legacy visible brand strings**
 
 Run: `rg -n "数智学习世界|学生端 v1\.0\.0|© 2026 数智教育" src index.html`
 
 Expected: no UI source hits. Do not replace “数智教育”“数智能力” where they describe course subject matter rather than the product name. Update obsolete tests that assert “欢迎来到数智学习世界” to the new brand copy.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `npm test -- --run src/app/brand.test.ts src/features/settings/SettingsPage.test.tsx src/features/auth/AuthFlow.test.tsx src/app/App.test.tsx src/app/App.integration.test.tsx`
 
 Expected: PASS and the legacy visible-brand scan remains empty.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/brand.ts src/app/brand.test.ts src/features/auth/AuthLayout.tsx src/features/auth/LoginPage.tsx src/features/auth/AuthFlow.test.tsx src/features/settings/SettingDetailPage.tsx src/features/settings/SettingsPage.test.tsx src/app/App.test.tsx src/app/App.integration.test.tsx index.html
@@ -511,7 +511,7 @@ git commit -m "feat: unify zhiya brand metadata"
 - Consumes: existing `useDialogFocus({ open, containerRef, triggerRef, onClose })` signature after confirming it from source.
 - Leaves unchanged: `messages`, conversation machine, voice handlers, composer, companion rotator and portal root.
 
-- [ ] **Step 1: Write failing behavior and accessibility tests**
+- [x] **Step 1: Write failing behavior and accessibility tests**
 
 Test both panels for in-APP sheet classes, Escape, backdrop, focus loop, focus restoration, compact empty state, grouped history, confirmation before clear, setting cards and privacy footer:
 
@@ -526,13 +526,13 @@ it('opens history as an app-contained bottom sheet and restores focus', async ()
 })
 ```
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 Run: `npm test -- --run src/features/ai_companion/AiLocalSheet.test.tsx src/features/ai_companion/AiPanel.test.tsx src/app/useDialogFocus.test.tsx`
 
 Expected: FAIL because current absolute panels lack a reusable sheet, focus trap and grouped history.
 
-- [ ] **Step 3: Build the contained sheet without changing the main chat**
+- [x] **Step 3: Build the contained sheet without changing the main chat**
 
 Render the sheet as the last child of `.ai-chat-shell`, not a separate `document.body` portal. Structure:
 
@@ -549,21 +549,21 @@ Render the sheet as the last child of `.ai-chat-shell`, not a separate `document
 
 Store refs for the two header trigger buttons and pass the active one into `useDialogFocus`. Add `max-height: min(68%, 560px)`, body-only `overflow-y: auto`, rounded top corners, warm cream/pink surfaces, fixed header/footer, and a reduced-motion media query. `.ai-chat-shell` remains the containing block; do not edit the main chat sections.
 
-- [ ] **Step 4: Implement grouped history and clear confirmation**
+- [x] **Step 4: Implement grouped history and clear confirmation**
 
 Add `messageCount: number` to `ConversationSummary`; normalize positive integers and use `1` only for legacy records that lack the field. Group valid `conversationSummaries` into “今天、昨天、更早” using local calendar dates. Cards show time, topic, one-line summary and `messageCount`. Clicking a card expands its summary. Add “清空记录”; opening it shows an in-sheet confirmation with cancel/confirm. Confirm calls `clearHistory()`, which must set both `historyCount: 0` and `conversationSummaries: []`, then closes only the confirmation. Empty state uses the existing companion visual language and no fixed tall spacer.
 
-- [ ] **Step 5: Implement three compact settings cards**
+- [x] **Step 5: Implement three compact settings cards**
 
 Use icon + title + one-line explanation + accessible switch for voice reply, save summary and learning memory. The footer always states that settings belong to the current account and provides “管理全部隐私设置”; wire it to the existing settings navigation callback passed into `AiPanel`, or add `onOpenPrivacySettings?: () => void` with a tested no-op-safe fallback. Do not alter the semantics of the three existing AppState setters.
 
-- [ ] **Step 6: Run focused tests and preserve main-chat assertions**
+- [x] **Step 6: Run focused tests and preserve main-chat assertions**
 
 Run: `npm test -- --run src/features/ai_companion/AiLocalSheet.test.tsx src/features/ai_companion/AiPanel.test.tsx src/app/useDialogFocus.test.tsx`
 
 Expected: PASS; existing message, voice and command tests remain unchanged.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/app/model.ts src/app/storage.ts src/app/AppState.tsx src/app/companionAccountRepository.test.ts src/features/ai_companion/AiLocalSheet.tsx src/features/ai_companion/AiLocalSheet.test.tsx src/features/ai_companion/AiPanel.tsx src/features/ai_companion/AiPanel.test.tsx src/features/ai_companion/ai-companion.css
@@ -581,7 +581,7 @@ git commit -m "feat: redesign ai auxiliary panels as sheets"
 - Consumes all interfaces produced by Tasks 1—7.
 - Produces no new production API.
 
-- [ ] **Step 1: Add an end-to-end state integration test**
+- [x] **Step 1: Add an end-to-end state integration test**
 
 Use the real providers and UI to cover this sequence in one account: finish a knowledge topic, submit a passing quiz with one wrong answer, correct it, save one embedded-game work, and verify growth values, paired medals, dates and title. Then switch to a second account and assert none of the first account's events, wrong answers or medals appear.
 
@@ -594,25 +594,25 @@ expect(screen.getByText('已获得 · 2026-10-26')).toBeInTheDocument()
 
 Use fake timers at `2026-10-26T10:00:00+08:00` so date assertions are deterministic. Compute final expected scores from exactly one event of each relevant action; do not mock the growth selector.
 
-- [ ] **Step 2: Run the new integration test and fix only integration defects**
+- [x] **Step 2: Run the new integration test and fix only integration defects**
 
 Run: `npm test -- --run src/app/App.integration.test.tsx src/features/profile/ProfilePage.test.tsx`
 
 Expected: PASS. If the test exposes duplicate events, fix the producer or `appendLearningEvent()` rather than weakening assertions.
 
-- [ ] **Step 3: Run the complete automated suite**
+- [x] **Step 3: Run the complete automated suite**
 
 Run: `npm run test:all`
 
 Expected: all frontend, server, script and embedded-game tests pass.
 
-- [ ] **Step 4: Run the production build**
+- [x] **Step 4: Run the production build**
 
 Run: `npm run build`
 
 Expected: TypeScript, Vite web build and both embedded-game builds succeed.
 
-- [ ] **Step 5: Run repository hygiene and secret scans**
+- [x] **Step 5: Run repository hygiene and secret scans**
 
 Run: `git diff --check`
 
@@ -626,7 +626,7 @@ Run: `git status --short`
 
 Expected: only intended source, tests and this checked plan are modified; `.env.local`, `dist`, logs and API keys are absent.
 
-- [ ] **Step 6: Commit integration coverage**
+- [x] **Step 6: Commit integration coverage**
 
 ```bash
 git add src/app/App.integration.test.tsx src/features/profile/ProfilePage.test.tsx docs/superpowers/plans/2026-10-26-growth-medals-brand-ai-panels.md
@@ -635,8 +635,8 @@ git commit -m "test: verify growth medals brand and ai sheets"
 
 ## Self-Review Checklist
 
-- [ ] Spec coverage: learning-event architecture, five dimensions, non-punitive scoring, account/band isolation, migration, rotating titles, 49 medals, brand source, two AI sheets and accessibility each map to a task above.
-- [ ] Data integrity: the plan never awards points during migration and never records AI conversation content as learning evidence.
-- [ ] Placeholder scan: search the plan for the five prohibited placeholder patterns listed in the `writing-plans` skill; all searches return no matches.
-- [ ] Type consistency: `LearningEvent`, `WrongAnswerRecord`, `GrowthTitle`, `QuizResult`, `CourseAchievement`, `submitQuizResult`, `completeCorrection`, and `recordCreativeWork` use the same names in producer and consumer tasks.
-- [ ] Scope protection: the main AI chat remains unchanged; external uploads do not increase growth; legal behavior and point rewards remain intact.
+- [x] Spec coverage: learning-event architecture, five dimensions, non-punitive scoring, account/band isolation, migration, rotating titles, 49 medals, brand source, two AI sheets and accessibility each map to a task above.
+- [x] Data integrity: the plan never awards points during migration and never records AI conversation content as learning evidence.
+- [x] Placeholder scan: search the plan for the five prohibited placeholder patterns listed in the `writing-plans` skill; all searches return no matches.
+- [x] Type consistency: `LearningEvent`, `WrongAnswerRecord`, `GrowthTitle`, `QuizResult`, `CourseAchievement`, `submitQuizResult`, `completeCorrection`, and `recordCreativeWork` use the same names in producer and consumer tasks.
+- [x] Scope protection: the main AI chat remains unchanged; external uploads do not increase growth; legal behavior and point rewards remain intact.
