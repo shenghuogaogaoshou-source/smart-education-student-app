@@ -15,7 +15,7 @@ function renderDialog(repository = createMemoryWorkRepository()) {
 }
 
 describe('UploadWorkDialog', () => {
-  it('接受任意文件并默认保存为草稿', async () => {
+  it('接受任意外部成品并直接进入发布流程', async () => {
     const user = userEvent.setup()
     const repository = createMemoryWorkRepository()
     renderDialog(repository)
@@ -26,16 +26,16 @@ describe('UploadWorkDialog', () => {
     await user.type(screen.getByLabelText('作品名称'), '我的 AI 模型作品')
     await user.type(screen.getByLabelText('作品介绍'), '这是我自己做的模型')
     await user.type(screen.getByLabelText('使用过的 AI 工具'), '其他 AI 工具')
-    await user.click(screen.getByRole('button', { name: '保存为草稿' }))
+    await user.click(screen.getByRole('button', { name: '提交发布' }))
 
-    expect(await screen.findByText('已保存为草稿')).toBeInTheDocument()
+    expect(await screen.findByText('作品已提交发布')).toBeInTheDocument()
     await waitFor(async () => {
       expect(await repository.list('student-a')).toEqual(expect.arrayContaining([
         expect.objectContaining({
           source: 'external-upload',
           fileName: 'model.custom-ai',
           title: '我的 AI 模型作品',
-          status: 'draft',
+          status: 'published',
           previewKind: 'generic',
         }),
       ]))
@@ -54,7 +54,7 @@ describe('UploadWorkDialog', () => {
     await user.upload(screen.getByLabelText('选择作品文件'), new File(['x'], 'draft.mine'))
     await user.type(screen.getByLabelText('作品名称'), '需要保留的标题')
     await user.type(screen.getByLabelText('使用过的 AI 工具'), '豆包')
-    await user.click(screen.getByRole('button', { name: '保存为草稿' }))
+    await user.click(screen.getByRole('button', { name: '提交发布' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('暂时没有保存成功')
     expect(screen.getByLabelText('作品名称')).toHaveValue('需要保留的标题')

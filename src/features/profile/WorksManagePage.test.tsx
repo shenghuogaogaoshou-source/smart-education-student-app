@@ -34,7 +34,7 @@ describe('WorksManagePage', () => {
     )
 
     expect(await screen.findByText('云朵电影院')).toBeInTheDocument()
-    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(await screen.findByText('12')).toBeInTheDocument()
     expect(screen.getByText('会唱歌的小车')).toBeInTheDocument()
     expect(screen.getByText('星星邮局')).toBeInTheDocument()
     expect(screen.getByText('我的秘密手稿')).toBeInTheDocument()
@@ -69,21 +69,21 @@ describe('WorksManagePage', () => {
 
   it('为演示作品显示真实媒体缩略图', async () => {
     const repository = createMemoryWorkRepository()
-    await repository.saveDraft('student-a', {
-      ...draft('云朵里的种子', 'demo-image-1'),
-      fileName: 'cloud-seed.webp',
-      blob: new Blob(['preview'], { type: 'image/webp' }),
+    await repository.saveDraft('123', {
+      ...draft('会呼吸的时钟', 'demo-video-1'),
+      fileName: 'clockwork-morning.mp4',
+      blob: new Blob(['preview'], { type: 'video/mp4' }),
     })
 
     render(
-      <WorksProvider accountId="student-a" repository={repository}>
+      <WorksProvider accountId="123" repository={repository}>
         <WorksManagePage onBack={vi.fn()} />
       </WorksProvider>,
     )
 
-    expect(await screen.findByRole('img', { name: '云朵里的种子' })).toHaveAttribute(
+    expect(await screen.findByRole('img', { name: '会呼吸的时钟' })).toHaveAttribute(
       'src',
-      '/demo-works/images/cloud-seed.webp',
+      '/demo-works/posters/clockwork-morning.jpg',
     )
   })
 })

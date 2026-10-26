@@ -1,16 +1,16 @@
-import type { PreviewKind, WorkRepository, WorkSource, WorkStatus } from './types'
+import type { WorkRecord, PreviewKind, WorkRepository, WorkSource } from './types'
 
 export type DemoWorkSpec = {
   id: string
   title: string
   description: string
   source: Exclude<WorkSource, 'external-upload'>
-  status: WorkStatus
   previewKind: Extract<PreviewKind, 'image' | 'video'>
   assetPath: string
   posterPath?: string
-  createdAt: string
-  publishedAt?: string
+  creatorId: string
+  creatorName: string
+  publishedOffsetMs: number
   aiTools: string[]
 }
 
@@ -45,49 +45,77 @@ const imageTitles = [
   ['time-bottle', '夜晚的温暖相遇', '在安静的夜晚，两位小伙伴用陪伴点亮彼此的心情。'],
 ] as const
 
-const publishedDates = [
-  '2026-10-26T06:40:00.000Z',
-  '2026-10-25T09:15:00.000Z',
-  '2026-10-24T11:30:00.000Z',
-  '2026-10-23T07:20:00.000Z',
-  '2026-10-20T12:10:00.000Z',
-  '2026-10-18T08:50:00.000Z',
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+
+const publishedOffsets = [
+  2 * HOUR,
+  7 * HOUR,
+  14 * HOUR,
+  23 * HOUR,
+  2 * DAY,
+  4 * DAY,
+  6 * DAY,
+  10 * DAY,
+  12 * DAY,
+  16 * DAY,
+  22 * DAY,
+  30 * DAY,
+  42 * DAY,
+  58 * DAY,
+  75 * DAY,
+  95 * DAY,
+  120 * DAY,
+  150 * DAY,
+  180 * DAY,
+  210 * DAY,
+  240 * DAY,
+  270 * DAY,
+  300 * DAY,
+  330 * DAY,
+  360 * DAY,
 ] as const
+
+const virtualAuthors = [
+  { id: 'virtual-author-lele', name: '乐乐' },
+  { id: 'virtual-author-xinghe', name: '星禾' },
+  { id: 'virtual-author-mili', name: '米粒' },
+  { id: 'virtual-author-xiaoyu', name: '小宇' },
+  { id: 'virtual-author-duoduo', name: '朵朵' },
+  { id: 'virtual-author-anan', name: '安安' },
+] as const
+
+const currentAccountCreator = {
+  id: 'current-account',
+  name: '晨曦同学',
+} as const
 
 const videoWorks: DemoWorkSpec[] = videoTitles.map(([slug, title, description], index) => ({
   id: `demo-video-${index + 1}`,
   title,
   description,
   source: index % 2 === 0 ? 'brain-film' : 'creative-module',
-  status: 'published',
   previewKind: 'video',
   assetPath: `/demo-works/videos/${slug}.mp4`,
   posterPath: `/demo-works/posters/${slug}.jpg`,
-  createdAt: publishedDates[index % publishedDates.length],
-  publishedAt: publishedDates[index % publishedDates.length],
+  creatorId: currentAccountCreator.id,
+  creatorName: currentAccountCreator.name,
+  publishedOffsetMs: publishedOffsets[index],
   aiTools: ['智芽创意助手'],
 }))
 
-const imageStatuses: WorkStatus[] = [
-  ...Array<WorkStatus>(9).fill('published'),
-  ...Array<WorkStatus>(3).fill('draft'),
-  ...Array<WorkStatus>(3).fill('reviewing'),
-  ...Array<WorkStatus>(2).fill('private'),
-]
-
 const imageWorks: DemoWorkSpec[] = imageTitles.map(([slug, title, description], index) => {
-  const status = imageStatuses[index]
-  const occurredAt = publishedDates[index % publishedDates.length]
+  const creator = virtualAuthors[index % virtualAuthors.length]
   return {
     id: `demo-image-${index + 1}`,
     title,
     description,
     source: index % 2 === 0 ? 'creative-module' : 'brain-film',
-    status,
     previewKind: 'image',
     assetPath: `/demo-works/images/${slug}.webp`,
-    createdAt: occurredAt,
-    publishedAt: status === 'published' ? occurredAt : undefined,
+    creatorId: creator.id,
+    creatorName: creator.name,
+    publishedOffsetMs: publishedOffsets[videoTitles.length + index],
     aiTools: ['智芽创意助手'],
   }
 })
@@ -100,7 +128,7 @@ export function getDemoWorkSpec(sourceDraftId?: string) {
     : undefined
 }
 
-export const DEFAULT_DEMO_WORK_ACCOUNT = 'chenxi_2026'
+export const DEFAULT_DEMO_WORK_ACCOUNT = '123'
 
 export type DemoAssetLoader = (assetPath: string) => Promise<Blob>
 
@@ -114,6 +142,7 @@ export async function seedDemoWorks(
   repository: WorkRepository,
   accountId: string,
   loadAsset: DemoAssetLoader = createDemoAssetPlaceholder,
+  initializedAt = new Date(),
 ) {
   const existing = await repository.list(accountId)
   const currentDemoIds = new Set(DEMO_WORK_SPECS.map((work) => work.id))
@@ -123,33 +152,57 @@ export async function seedDemoWorks(
   ))
   await Promise.all(obsoleteDemoWorks.map((work) => repository.delete(accountId, work.id)))
 
-  const seededIds = new Set(existing.map((work) => work.sourceDraftId).filter(Boolean))
+  const existingBySourceDraft = new Map(
+    existing
+      .filter((work) => work.sourceDraftId)
+      .map((work) => [work.sourceDraftId!, work]),
+  )
 
   for (const [index, spec] of DEMO_WORK_SPECS.entries()) {
-    if (seededIds.has(spec.id)) continue
+    const creatorId = spec.creatorId === currentAccountCreator.id
+      ? accountId
+      : spec.creatorId
+    const desiredPublishedAt = new Date(
+      initializedAt.getTime() - spec.publishedOffsetMs,
+    ).toISOString()
+    let record = existingBySourceDraft.get(spec.id)
+    const needsMigration = !record
+      || record.status !== 'published'
+      || !record.publishedAt
+      || !record.creatorId
+      || !record.creatorName
 
-    const blob = await loadAsset(spec.assetPath)
-    const draft = await repository.saveDraft(accountId, {
-      source: spec.source,
-      sourceDraftId: spec.id,
-      title: spec.title,
-      description: spec.description,
-      aiTools: spec.aiTools,
-      fileName: spec.assetPath.split('/').at(-1) ?? `${spec.id}.${spec.previewKind === 'video' ? 'mp4' : 'png'}`,
-      blob,
-    })
-
-    const withStatus = spec.status === 'draft'
-      ? draft
-      : await repository.setStatus(accountId, draft.id, spec.status)
-
-    if (spec.status === 'published') {
-      await repository.update(accountId, withStatus.id, {
-        likes: 18 + (index * 7) % 83,
-        favorites: 6 + (index * 5) % 37,
+    if (!record) {
+      const blob = await loadAsset(spec.assetPath)
+      record = await repository.saveDraft(accountId, {
+        source: spec.source,
+        sourceDraftId: spec.id,
+        creatorId,
+        creatorName: spec.creatorName,
+        title: spec.title,
+        description: spec.description,
+        aiTools: spec.aiTools,
+        fileName: spec.assetPath.split('/').at(-1) ?? `${spec.id}.${spec.previewKind === 'video' ? 'mp4' : 'png'}`,
+        blob,
       })
     }
+
+    if (!needsMigration) continue
+
+    const published = await repository.setStatus(accountId, record.id, 'published')
+    await repository.update(accountId, published.id, {
+      creatorId,
+      creatorName: spec.creatorName,
+      publishedAt: desiredPublishedAt,
+      likes: 18 + (index * 7) % 83,
+      favorites: 6 + (index * 5) % 37,
+    })
   }
 
   return repository.list(accountId)
+}
+
+export function isContinuableGameDraft(work: WorkRecord) {
+  return work.status === 'draft'
+    && (work.source === 'brain-film' || work.source === 'creative-module')
 }

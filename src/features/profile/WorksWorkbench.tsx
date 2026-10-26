@@ -1,6 +1,7 @@
 import { ArrowRight, Sparkles } from 'lucide-react'
 import type { GameId } from '../games/gameRegistry'
 import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
+import { isContinuableGameDraft } from '../works/demoWorks'
 import { useOptionalWorks } from '../works/WorksProvider'
 
 export function WorksWorkbench({
@@ -14,8 +15,11 @@ export function WorksWorkbench({
   onContinueCreate?: (gameId?: GameId) => void
   onOpenManageWithFilter?: (filter: string) => void
 }) {
-  const works = useOptionalWorks()?.works ?? []
-  const draft = works.find((work) => work.status === 'draft')
+  const worksState = useOptionalWorks()
+  const works = (worksState?.works ?? []).filter((work) => (
+    (work.creatorId || work.ownerId) === worksState?.accountId
+  ))
+  const draft = works.find(isContinuableGameDraft)
   const recent = works.find((work) => work.status === 'published') ?? works[0]
   const statuses = [
     { label: '草稿', value: works.filter((work) => work.status === 'draft').length },

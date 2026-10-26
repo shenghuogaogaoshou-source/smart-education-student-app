@@ -17,7 +17,7 @@ import type {
   WorkRepository,
 } from './types'
 
-type NewUpload = Omit<SaveWorkDraftInput, 'source'>
+type NewUpload = Omit<SaveWorkDraftInput, 'source' | 'creatorId' | 'creatorName'>
 
 type WorksContextValue = {
   accountId: string
@@ -75,7 +75,15 @@ export function WorksProvider({
     const records = seedDemoWorks(activeRepository, accountId, demoAssetLoader)
     records
       .then((records) => {
-        if (!cancelled) setWorks(records)
+        if (cancelled) return
+        setWorks((current) => {
+          const byId = new Map(records.map((work) => [work.id, work]))
+          for (const work of current) {
+            const seeded = byId.get(work.id)
+            if (!seeded || work.updatedAt >= seeded.updatedAt) byId.set(work.id, work)
+          }
+          return [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        })
       })
       .catch((reason) => {
         if (!cancelled) setError(friendlyError(reason))
@@ -114,21 +122,26 @@ export function WorksProvider({
     return record
   }), [accountId, activeRepository, replaceWork, run])
 
-  const upload = useCallback((input: NewUpload) => saveDraft({
-    ...input,
-    source: 'external-upload',
-  }), [saveDraft])
-
   const submitForReview = useCallback((workId: string) => run(async () => {
     const reviewing = await activeRepository.setStatus(accountId, workId, 'reviewing')
     replaceWork(reviewing)
     const result = await localDemoModeration.review(reviewing)
-    const finalStatus = result.allowed ? 'published' : 'draft'
+    const finalStatus = result.allowed
+      ? 'published'
+      : reviewing.source === 'external-upload' ? 'private' : 'draft'
     const statusRecord = await activeRepository.setStatus(accountId, workId, finalStatus)
     const record = await activeRepository.update(accountId, workId, { reviewMessage: result.message })
     replaceWork(record)
     return { ...statusRecord, ...record }
   }), [accountId, activeRepository, replaceWork, run])
+
+  const upload = useCallback(async (input: NewUpload) => {
+    const draft = await saveDraft({
+      ...input,
+      source: 'external-upload',
+    })
+    return submitForReview(draft.id)
+  }, [saveDraft, submitForReview])
 
   const makePrivate = useCallback((workId: string) => run(async () => {
     const record = await activeRepository.setStatus(accountId, workId, 'private')

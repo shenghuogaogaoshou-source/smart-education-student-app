@@ -13,6 +13,8 @@ export type WorkComment = {
 export type WorkRecord = {
   id: string
   ownerId: string
+  creatorId: string
+  creatorName: string
   source: WorkSource
   sourceDraftId?: string
   title: string
@@ -38,6 +40,8 @@ export type WorkRecord = {
 export type SaveWorkDraftInput = {
   source: WorkSource
   sourceDraftId?: string
+  creatorId?: string
+  creatorName?: string
   title: string
   description: string
   aiTools: string[]
@@ -50,6 +54,8 @@ export type WorkUpdatePatch = Partial<Pick<
   | 'title'
   | 'description'
   | 'aiTools'
+  | 'creatorId'
+  | 'creatorName'
   | 'reviewMessage'
   | 'publishedAt'
   | 'likes'

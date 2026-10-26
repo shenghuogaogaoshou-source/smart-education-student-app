@@ -4,7 +4,8 @@ import type { WorkRecord } from './types'
 import { WorkAssetPreview } from './WorkAssetPreview'
 
 const baseWork: WorkRecord = {
-  id: 'work-1', ownerId: 'student-a', source: 'external-upload',
+  id: 'work-1', ownerId: 'student-a', creatorId: 'student-a', creatorName: '晨曦同学',
+  source: 'external-upload',
   title: '我的作品', description: '', aiTools: ['豆包'], status: 'draft',
   assetId: 'asset-1', fileName: 'story.txt', mimeType: 'text/plain', byteSize: 12,
   previewKind: 'text', createdAt: '2026-10-20T10:00:00Z', updatedAt: '2026-10-20T10:00:00Z',

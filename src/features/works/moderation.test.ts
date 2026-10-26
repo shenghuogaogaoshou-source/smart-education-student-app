@@ -6,6 +6,8 @@ function work(id: string, publishedAt: string, likes: number, favorites = 0, com
   return {
     id,
     ownerId: 'student-a',
+    creatorId: 'student-a',
+    creatorName: '晨曦同学',
     source: 'external-upload',
     title: id,
     description: '',

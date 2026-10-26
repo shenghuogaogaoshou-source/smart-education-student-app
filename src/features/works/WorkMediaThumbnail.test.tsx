@@ -7,6 +7,8 @@ function demoWork(overrides: Partial<WorkRecord> = {}): WorkRecord {
   return {
     id: 'demo-record',
     ownerId: 'chenxi_2026',
+    creatorId: '123',
+    creatorName: '晨曦同学',
     source: 'brain-film',
     sourceDraftId: 'demo-video-1',
     title: '会呼吸的时钟',

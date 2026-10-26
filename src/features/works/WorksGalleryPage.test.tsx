@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
+import { seedDemoWorks } from './demoWorks'
 import { createMemoryWorkRepository } from './memoryRepository'
 import { WorksGalleryPage } from './WorksGalleryPage'
 import { WorksProvider } from './WorksProvider'
@@ -89,5 +90,31 @@ describe('WorksGalleryPage', () => {
     expect(previews.every((preview) => (
       preview.getAttribute('src') === '/demo-works/posters/clockwork-morning.jpg'
     ))).toBe(true)
+  })
+
+  it('展示多名同学的作品作者而不是统一显示当前账号', async () => {
+    const user = userEvent.setup()
+    const repository = createMemoryWorkRepository()
+    await seedDemoWorks(
+      repository,
+      '123',
+      async (path) => new Blob([path], {
+        type: path.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+      }),
+      new Date(),
+    )
+
+    render(
+      <AppStateProvider>
+        <WorksProvider accountId="123" repository={repository}>
+          <WorksGalleryPage onBack={vi.fn()} />
+        </WorksProvider>
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '每年' }))
+    for (const name of ['晨曦同学', '乐乐', '星禾', '米粒', '小宇', '朵朵', '安安']) {
+      expect((await screen.findAllByText(new RegExp(`^${name} ·`))).length).toBeGreaterThan(0)
+    }
   })
 })

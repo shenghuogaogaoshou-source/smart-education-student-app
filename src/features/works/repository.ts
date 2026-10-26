@@ -67,6 +67,8 @@ function storageError(error: unknown): WorkStorageError {
 function cloneWork(work: WorkRecord): WorkRecord {
   return {
     ...work,
+    creatorId: work.creatorId || work.ownerId,
+    creatorName: work.creatorName || work.ownerId,
     aiTools: [...work.aiTools],
     likedBy: [...work.likedBy],
     favoritedBy: [...work.favoritedBy],
@@ -91,6 +93,8 @@ export function buildWorkRecord({
   return {
     id: workId,
     ownerId: accountId,
+    creatorId: input.creatorId ?? existing?.creatorId ?? accountId,
+    creatorName: input.creatorName ?? existing?.creatorName ?? accountId,
     source: input.source,
     sourceDraftId: input.sourceDraftId,
     title: input.title.trim(),

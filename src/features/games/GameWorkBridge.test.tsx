@@ -9,6 +9,8 @@ describe('GameWorkBridge', () => {
     const record: WorkRecord = {
       id: 'work-1',
       ownerId: 'chenxi_2026',
+      creatorId: '123',
+      creatorName: '晨曦同学',
       source: 'brain-film',
       title: '云朵电影院',
       description: '',

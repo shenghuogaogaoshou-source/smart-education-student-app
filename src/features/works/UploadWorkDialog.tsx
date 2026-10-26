@@ -87,12 +87,12 @@ export function UploadWorkDialog({ open, onClose }: { open: boolean; onClose: ()
           </label>
 
           {(error || providerError) && <p className="upload-work-error" role="alert">{error || providerError}</p>}
-          {saved && <p className="upload-work-success" role="status">已保存为草稿</p>}
+          {saved && <p className="upload-work-success" role="status">作品已提交发布</p>}
 
           <div className="upload-work-actions">
             <button type="button" className="wm-action-ghost" onClick={onClose}>取消</button>
             <button type="submit" className="wm-action-primary" disabled={saving}>
-              {saving ? '正在保存…' : '保存为草稿'}
+              {saving ? '正在提交…' : '提交发布'}
             </button>
           </div>
         </form>

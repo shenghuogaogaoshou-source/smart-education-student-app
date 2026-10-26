@@ -58,7 +58,7 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
               <div className="gallery-work-copy" onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
                 <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
                 <h3>{work.title}</h3>
-                <p>{state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
+                <p>{work.creatorName || state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
               </div>
               <div className="gallery-work-actions">
                 <button type="button" aria-label="点赞作品" aria-pressed={liked} onClick={() => worksState?.toggleLike(work.id)}>

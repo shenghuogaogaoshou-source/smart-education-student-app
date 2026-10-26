@@ -43,7 +43,9 @@ export function WorksManagePage({
   onWorkClick?: (workId: string) => void
 }) {
   const worksState = useOptionalWorks()
-  const works = worksState?.works ?? []
+  const works = (worksState?.works ?? []).filter((work) => (
+    (work.creatorId || work.ownerId) === worksState?.accountId
+  ))
   const [filter, setFilter] = useState<WorkFilter>(() => filters.includes(initialFilter as WorkFilter) ? initialFilter as WorkFilter : '全部')
   const [uploadOpen, setUploadOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState('')

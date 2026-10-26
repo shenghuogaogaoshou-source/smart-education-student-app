@@ -6,7 +6,7 @@ import { WorksProvider } from '../works/WorksProvider'
 import { WorksWorkbench } from './WorksWorkbench'
 
 describe('WorksWorkbench', () => {
-  it('shows the complete demo status counts and real recent artwork', async () => {
+  it('counts only the current account creations in the personal workbench', async () => {
     const repository = createMemoryWorkRepository()
     render(
       <WorksProvider
@@ -21,12 +21,13 @@ describe('WorksWorkbench', () => {
     )
 
     const section = await screen.findByRole('region', { name: '我的作品' })
-    expect(within(section).getByRole('button', { name: /3\s*草稿/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /3\s*审核中/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /17\s*已发布/ })).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: /2\s*仅自己/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /0\s*草稿/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /0\s*审核中/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /8\s*已发布/ })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: /0\s*仅自己/ })).toBeInTheDocument()
+    expect(within(section).queryByText('正在创作')).not.toBeInTheDocument()
     const previews = within(section).getAllByRole('img')
-    expect(previews).toHaveLength(2)
+    expect(previews).toHaveLength(1)
     expect(previews.every((preview) => preview.getAttribute('src')?.startsWith('/demo-works/'))).toBe(true)
   })
 })

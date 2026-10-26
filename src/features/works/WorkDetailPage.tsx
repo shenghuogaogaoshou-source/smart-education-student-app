@@ -48,7 +48,7 @@ export function WorkDetailPage({ workId, onBack }: { workId: string; onBack: () 
 
       <div className="work-detail-content">
         <h2 className="work-title">{work.title}</h2>
-        <p className="work-author">作者：{state.nickname}</p>
+        <p className="work-author">作者：{work.creatorName || state.nickname}</p>
         <div className="work-preview"><WorkAssetPreview work={work} getAsset={worksState!.getAsset} /></div>
 
         <div className="work-info-section"><h3>作品简介</h3><p>{work.description || '作者还没有填写作品介绍。'}</p></div>
