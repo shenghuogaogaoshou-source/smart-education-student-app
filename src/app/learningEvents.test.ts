@@ -51,6 +51,19 @@ describe('learning events', () => {
     expect(appendLearningEvent([], event)).toEqual([event])
   })
 
+  it('rejects a known action paired with the wrong source', () => {
+    const invalidInput = {
+      accountId: 'student-a',
+      gradeBand: 'grade1-2',
+      source: 'test',
+      contentId: 'qmx-1',
+      action: 'knowledge-completed',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+    } as unknown as Parameters<typeof createLearningEvent>[0]
+
+    expect(() => createLearningEvent(invalidInput)).toThrow('学习事件的来源必须与完成动作匹配')
+  })
+
   it('keeps otherwise identical records isolated by account and grade band', () => {
     const first = createLearningEvent({
       accountId: 'student-a', gradeBand: 'grade1-2', source: 'knowledge',

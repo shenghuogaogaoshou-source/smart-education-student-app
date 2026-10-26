@@ -310,6 +310,40 @@ describe('primary-only state migration', () => {
     }
   })
 
+  it('uses the matching reward transaction date and falls back to migration time', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-26T10:00:00.000Z'))
+    try {
+      const v4 = {
+        ...createDefaultState(),
+        stateVersion: 4,
+        learningEvents: undefined,
+        learningProgress: {
+          'grade1-2': { knowledgeCompleted: [], testsPassed: [] },
+          'grade3-4': { knowledgeCompleted: [], testsPassed: [] },
+          'grade5-6': { knowledgeCompleted: ['ael-1' as const, 'ael-2' as const], testsPassed: [] },
+        },
+        transactions: [{
+          id: 'knowledge-ael-1',
+          eventId: 'knowledge:ael-1',
+          kind: 'knowledge' as const,
+          title: '完成知识：ael-1',
+          amount: 30,
+          occurredAt: '2026-10-20T08:30:00.000Z',
+        }],
+      }
+
+      const migrated = normalizePersistedState(v4)
+
+      expect(migrated.learningEvents.map(({ contentId, occurredAt }) => [contentId, occurredAt])).toEqual([
+        ['ael-1', '2026-10-20T08:30:00.000Z'],
+        ['ael-2', '2026-10-26T10:00:00.000Z'],
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('saves a v4 migration once and does not duplicate migrated events on the next load', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-26T10:00:00.000Z'))

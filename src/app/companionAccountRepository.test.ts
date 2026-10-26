@@ -120,7 +120,7 @@ describe('companion account repository', () => {
     expect(loadAccountState('first').processedRewardIds).toEqual(first.processedRewardIds)
   })
 
-  it('keeps learning events isolated by normalized account', () => {
+  it('keeps learning events, wrong answers and growth titles isolated by normalized account', () => {
     const first = createDefaultState()
     const second = createDefaultState()
     first.learningEvents = [{
@@ -143,12 +143,47 @@ describe('companion account repository', () => {
       occurredAt: '2026-10-26T09:05:00.000Z',
       dimensionDeltas: { curiosity: 0, knowledge: 2, problemSolving: 4, creativity: 0, planning: 0 },
     }]
+    first.wrongAnswers = [{
+      id: 'first-wrong',
+      gradeBand: 'grade5-6',
+      partId: 'ael-4',
+      questionId: 'q-first',
+      prompt: '第一账号错题',
+      options: ['正确', '错误'],
+      selectedIndex: 1,
+      answerIndex: 0,
+      explanation: '第一账号解析',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+      correctedAt: null,
+    }]
+    second.wrongAnswers = [{
+      id: 'second-wrong',
+      gradeBand: 'grade3-4',
+      partId: 'cxd-2',
+      questionId: 'q-second',
+      prompt: '第二账号错题',
+      options: ['正确', '错误'],
+      selectedIndex: 1,
+      answerIndex: 0,
+      explanation: '第二账号解析',
+      occurredAt: '2026-10-26T09:05:00.000Z',
+      correctedAt: null,
+    }]
+    first.growthTitle = { text: '第一账号称号', description: '第一账号描述', eventId: first.learningEvents[0].id }
+    second.growthTitle = { text: '第二账号称号', description: '第二账号描述', eventId: second.learningEvents[0].id }
 
     saveAccountState('FIRST', first)
     saveAccountState('second', second)
 
-    expect(loadAccountState(' first ').learningEvents).toEqual(first.learningEvents)
-    expect(loadAccountState('SECOND').learningEvents).toEqual(second.learningEvents)
+    const loadedFirst = loadAccountState(' first ')
+    const loadedSecond = loadAccountState('SECOND')
+
+    expect(loadedFirst.learningEvents).toEqual(first.learningEvents)
+    expect(loadedFirst.wrongAnswers).toEqual(first.wrongAnswers)
+    expect(loadedFirst.growthTitle).toEqual(first.growthTitle)
+    expect(loadedSecond.learningEvents).toEqual(second.learningEvents)
+    expect(loadedSecond.wrongAnswers).toEqual(second.wrongAnswers)
+    expect(loadedSecond.growthTitle).toEqual(second.growthTitle)
   })
 
   it('keeps only the newest twenty reviewed conversation summaries', () => {

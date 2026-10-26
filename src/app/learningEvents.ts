@@ -38,13 +38,26 @@ const SOURCE_BY_ACTION: Record<LearningEventAction, LearningEventSource> = {
 }
 
 type LearningEventKeyInput = Pick<LearningEvent, 'accountId' | 'gradeBand' | 'action' | 'contentId'>
-type CreateLearningEventInput = Omit<LearningEvent, 'id' | 'dimensionDeltas'>
+type SourceByAction = typeof SOURCE_BY_ACTION
+type CreateLearningEventInput = {
+  accountId: string
+  gradeBand: GradeBand
+  contentId: string
+  occurredAt: string
+  migrationVersion?: 1
+} & {
+  [Action in LearningEventAction]: { action: Action; source: SourceByAction[Action] }
+}[LearningEventAction]
 
 export function eventKey(input: LearningEventKeyInput): string {
   return `${input.accountId}:${input.gradeBand}:${input.action}:${input.contentId}`
 }
 
 export function createLearningEvent(input: CreateLearningEventInput): LearningEvent {
+  if ((input.source as LearningEventSource) !== SOURCE_BY_ACTION[input.action]) {
+    throw new Error('学习事件的来源必须与完成动作匹配')
+  }
+
   return {
     id: eventKey(input),
     accountId: input.accountId,
