@@ -1,20 +1,80 @@
-import { ArrowLeft, Award, Heart, MessageCircle } from 'lucide-react'
+import {
+  ArrowLeft,
+  BookOpenCheck,
+  Brain,
+  CalendarClock,
+  ChevronRight,
+  NotebookPen,
+  Palette,
+  Trophy,
+} from 'lucide-react'
+
+export type NotificationTarget =
+  | { kind: 'schedule' }
+  | { kind: 'knowledge' }
+  | { kind: 'wrong-book' }
+  | { kind: 'medals' }
+  | { kind: 'work'; workId: string }
+  | { kind: 'ai-advice' }
 
 type NotificationItem = {
-  id: number
-  type: 'like' | 'comment' | 'badge'
-  icon: typeof Heart
+  id: string
+  type: 'plan' | 'knowledge' | 'wrong-book' | 'reward' | 'work' | 'ai-advice'
+  icon: typeof CalendarClock
   text: string
   time: string
+  target: NotificationTarget
 }
 
 const notifications: NotificationItem[] = [
-  { id: 1, type: 'like', icon: Heart, text: '有同学赞了你的公开作品', time: '5分钟前' },
-  { id: 2, type: 'comment', icon: MessageCircle, text: '你的公开作品收到了一条友好留言', time: '20分钟前' },
-  { id: 3, type: 'badge', icon: Award, text: '恭喜获得新徽章「灵感探索者」', time: '1小时前' },
-  { id: 4, type: 'like', icon: Heart, text: '你的创意作品又被两位同学收藏了', time: '2小时前' },
-  { id: 5, type: 'comment', icon: MessageCircle, text: '你的作品收到了一条新的鼓励', time: '昨天' },
-  { id: 6, type: 'badge', icon: Award, text: '本周学习达成 5 天，获得「坚持之星」徽章', time: '昨天' },
+  {
+    id: 'plan',
+    type: 'plan',
+    icon: CalendarClock,
+    text: '今天 19:00 的「AI 小小观察家」学习安排还在等你',
+    time: '5 分钟前',
+    target: { kind: 'schedule' },
+  },
+  {
+    id: 'knowledge',
+    type: 'knowledge',
+    icon: BookOpenCheck,
+    text: '知识进度已更新：继续「声音的旅行」',
+    time: '20 分钟前',
+    target: { kind: 'knowledge' },
+  },
+  {
+    id: 'wrong-book',
+    type: 'wrong-book',
+    icon: NotebookPen,
+    text: '错题本新增 2 道题，去回顾一下思路吧',
+    time: '1 小时前',
+    target: { kind: 'wrong-book' },
+  },
+  {
+    id: 'reward',
+    type: 'reward',
+    icon: Trophy,
+    text: '积分到账 +20，新的成长徽章可以领取了',
+    time: '2 小时前',
+    target: { kind: 'medals' },
+  },
+  {
+    id: 'work',
+    type: 'work',
+    icon: Palette,
+    text: '乐乐赞了你的作品《会呼吸的时钟》',
+    time: '昨天',
+    target: { kind: 'work', workId: 'demo-video-1' },
+  },
+  {
+    id: 'ai-advice',
+    type: 'ai-advice',
+    icon: Brain,
+    text: 'AI 建议：今晚可以先用 10 分钟复习错题',
+    time: '昨天',
+    target: { kind: 'ai-advice' },
+  },
 ]
 
 const grouped = [
@@ -22,7 +82,13 @@ const grouped = [
   { label: '昨天', items: notifications.slice(4, 6) },
 ]
 
-export function NotificationsPage({ onBack }: { onBack: () => void }) {
+export function NotificationsPage({
+  onBack,
+  onOpenTarget,
+}: {
+  onBack: () => void
+  onOpenTarget?: (target: NotificationTarget) => void
+}) {
   return (
     <div className="notifications-page">
       <header className="notifications-header">
@@ -36,20 +102,27 @@ export function NotificationsPage({ onBack }: { onBack: () => void }) {
         <section key={group.label} className="notifications-group">
           <p className="notifications-group-label">{group.label}</p>
           <ul className="notifications-list">
-            {group.items.map(({ id, icon: Icon, text, time, type }) => (
-              <li key={id} className={`notifications-item notifications-${type}`}>
-                <span className="notifications-icon"><Icon aria-hidden="true" size={18} /></span>
-                <div className="notifications-body">
-                  <p>{text}</p>
-                  <small>{time}</small>
-                </div>
+            {group.items.map(({ id, icon: Icon, text, time, type, target }) => (
+              <li key={id}>
+                <button
+                  className={`notifications-item notifications-${type}`}
+                  type="button"
+                  onClick={() => onOpenTarget?.(target)}
+                >
+                  <span className="notifications-icon"><Icon aria-hidden="true" size={18} /></span>
+                  <span className="notifications-body">
+                    <p>{text}</p>
+                    <small>{time}</small>
+                  </span>
+                  <ChevronRight className="notifications-chevron" aria-hidden="true" size={16} />
+                </button>
               </li>
             ))}
           </ul>
         </section>
       ))}
 
-      <p className="notifications-service-notice">仅显示近期的点赞、评论与徽章消息</p>
+      <p className="notifications-service-notice">涵盖学习安排、知识、错题、奖励、作品与 AI 建议</p>
     </div>
   )
 }

@@ -921,11 +921,18 @@
 
 .notifications-item {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 44px 1fr 18px;
   gap: 12px;
   align-items: flex-start;
+  width: 100%;
   padding: 14px 12px;
+  border: 0;
   border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: background 0.2s ease;
 }
 
@@ -944,19 +951,25 @@
   flex-shrink: 0;
 }
 
-.notifications-like .notifications-icon {
+.notifications-work .notifications-icon {
   background: color-mix(in srgb, #fce7f3 70%, transparent);
   color: #ec4899;
 }
 
-.notifications-comment .notifications-icon {
+.notifications-knowledge .notifications-icon,
+.notifications-ai-advice .notifications-icon {
   background: color-mix(in srgb, #dbeafe 70%, transparent);
   color: #3b82f6;
 }
 
-.notifications-badge .notifications-icon {
+.notifications-reward .notifications-icon {
   background: linear-gradient(135deg, #fef3c7, #fde68a);
   color: #f59e0b;
+}
+
+.notifications-wrong-book .notifications-icon {
+  background: color-mix(in srgb, #fee2e2 70%, transparent);
+  color: #dc6b6b;
 }
 
 .notifications-body {
@@ -973,6 +986,11 @@
 .notifications-body small {
   color: var(--muted);
   font-size: calc(0.64rem * var(--font-scale));
+}
+
+.notifications-chevron {
+  align-self: center;
+  color: var(--muted);
 }
 
 .notifications-service-notice {

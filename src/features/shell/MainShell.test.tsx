@@ -76,6 +76,17 @@ describe('main shell navigation', () => {
     }
   })
 
+  it('opens the learning schedule from a project notification', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><MainShell /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '消息通知' }))
+    await user.click(screen.getByRole('button', { name: /学习安排还在等你/ }))
+
+    expect(screen.getByRole('heading', { name: '成长安排' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '我的' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('opens the available knowledge course and test map', async () => {
     const user = userEvent.setup()
     render(<AppStateProvider><MainShell /></AppStateProvider>)

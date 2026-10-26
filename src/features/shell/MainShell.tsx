@@ -8,7 +8,7 @@ import type { CompanionCommand } from '../ai_companion/commands/commandTypes'
 import { EmbeddedGamePage } from '../games/EmbeddedGamePage'
 import { getLastPlayedGame, rememberLastPlayedGame, type GameId } from '../games/gameRegistry'
 import { HomePage } from '../home/HomePage'
-import { NotificationsPage } from '../home/NotificationsPage'
+import { NotificationsPage, type NotificationTarget } from '../home/NotificationsPage'
 import { AiCenterPage } from '../profile/AiCenterPage'
 import { CalendarPage } from '../profile/CalendarPage'
 import { FavoritesPage } from '../profile/FavoritesPage'
@@ -147,6 +147,29 @@ function MainShellBody() {
 
   const openLastPlayedGame = () => openGame(getLastPlayedGame())
 
+  const openNotificationTarget = (target: NotificationTarget) => {
+    switch (target.kind) {
+      case 'schedule':
+        openProfileView({ kind: 'schedule' })
+        return
+      case 'knowledge':
+        selectTab('knowledge')
+        return
+      case 'wrong-book':
+        openProfileView({ kind: 'wrong-book' })
+        return
+      case 'medals':
+        openProfileView({ kind: 'medals' })
+        return
+      case 'work':
+        push({ kind: 'work', workId: target.workId })
+        return
+      case 'ai-advice':
+        openProfileView({ kind: 'ai-center' })
+        return
+    }
+  }
+
   const executeCompanionCommand = (command: CompanionCommand) => {
     const band = getGradeBand(state.grade)
     const course = getCourseForBand(band)
@@ -251,7 +274,7 @@ function MainShellBody() {
   }
 
   if (view.kind === 'notifications') {
-    return <NotificationsPage onBack={pop} />
+    return <NotificationsPage onBack={pop} onOpenTarget={openNotificationTarget} />
   }
 
   if (view.kind === 'profile-detail') {
