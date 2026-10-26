@@ -30,7 +30,7 @@ describe('UploadWorkDialog', () => {
 
     expect(await screen.findByText('已保存为草稿')).toBeInTheDocument()
     await waitFor(async () => {
-      expect(await repository.list('student-a')).toEqual([
+      expect(await repository.list('student-a')).toEqual(expect.arrayContaining([
         expect.objectContaining({
           source: 'external-upload',
           fileName: 'model.custom-ai',
@@ -38,7 +38,7 @@ describe('UploadWorkDialog', () => {
           status: 'draft',
           previewKind: 'generic',
         }),
-      ])
+      ]))
     })
   })
 

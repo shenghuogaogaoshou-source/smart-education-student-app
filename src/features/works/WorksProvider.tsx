@@ -7,7 +7,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react'
-import { DEFAULT_DEMO_WORK_ACCOUNT, seedDemoWorks, type DemoAssetLoader } from './demoWorks'
+import { seedDemoWorks, type DemoAssetLoader } from './demoWorks'
 import { createIndexedDbWorkRepository } from './repository'
 import { localDemoModeration, reviewComment, WorkCommentRejected } from './moderation'
 import type {
@@ -72,9 +72,7 @@ export function WorksProvider({
     setLoading(true)
     setError('')
     setWorks([])
-    const records = accountId === DEFAULT_DEMO_WORK_ACCOUNT
-      ? seedDemoWorks(activeRepository, accountId, demoAssetLoader)
-      : activeRepository.list(accountId)
+    const records = seedDemoWorks(activeRepository, accountId, demoAssetLoader)
     records
       .then((records) => {
         if (!cancelled) setWorks(records)

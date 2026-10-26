@@ -57,4 +57,22 @@ describe('WorksProvider', () => {
     expect(await screen.findByText('会呼吸的时钟')).toBeInTheDocument()
     expect(screen.getByLabelText('作品总数')).toHaveTextContent('25')
   })
+
+  it('为当前登录的非默认账号也自动载入完整示例作品', async () => {
+    const repository = createMemoryWorkRepository()
+    render(
+      <WorksProvider
+        accountId="student-custom"
+        repository={repository}
+        demoAssetLoader={async (path) => new Blob([path], {
+          type: path.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+        })}
+      >
+        <Probe />
+      </WorksProvider>,
+    )
+
+    expect(await screen.findByText('会呼吸的时钟')).toBeInTheDocument()
+    expect(screen.getByLabelText('作品总数')).toHaveTextContent('25')
+  })
 })

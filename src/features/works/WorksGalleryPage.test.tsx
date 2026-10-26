@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
@@ -56,8 +56,9 @@ describe('WorksGalleryPage', () => {
 
     expect((await screen.findAllByText('会分类的小车')).length).toBeGreaterThan(0)
     expect(screen.queryByText('还没完成的小电影')).not.toBeInTheDocument()
-    const likes = screen.getAllByRole('button', { name: '点赞作品' })
-    await user.click(likes[0])
+    const publishedCard = (await screen.findAllByText('会分类的小车'))[0].closest('article')
+    expect(publishedCard).not.toBeNull()
+    await user.click(within(publishedCard!).getByRole('button', { name: '点赞作品' }))
     expect((await repository.get('student-a', published.id))?.likes).toBe(1)
     expect((await repository.get('student-a', draft.id))?.likes).toBe(0)
   })
