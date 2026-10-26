@@ -56,6 +56,25 @@ export function createEmptyLearningProgress(): LearningProgress {
   }
 }
 
+export function getResumeKnowledgePart(state: {
+  grade: PrimaryGrade
+  learningProgress: LearningProgress
+}): CoursePartId {
+  const band = getGradeBand(state.grade)
+  const partIds = getPartIdsForBand(band)
+  const completed = new Set(state.learningProgress[band].knowledgeCompleted)
+  const mostRecentCompleted = [...state.learningProgress[band].knowledgeCompleted]
+    .reverse()
+    .find((partId) => partIds.includes(partId))
+
+  if (!mostRecentCompleted) return partIds[0]
+
+  const resumeAfterIndex = partIds.indexOf(mostRecentCompleted) + 1
+  return partIds.slice(resumeAfterIndex).find((partId) => !completed.has(partId))
+    ?? partIds.find((partId) => !completed.has(partId))
+    ?? partIds.at(-1)!
+}
+
 export function isTestUnlocked(progress: BandProgress, partId: CoursePartId) {
   return progress.knowledgeCompleted.includes(partId)
 }

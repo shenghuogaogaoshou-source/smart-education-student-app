@@ -3,12 +3,30 @@ import {
   createEmptyLearningProgress,
   getCourseIdForBand,
   getGradeBand,
+  getPartIdsForBand,
+  getResumeKnowledgePart,
   isTestUnlocked,
   makeCoursePartId,
   PRIMARY_GRADES,
 } from './learning'
 
 describe('primary learning domain', () => {
+  it('resumes at the first unfinished knowledge part after the most recent completion', () => {
+    const progress = createEmptyLearningProgress()
+    progress['grade5-6'].knowledgeCompleted = ['ael-1', 'ael-3']
+
+    expect(getResumeKnowledgePart({ grade: 'grade5', learningProgress: progress })).toBe('ael-4')
+  })
+
+  it('resumes at the first part when nothing is complete and the last part when all are complete', () => {
+    const empty = createEmptyLearningProgress()
+    expect(getResumeKnowledgePart({ grade: 'grade3', learningProgress: empty })).toBe('cxd-1')
+
+    const complete = createEmptyLearningProgress()
+    complete['grade1-2'].knowledgeCompleted = getPartIdsForBand('grade1-2')
+    expect(getResumeKnowledgePart({ grade: 'grade1', learningProgress: complete })).toBe('qmx-8')
+  })
+
   it('maps all six grades into the three approved bands', () => {
     expect(PRIMARY_GRADES).toEqual(['grade1', 'grade2', 'grade3', 'grade4', 'grade5', 'grade6'])
     expect(PRIMARY_GRADES.map(getGradeBand)).toEqual([

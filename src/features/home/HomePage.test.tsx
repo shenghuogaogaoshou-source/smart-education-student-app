@@ -136,7 +136,7 @@ describe('home page', () => {
     expect(onOpenGame).toHaveBeenCalledWith('creative-module')
   })
 
-  it('shows the latest completed knowledge title and opens that chapter', async () => {
+  it('shows the next unfinished knowledge title and opens that exact chapter', async () => {
     const user = userEvent.setup()
     const onOpenContent = vi.fn()
     saveState({
@@ -152,9 +152,9 @@ describe('home page', () => {
     render(<AppStateProvider><HomePage onOpenContent={onOpenContent} /></AppStateProvider>)
 
     expect(screen.getByText('上次学到')).toBeInTheDocument()
-    expect(screen.getByText('数据侦探营')).toBeInTheDocument()
+    expect(screen.getByText('第一次 AI 实验')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '继续学习' }))
-    expect(onOpenContent).toHaveBeenCalledWith('ael', 2)
+    expect(onOpenContent).toHaveBeenCalledWith('ael', 4)
   })
 
   it('uses the first knowledge chapter before any chapter is completed', () => {

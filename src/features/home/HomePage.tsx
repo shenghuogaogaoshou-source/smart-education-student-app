@@ -1,7 +1,7 @@
 import { ArrowRight, Camera, Clock3, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useAppState } from '../../app/AppState'
-import { getGradeBand } from '../../app/learning'
+import { getGradeBand, getResumeKnowledgePart } from '../../app/learning'
 import { getCourseForBand } from '../knowledge/courseCatalog'
 import { HomeSearch } from './HomeSearch'
 import { AchievementShowcase } from './AchievementShowcase'
@@ -29,7 +29,8 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
   const band = getGradeBand(state.grade)
   const course = getCourseForBand(band)
   const completedPartIds = state.learningProgress[band].knowledgeCompleted
-  const latestPart = course.parts.find((part) => part.id === completedPartIds[completedPartIds.length - 1]) ?? course.parts[0]
+  const resumePartId = getResumeKnowledgePart(state)
+  const resumePart = course.parts.find((part) => part.id === resumePartId) ?? course.parts[0]
   const courseProgress = course.parts.length > 0
     ? Math.round((completedPartIds.length / course.parts.length) * 100)
     : 0
@@ -134,14 +135,14 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
         <div className="continue-icon"><Clock3 aria-hidden="true" size={21} /></div>
         <div>
           <span>上次学到</span>
-          <h2>{latestPart.title}</h2>
+          <h2>{resumePart.title}</h2>
           <div className="mini-progress" aria-label={`已完成 ${courseProgress}%`}><span style={{ width: `${courseProgress}%` }} /></div>
         </div>
         <button
           type="button"
           aria-label="继续学习"
           onClick={() => {
-            if (onOpenContent) onOpenContent(course.id, latestPart.number)
+            if (onOpenContent) onOpenContent(course.id, resumePart.number)
             else if (onNavigateToKnowledge) onNavigateToKnowledge()
             else setNotice('知识内容等待开发中')
           }}
