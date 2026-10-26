@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
 import { saveAccountState } from '../../app/companionAccountRepository'
+import { createLearningEvent } from '../../app/learningEvents'
 import type { LearningPlanTask } from '../../app/learningPlan'
 import { createDefaultState } from '../../app/model'
 import { CalendarPage } from './CalendarPage'
@@ -94,7 +95,33 @@ describe('profile dashboard', () => {
     for (const dimension of ['好奇探索', '知识理解', '问题解决', '实践创造', '自主规划']) {
       expect(screen.getByText(dimension)).toBeInTheDocument()
     }
-    expect(screen.getByText('耐心找方法的小研究员')).toBeInTheDocument()
+    expect(screen.getByText('正在认识你的学习方式')).toBeInTheDocument()
+  })
+
+  it('renders live profile scores and the persisted gentle title', async () => {
+    const user = userEvent.setup()
+    const state = createDefaultState()
+    state.learningEvents = [createLearningEvent({
+      accountId: state.accountId,
+      gradeBand: 'grade5-6',
+      source: 'knowledge',
+      contentId: 'ael-4',
+      action: 'knowledge-completed',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+    })]
+    state.growthTitle = {
+      text: '愿意多问一步的小探索家',
+      description: '你认真看完了一段新知识，还留下了继续探索的线索。',
+      eventId: state.learningEvents[0].id,
+    }
+    saveAccountState(state.accountId, state)
+    render(<AppStateProvider><ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: '成长画像' }))
+
+    expect(screen.getByText('愿意多问一步的小探索家')).toBeInTheDocument()
+    expect(screen.getByText('好奇探索 42 · 知识理解 44 · 问题解决 40 · 实践创造 40 · 自主规划 40'))
+      .toBeInTheDocument()
   })
 
   it('shows the real next plan task and opens the schedule flow for AI advice', async () => {

@@ -4,6 +4,7 @@ import { useAppState } from '../../app/AppState'
 import { GRADE_BAND_LABELS, getGradeBand, isTestUnlocked, type PrimaryGrade } from '../../app/learning'
 import type { LearningPlanTask } from '../../app/learningPlan'
 import { GrowthRadar } from './GrowthRadar'
+import { deriveGrowthProfile } from './growthProfile'
 import { formatPlanTaskDate, getNextPlanTask, getPlanTaskView, isActiveBandTask } from './plan'
 
 type Props = {
@@ -32,6 +33,7 @@ export function GrowthSection({ onStartTask, onOpenSchedule, onOpenCalendar }: P
     : 0
   const lockedTest = nextTask?.kind === 'test' && !isTestUnlocked(progress, nextTask.partId)
   const primaryLabel = nextTask?.kind === 'test' && !lockedTest ? '开始测试' : '开始学习'
+  const growthProfile = deriveGrowthProfile(state.learningEvents, state.accountId)
 
   return (
     <section className="profile-section growth-card" aria-label="成长安排">
@@ -91,8 +93,20 @@ export function GrowthSection({ onStartTask, onOpenSchedule, onOpenCalendar }: P
       ) : (
         <div className="portrait-panel">
           <div className="section-heading-row"><div><p className="section-kicker">只和自己的近期相比</p><h2>近期成长足迹</h2></div></div>
-          <GrowthRadar />
-          <div className="praise-title"><span>本周小称号</span><strong>耐心找方法的小研究员</strong><p>你最近愿意换一种方法再试一次，这份耐心很珍贵。</p></div>
+          <GrowthRadar scores={growthProfile.scores} />
+          {growthProfile.hasEvidence && state.growthTitle ? (
+            <div className="praise-title">
+              <span>本周小称号</span>
+              <strong>{state.growthTitle.text}</strong>
+              <p>{state.growthTitle.description}</p>
+            </div>
+          ) : (
+            <div className="praise-title praise-title--neutral">
+              <span>正在认识你的学习方式</span>
+              <strong>每一次好奇都值得慢慢记录</strong>
+              <p>完成知识、挑战、订正或作品后，这里会留下属于你的成长线索。</p>
+            </div>
+          )}
           <p className="portrait-note">这是近期学习过程的温和记录，不是固定能力评价；AI 对话不会进入画像数据。</p>
         </div>
       )}

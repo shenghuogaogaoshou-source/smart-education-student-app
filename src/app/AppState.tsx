@@ -12,7 +12,9 @@ import { getTaskCompletion, normalizeLearningPlan, type DailyAvailability, type 
 import { applyTransactionOnce, buildProgressRewardTransactions, getPointsBalance } from './points'
 import { loadAccountState, peekAccountCompanion, saveAccountState } from './companionAccountRepository'
 import { appendLearningEvent, createLearningEvent } from './learningEvents'
+import type { LearningEvent } from './learningEvents'
 import { useOptionalSessionCredential } from '../features/auth/sessionCredential'
+import { chooseNextGrowthTitle } from '../features/profile/growthProfile'
 import type { QuizResult, QuizWrongAnswer } from '../features/test/QuizModal'
 
 type Action =
@@ -81,6 +83,16 @@ function toggle(items: string[], id: string) {
   return items.includes(id) ? items.filter((item) => item !== id) : [...items, id]
 }
 
+function applyLearningEvent(state: AppState, event: LearningEvent): AppState {
+  const learningEvents = appendLearningEvent(state.learningEvents, event)
+  if (learningEvents === state.learningEvents) return state
+  return {
+    ...state,
+    learningEvents,
+    growthTitle: chooseNextGrowthTitle(event, state.growthTitle),
+  }
+}
+
 function updateProgress(
   state: AppState,
   action: Extract<Action, { type: 'complete-knowledge' | 'pass-test' }>,
@@ -114,21 +126,9 @@ function updateProgress(
         action: 'test-passed',
         occurredAt: action.occurredAt,
       })
-  let learningEvents = appendLearningEvent(state.learningEvents, completionEvent)
-  for (const task of pendingPlanTasks) {
-    learningEvents = appendLearningEvent(learningEvents, createLearningEvent({
-      accountId: state.accountId,
-      gradeBand: band,
-      source: 'schedule',
-      contentId: task.id,
-      action: 'schedule-completed',
-      occurredAt: action.occurredAt,
-    }))
-  }
   let next = {
     ...state,
     learningProgress: { ...state.learningProgress, [band]: after },
-    learningEvents,
   }
   for (const transaction of buildProgressRewardTransactions(
     before,
@@ -145,6 +145,17 @@ function updateProgress(
           ? `通过测试：${action.title}`
           : transaction.title,
     })
+  }
+  next = applyLearningEvent(next, completionEvent)
+  for (const task of pendingPlanTasks) {
+    next = applyLearningEvent(next, createLearningEvent({
+      accountId: state.accountId,
+      gradeBand: band,
+      source: 'schedule',
+      contentId: task.id,
+      action: 'schedule-completed',
+      occurredAt: action.occurredAt,
+    }))
   }
   return next
 }
@@ -221,20 +232,19 @@ function completeCorrection(
   const wrongAnswer = state.wrongAnswers.find((record) => record.id === action.wrongAnswerId)
   if (!wrongAnswer || wrongAnswer.correctedAt) return state
 
-  return {
+  return applyLearningEvent({
     ...state,
     wrongAnswers: state.wrongAnswers.map((record) => (
       record.id === wrongAnswer.id ? { ...record, correctedAt: action.occurredAt } : record
     )),
-    learningEvents: appendLearningEvent(state.learningEvents, createLearningEvent({
-      accountId: state.accountId,
-      gradeBand: wrongAnswer.gradeBand,
-      source: 'correction',
-      contentId: wrongAnswer.id,
-      action: 'correction-completed',
-      occurredAt: action.occurredAt,
-    })),
-  }
+  }, createLearningEvent({
+    accountId: state.accountId,
+    gradeBand: wrongAnswer.gradeBand,
+    source: 'correction',
+    contentId: wrongAnswer.id,
+    action: 'correction-completed',
+    occurredAt: action.occurredAt,
+  }))
 }
 
 function recordCreativeWork(
@@ -249,8 +259,7 @@ function recordCreativeWork(
     action: 'work-completed',
     occurredAt: action.occurredAt,
   })
-  const learningEvents = appendLearningEvent(state.learningEvents, event)
-  return learningEvents === state.learningEvents ? state : { ...state, learningEvents }
+  return applyLearningEvent(state, event)
 }
 
 function purchase(

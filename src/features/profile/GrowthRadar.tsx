@@ -1,11 +1,13 @@
+import type { GrowthScores } from '../../app/learningEvents'
+
 // 纯 SVG 五维雷达图，不依赖 recharts，避免 lazy import 时第三方库加载失败。
-const growthData = [
-  { dimension: '好奇探索', value: 78 },
-  { dimension: '知识理解', value: 70 },
-  { dimension: '问题解决', value: 66 },
-  { dimension: '实践创造', value: 74 },
-  { dimension: '自主规划', value: 58 },
-]
+const DIMENSION_LABELS = [
+  ['curiosity', '好奇探索'],
+  ['knowledge', '知识理解'],
+  ['problemSolving', '问题解决'],
+  ['creativity', '实践创造'],
+  ['planning', '自主规划'],
+] as const
 
 const SIZE = 260
 const CENTER = SIZE / 2
@@ -21,7 +23,11 @@ function polygonPoints(r: number) {
   return Array.from({ length: 5 }, (_, i) => pointAt(i, r).join(',')).join(' ')
 }
 
-export function GrowthRadar() {
+export function GrowthRadar({ scores }: { scores: GrowthScores }) {
+  const growthData = DIMENSION_LABELS.map(([dimension, label]) => ({
+    dimension: label,
+    value: scores[dimension],
+  }))
   const dataPoints = growthData.map((d, i) => {
     const [x, y] = pointAt(i, (d.value / 100) * RADIUS)
     return `${x},${y}`

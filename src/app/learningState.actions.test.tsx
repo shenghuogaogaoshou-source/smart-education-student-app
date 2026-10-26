@@ -7,6 +7,7 @@ import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
 import { loadAccountState, saveAccountState } from './companionAccountRepository'
 import { getCourseForBand } from '../features/knowledge/courseCatalog'
+import { deriveGrowthProfile } from '../features/profile/growthProfile'
 
 const pairedGrade: Record<PrimaryGrade, PrimaryGrade> = {
   grade1: 'grade2', grade2: 'grade1', grade3: 'grade4',
@@ -201,6 +202,36 @@ describe('learning progress actions', () => {
       event.action === 'knowledge-completed' && event.contentId === 'ael-4'
     ))).toHaveLength(1)
     expect(saved.learningEvents.filter((event) => event.action === 'schedule-completed')).toHaveLength(1)
+  })
+
+  it('updates the derived profile with a real event and does not rotate duplicate titles', async () => {
+    seedEmptyProgress('grade5')
+    const user = userEvent.setup()
+    render(
+      <AppStateProvider>
+        <Harness grade="grade5" partId="ael-4" title="第一次 AI 实验" lockedPartId="ael-5" />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '完成知识' }))
+    const first = loadAccountState(createDefaultState().accountId)
+    const firstTitle = first.growthTitle
+    expect(deriveGrowthProfile(first.learningEvents, first.accountId)).toMatchObject({
+      hasEvidence: true,
+      eventCount: 2,
+      scores: {
+        curiosity: 42,
+        knowledge: 44,
+        problemSolving: 40,
+        creativity: 40,
+        planning: 43,
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: '完成知识' }))
+    const second = loadAccountState(createDefaultState().accountId)
+    expect(second.growthTitle).toEqual(firstTitle)
+    expect(second.learningEvents).toHaveLength(2)
   })
 
   it('stores the latest real wrong answer after a passing quiz and records one test event', async () => {
