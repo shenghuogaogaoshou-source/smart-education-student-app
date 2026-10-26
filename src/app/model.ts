@@ -1,8 +1,9 @@
-import type { LearningProgress, PrimaryGrade } from './learning'
+import type { CoursePartId, GradeBand, LearningProgress, PrimaryGrade } from './learning'
+import type { LearningEvent } from './learningEvents'
 import type { PointTransaction } from './points'
 import { createDefaultLearningPlan, type LearningPlanState } from './learningPlan'
 
-export const APP_STATE_VERSION = 4 as const
+export const APP_STATE_VERSION = 5 as const
 
 export type FontScale = 'standard' | 'large' | 'xlarge'
 
@@ -38,6 +39,22 @@ export type ConversationSummary = {
   occurredAt: string
 }
 
+export type WrongAnswerRecord = {
+  id: string
+  gradeBand: GradeBand
+  partId: CoursePartId
+  questionId: string
+  prompt: string
+  options: string[]
+  selectedIndex: number
+  answerIndex: number
+  explanation: string
+  occurredAt: string
+  correctedAt: string | null
+}
+
+export type GrowthTitle = { text: string; description: string; eventId: string }
+
 export type CompanionCategory = 'appearance' | 'outfit' | 'decoration'
 
 export type CompanionLoadout = {
@@ -52,6 +69,9 @@ export type AppState = {
   isLoggedIn: boolean
   learningProgress: LearningProgress
   learningPlan: LearningPlanState
+  learningEvents: LearningEvent[]
+  wrongAnswers: WrongAnswerRecord[]
+  growthTitle: GrowthTitle | null
   transactions: PointTransaction[]
   processedRewardIds: string[]
   aiPosition: AiPosition
@@ -121,6 +141,9 @@ export function createDefaultState(): AppState {
       },
     },
     learningPlan: createDefaultLearningPlan(),
+    learningEvents: [],
+    wrongAnswers: [],
+    growthTitle: null,
     transactions: DEMO_TRANSACTIONS.map((transaction) => ({ ...transaction })),
     processedRewardIds: [
       'demo:knowledge', 'demo:tests', 'demo:medals', 'demo:starter',

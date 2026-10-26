@@ -1,7 +1,8 @@
 import { COMPANION_CATALOG } from '../features/ai_companion/companionCatalog'
 import { createDefaultLearningPlan, normalizeLearningPlan } from './learningPlan'
-import { createEmptyLearningProgress, getPartIdsForBand, PRIMARY_GRADES, type CoursePartId } from './learning'
-import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type ConversationSummary, type DeviceInfo, type GuardianInfo } from './model'
+import { createEmptyLearningProgress, getPartIdsForBand, PRIMARY_GRADES, type CoursePartId, type GradeBand } from './learning'
+import { appendLearningEvent, createLearningEvent, normalizeLearningEvents, type LearningEvent } from './learningEvents'
+import { APP_STATE_VERSION, createDefaultState, type AppState, type CompanionCategory, type CompanionLoadout, type ConversationSummary, type DeviceInfo, type GrowthTitle, type GuardianInfo, type WrongAnswerRecord } from './model'
 import type { PointTransaction, RewardKind } from './points'
 
 export const LEGACY_STORAGE_KEY = 'student-app-state'
@@ -11,6 +12,7 @@ type PersistedAppState = AppState
 
 const PERSISTED_KEYS: Array<keyof PersistedAppState> = [
   'stateVersion', 'grade', 'isLoggedIn', 'learningProgress', 'learningPlan', 'transactions', 'processedRewardIds',
+  'learningEvents', 'wrongAnswers', 'growthTitle',
   'aiPosition', 'companion', 'fontScale', 'nickname', 'avatar', 'likes', 'favorites', 'notifications',
   'accountId', 'passwordHint', 'lastPasswordChange', 'twoFactorEnabled', 'guardian', 'familyName',
   'devices', 'aiName', 'aiPersonality', 'aiSkin', 'voiceEnabled', 'autoListenEnabled', 'voiceMode',
@@ -28,7 +30,7 @@ export function loadState(): AppState {
     if (!raw) return fresh
 
     const parsed = JSON.parse(raw) as unknown
-    if (!isRecord(parsed) || (parsed.stateVersion !== 2 && parsed.stateVersion !== 3 && parsed.stateVersion !== APP_STATE_VERSION)) {
+    if (!isRecord(parsed) || (parsed.stateVersion !== 2 && parsed.stateVersion !== 3 && parsed.stateVersion !== 4 && parsed.stateVersion !== APP_STATE_VERSION)) {
       return migrateToPrimaryState(fresh)
     }
 
@@ -51,13 +53,24 @@ export function normalizePersistedState(parsed: Record<string, unknown>, fresh: 
   const grade = oneOf(parsed.grade, PRIMARY_GRADES, fresh.grade)
   const now = new Date()
   const planFallback = grade === fresh.grade ? fresh.learningPlan : createDefaultLearningPlan(now, grade)
+  const accountId = fresh.accountId
+  const learningProgress = normalizeLearningProgress(parsed.learningProgress, fresh.learningProgress)
+  const transactions = normalizeTransactions(parsed.transactions, fresh.transactions)
+  const learningEvents = parsed.stateVersion === 4
+    ? migrateV4LearningEvents(learningProgress, transactions, accountId, now)
+    : parsed.stateVersion === APP_STATE_VERSION
+      ? normalizeLearningEvents(parsed.learningEvents, accountId)
+      : []
   return {
     stateVersion: APP_STATE_VERSION,
     grade,
     isLoggedIn: booleanValue(parsed.isLoggedIn, fresh.isLoggedIn),
-    learningProgress: normalizeLearningProgress(parsed.learningProgress, fresh.learningProgress),
-    learningPlan: normalizeLearningPlan(parsed.stateVersion === APP_STATE_VERSION ? parsed.learningPlan : undefined, planFallback, now, grade),
-    transactions: normalizeTransactions(parsed.transactions, fresh.transactions),
+    learningProgress,
+    learningPlan: normalizeLearningPlan(parsed.stateVersion === 4 || parsed.stateVersion === APP_STATE_VERSION ? parsed.learningPlan : undefined, planFallback, now, grade),
+    learningEvents,
+    wrongAnswers: normalizeWrongAnswers(parsed.stateVersion === APP_STATE_VERSION ? parsed.wrongAnswers : undefined),
+    growthTitle: normalizeGrowthTitle(parsed.stateVersion === APP_STATE_VERSION ? parsed.growthTitle : undefined),
+    transactions,
     processedRewardIds: stringArray(parsed.processedRewardIds, fresh.processedRewardIds),
     aiPosition: normalizeAiPosition(parsed.aiPosition, fresh.aiPosition),
     companion: normalizePrimaryLoadout(parsed.companion, fresh.companion),
@@ -67,7 +80,7 @@ export function normalizePersistedState(parsed: Record<string, unknown>, fresh: 
     likes: stringArray(parsed.likes, fresh.likes),
     favorites: stringArray(parsed.favorites, fresh.favorites),
     notifications: oneOf(parsed.notifications, NOTIFICATION_OPTIONS, fresh.notifications),
-    accountId: stringValue(parsed.accountId, fresh.accountId),
+    accountId,
     passwordHint: stringValue(parsed.passwordHint, fresh.passwordHint),
     lastPasswordChange: stringValue(parsed.lastPasswordChange, fresh.lastPasswordChange),
     twoFactorEnabled: booleanValue(parsed.twoFactorEnabled, fresh.twoFactorEnabled),
@@ -117,6 +130,7 @@ const PERMISSION_STATUSES = ['granted', 'denied', 'prompt'] as const
 const CONTENT_LEVELS = ['general', 'teen', 'child'] as const
 const REWARD_KINDS: RewardKind[] = ['knowledge', 'test', 'medal', 'band', 'starter', 'purchase']
 const COMPANION_CATEGORIES: CompanionCategory[] = ['appearance', 'outfit', 'decoration']
+const GRADE_BANDS: GradeBand[] = ['grade1-2', 'grade3-4', 'grade5-6']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -182,6 +196,117 @@ function normalizeLearningProgress(value: unknown, fallback: AppState['learningP
 function normalizeCoursePartIds(value: unknown, validIds: Set<CoursePartId>, fallback: CoursePartId[]): CoursePartId[] {
   if (!Array.isArray(value)) return [...fallback]
   return value.filter((id): id is CoursePartId => typeof id === 'string' && validIds.has(id as CoursePartId))
+}
+
+function migrateV4LearningEvents(
+  progress: AppState['learningProgress'],
+  transactions: PointTransaction[],
+  accountId: string,
+  now: Date,
+): LearningEvent[] {
+  let events: LearningEvent[] = []
+  for (const gradeBand of GRADE_BANDS) {
+    for (const contentId of progress[gradeBand].knowledgeCompleted) {
+      events = appendLearningEvent(events, createLearningEvent({
+        accountId,
+        gradeBand,
+        source: 'knowledge',
+        contentId,
+        action: 'knowledge-completed',
+        occurredAt: transactionDate(transactions, `knowledge:${contentId}`, now),
+        migrationVersion: 1,
+      }))
+    }
+    for (const contentId of progress[gradeBand].testsPassed) {
+      events = appendLearningEvent(events, createLearningEvent({
+        accountId,
+        gradeBand,
+        source: 'test',
+        contentId,
+        action: 'test-passed',
+        occurredAt: transactionDate(transactions, `test:${contentId}`, now),
+        migrationVersion: 1,
+      }))
+    }
+  }
+  return events
+}
+
+function transactionDate(transactions: PointTransaction[], eventId: string, fallback: Date): string {
+  const occurredAt = transactions.find((transaction) => transaction.eventId === eventId)?.occurredAt
+  if (occurredAt) {
+    const timestamp = Date.parse(occurredAt)
+    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString()
+  }
+  return fallback.toISOString()
+}
+
+function normalizeWrongAnswers(value: unknown): WrongAnswerRecord[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const records: WrongAnswerRecord[] = []
+  for (const candidate of value) {
+    if (!isWrongAnswerRecord(candidate) || seen.has(candidate.id)) continue
+    seen.add(candidate.id)
+    records.push({
+      id: candidate.id,
+      gradeBand: candidate.gradeBand,
+      partId: candidate.partId,
+      questionId: candidate.questionId,
+      prompt: candidate.prompt,
+      options: [...candidate.options],
+      selectedIndex: candidate.selectedIndex,
+      answerIndex: candidate.answerIndex,
+      explanation: candidate.explanation,
+      occurredAt: candidate.occurredAt,
+      correctedAt: candidate.correctedAt,
+    })
+  }
+  return records
+}
+
+function isWrongAnswerRecord(value: unknown): value is WrongAnswerRecord {
+  if (!isRecord(value)
+    || typeof value.id !== 'string'
+    || typeof value.gradeBand !== 'string'
+    || !GRADE_BANDS.includes(value.gradeBand as GradeBand)
+    || typeof value.partId !== 'string'
+    || typeof value.questionId !== 'string'
+    || typeof value.prompt !== 'string'
+    || !Array.isArray(value.options)
+    || value.options.length < 2
+    || !value.options.every((option) => typeof option === 'string')
+    || !Number.isInteger(value.selectedIndex)
+    || !Number.isInteger(value.answerIndex)
+    || (value.selectedIndex as number) < 0
+    || (value.selectedIndex as number) >= value.options.length
+    || (value.answerIndex as number) < 0
+    || (value.answerIndex as number) >= value.options.length
+    || value.selectedIndex === value.answerIndex
+    || typeof value.explanation !== 'string'
+    || typeof value.occurredAt !== 'string'
+    || !isIsoDate(value.occurredAt)
+    || (value.correctedAt !== null && (typeof value.correctedAt !== 'string' || !isIsoDate(value.correctedAt)))
+  ) {
+    return false
+  }
+
+  return new Set(getPartIdsForBand(value.gradeBand as GradeBand)).has(value.partId as CoursePartId)
+}
+
+function normalizeGrowthTitle(value: unknown): GrowthTitle | null {
+  if (!isRecord(value)
+    || typeof value.text !== 'string'
+    || typeof value.description !== 'string'
+    || typeof value.eventId !== 'string') {
+    return null
+  }
+  return { text: value.text, description: value.description, eventId: value.eventId }
+}
+
+function isIsoDate(value: string): boolean {
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
 }
 
 function normalizeTransactions(value: unknown, fallback: PointTransaction[]): PointTransaction[] {

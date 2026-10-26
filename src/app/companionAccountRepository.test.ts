@@ -64,7 +64,7 @@ describe('companion account repository', () => {
 
     const migrated = loadAccountState('chenxi_2026')
 
-    expect(migrated.stateVersion).toBe(4)
+    expect(migrated.stateVersion).toBe(5)
     expect(migrated.nickname).toBe('迁移同学')
     expect(migrated.learningProgress['grade5-6']).toEqual({
       knowledgeCompleted: ['ael-4'],
@@ -118,6 +118,37 @@ describe('companion account repository', () => {
     expect(loadAccountState('second').learningPlan.tasks.map((task) => task.title)).toEqual(['第二账号安排'])
     expect(loadAccountState('first').transactions).toEqual(first.transactions)
     expect(loadAccountState('first').processedRewardIds).toEqual(first.processedRewardIds)
+  })
+
+  it('keeps learning events isolated by normalized account', () => {
+    const first = createDefaultState()
+    const second = createDefaultState()
+    first.learningEvents = [{
+      id: 'first:grade5-6:knowledge-completed:ael-4',
+      accountId: 'first',
+      gradeBand: 'grade5-6',
+      source: 'knowledge',
+      contentId: 'ael-4',
+      action: 'knowledge-completed',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+      dimensionDeltas: { curiosity: 2, knowledge: 4, problemSolving: 0, creativity: 0, planning: 0 },
+    }]
+    second.learningEvents = [{
+      id: 'second:grade3-4:test-passed:cxd-2',
+      accountId: 'second',
+      gradeBand: 'grade3-4',
+      source: 'test',
+      contentId: 'cxd-2',
+      action: 'test-passed',
+      occurredAt: '2026-10-26T09:05:00.000Z',
+      dimensionDeltas: { curiosity: 0, knowledge: 2, problemSolving: 4, creativity: 0, planning: 0 },
+    }]
+
+    saveAccountState('FIRST', first)
+    saveAccountState('second', second)
+
+    expect(loadAccountState(' first ').learningEvents).toEqual(first.learningEvents)
+    expect(loadAccountState('SECOND').learningEvents).toEqual(second.learningEvents)
   })
 
   it('keeps only the newest twenty reviewed conversation summaries', () => {

@@ -16,7 +16,10 @@ describe('primary-only state migration', () => {
   it('creates the approved guardian-authorized grade-5 account', () => {
     const state = createDefaultState()
 
-    expect(state.stateVersion).toBe(4)
+    expect(state.stateVersion).toBe(5)
+    expect(state.learningEvents).toEqual([])
+    expect(state.wrongAnswers).toEqual([])
+    expect(state.growthTitle).toBeNull()
     expect(state.grade).toBe('grade5')
     expect(state.guardian.authorised).toBe(true)
     expect(state.learningProgress['grade5-6']).toEqual({
@@ -34,7 +37,7 @@ describe('primary-only state migration', () => {
 
     const migrated = loadState()
 
-    expect(migrated.stateVersion).toBe(4)
+    expect(migrated.stateVersion).toBe(5)
     expect(migrated.grade).toBe('grade5')
     expect(localStorage.getItem('unrelated-preference')).toBe('keep-me')
     expect(localStorage.getItem('student-app-primary-v3-migrated')).toBe('1')
@@ -53,7 +56,7 @@ describe('primary-only state migration', () => {
     }
   })
 
-  it('migrates a v3 account to v4 without retaining three legacy fake tasks', () => {
+  it('migrates a v3 account to v5 without retaining three legacy fake tasks', () => {
     const v3 = {
       ...createDefaultState(),
       stateVersion: 3,
@@ -64,14 +67,14 @@ describe('primary-only state migration', () => {
       },
     }
     const migrated = normalizePersistedState(v3)
-    expect(migrated.stateVersion).toBe(4)
+    expect(migrated.stateVersion).toBe(5)
     expect(migrated.learningPlan.tasks).toHaveLength(3)
     expect(migrated.learningPlan.tasks.every((task) => task.partId.startsWith('ael-'))).toBe(true)
     expect(migrated.learningPlan.tasks.some((task) => task.title === '图片识别小探索')).toBe(false)
     localStorage.setItem('student-app-state', JSON.stringify(v3))
-    expect(loadState().stateVersion).toBe(4)
+    expect(loadState().stateVersion).toBe(5)
     const saved = JSON.parse(localStorage.getItem('student-app-state') ?? '{}')
-    expect(saved.stateVersion).toBe(4)
+    expect(saved.stateVersion).toBe(5)
     expect(saved.learningPlan.tasks.map((task: { partId: string; title: string }) => [task.partId, task.title])).toEqual(
       migrated.learningPlan.tasks.map((task) => [task.partId, task.title]),
     )
@@ -285,5 +288,85 @@ describe('primary-only state migration', () => {
       },
       version: 1,
     })
+  })
+
+  it('migrates v4 progress into events without changing points', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-26T10:00:00.000Z'))
+    try {
+      const v4 = { ...createDefaultState(), stateVersion: 4, learningEvents: undefined }
+      const migrated = normalizePersistedState(v4)
+
+      expect(migrated.stateVersion).toBe(5)
+      expect(migrated.learningEvents.map(({ action, contentId }) => [action, contentId])).toEqual([
+        ['knowledge-completed', 'ael-1'], ['knowledge-completed', 'ael-2'], ['knowledge-completed', 'ael-3'],
+        ['test-passed', 'ael-1'], ['test-passed', 'ael-2'],
+      ])
+      expect(migrated.learningEvents.every((event) => event.migrationVersion === 1)).toBe(true)
+      expect(migrated.transactions).toEqual(v4.transactions)
+      expect(migrated.processedRewardIds).toEqual(v4.processedRewardIds)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('saves a v4 migration once and does not duplicate migrated events on the next load', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-26T10:00:00.000Z'))
+    try {
+      const v4 = { ...createDefaultState(), stateVersion: 4, learningEvents: undefined }
+      localStorage.setItem('student-app-state', JSON.stringify(v4))
+
+      const first = loadState()
+      const savedAfterFirstLoad = localStorage.getItem('student-app-state')
+      const second = loadState()
+
+      expect(first.learningEvents).toHaveLength(5)
+      expect(second.learningEvents).toEqual(first.learningEvents)
+      expect(localStorage.getItem('student-app-state')).toBe(savedAfterFirstLoad)
+      expect(second.transactions).toEqual(v4.transactions)
+      expect(second.processedRewardIds).toEqual(v4.processedRewardIds)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('normalizes events, wrong answers and growth title without one corrupt sibling clearing valid data', () => {
+    const fresh = createDefaultState()
+    const event = {
+      id: 'chenxi_2026:grade5-6:knowledge-completed:ael-4',
+      accountId: 'chenxi_2026',
+      gradeBand: 'grade5-6',
+      source: 'knowledge',
+      contentId: 'ael-4',
+      action: 'knowledge-completed',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+      dimensionDeltas: { curiosity: 2, knowledge: 4, problemSolving: 0, creativity: 0, planning: 0 },
+    }
+    const wrongAnswer = {
+      id: 'grade5-6:ael-4:q-1',
+      gradeBand: 'grade5-6',
+      partId: 'ael-4',
+      questionId: 'q-1',
+      prompt: '下列哪项正确？',
+      options: ['A', 'B'],
+      selectedIndex: 1,
+      answerIndex: 0,
+      explanation: 'A 才是正确答案。',
+      occurredAt: '2026-10-26T09:00:00.000Z',
+      correctedAt: null,
+    }
+    const growthTitle = { text: '好奇探索者', description: '愿意继续提问与发现。', eventId: event.id }
+
+    const loaded = normalizePersistedState({
+      ...fresh,
+      learningEvents: [event, { ...event, id: 'forged-id' }, null],
+      wrongAnswers: [wrongAnswer, { ...wrongAnswer, selectedIndex: 99 }, null],
+      growthTitle,
+    })
+
+    expect(loaded.learningEvents).toEqual([event])
+    expect(loaded.wrongAnswers).toEqual([wrongAnswer])
+    expect(loaded.growthTitle).toEqual(growthTitle)
   })
 })
