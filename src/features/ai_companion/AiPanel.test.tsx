@@ -38,10 +38,25 @@ describe('AI companion conversation page', () => {
   it('shows a rotatable companion above a stable conversation input area', () => {
     renderPanel()
 
-    expect(screen.getByLabelText('当前 AI 伙伴八方向预览')).toBeInTheDocument()
+    expect(screen.getByLabelText('当前 AI 伙伴绒桃 Momo 八方向预览')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: '输入想问的问题' })).toBeVisible()
     expect(screen.getByRole('button', { name: '按住说话' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '播放回答' })).toBeInTheDocument()
+  })
+
+  it('uses the equipped companion full name throughout the conversation page', () => {
+    const state = createDefaultState()
+    state.companion.owned.appearance = ['momo', 'cloudbloom']
+    state.companion.equipped.appearance = 'cloudbloom'
+    saveAccountState(state.accountId, state)
+
+    renderPanel()
+
+    expect(screen.getByRole('heading', { name: '云绽 Cloudbloom' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '云绽 Cloudbloom 的对话' })).toBeInTheDocument()
+    expect(screen.getByLabelText('当前 AI 伙伴云绽 Cloudbloom 八方向预览')).toBeInTheDocument()
+    expect(screen.getByText('你好，我是云绽 Cloudbloom。想一起弄明白什么？')).toBeInTheDocument()
+    expect(screen.queryByText('小启')).not.toBeInTheDocument()
   })
 
   it('keeps an ordinary question and answer in the scrollable message history', async () => {

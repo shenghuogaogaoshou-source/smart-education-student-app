@@ -173,7 +173,7 @@ describe('temporary AI companion', () => {
     await user.click(control)
     expect(screen.getByRole('status')).toHaveTextContent('继续上次')
     await user.click(control)
-    expect(screen.getByRole('dialog', { name: 'AI 学习伙伴' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '云朵 Yunduo 的对话' })).toBeInTheDocument()
   })
 
   it('uses the saved login bounds once and clears the handoff record after the animation', () => {
@@ -247,10 +247,10 @@ describe('temporary AI companion', () => {
 
     await user.click(companion)
     expect(screen.getByRole('status')).toHaveTextContent('继续上次')
-    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '绒桃 Momo 的对话' })).not.toBeInTheDocument()
 
     await user.click(companion)
-    expect(screen.getByRole('dialog', { name: 'AI 学习伙伴' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '绒桃 Momo 的对话' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: '输入想问的问题' })).toBeInTheDocument()
   })
 
@@ -262,7 +262,7 @@ describe('temporary AI companion', () => {
     await user.click(screen.getByRole('button', { name: 'AI伙伴' }))
 
     expect(screen.getByRole('status')).toHaveTextContent('关')
-    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '绒桃 Momo 的对话' })).not.toBeInTheDocument()
   })
 
   it('starts voice listening in a small companion bubble after a deliberate long press', () => {
@@ -281,7 +281,7 @@ describe('temporary AI companion', () => {
     act(() => vi.advanceTimersByTime(650))
     fireEvent.pointerUp(control, { clientX: 300, clientY: 500, pointerId: 1 })
 
-    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '绒桃 Momo 的对话' })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('请说，我在听')
     expect(recognition.start).toHaveBeenCalledTimes(1)
   })
@@ -304,6 +304,6 @@ describe('temporary AI companion', () => {
 
     expect(recognition.abort).toHaveBeenCalledTimes(1)
     expect(recognition.stop).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog', { name: 'AI 学习伙伴' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '绒桃 Momo 的对话' })).not.toBeInTheDocument()
   })
 })

@@ -32,6 +32,10 @@ export function getCompanionItem(id: string | null | undefined) {
   return id ? COMPANION_CATALOG.find((item) => item.id === id) : undefined
 }
 
+export function getCompanionDisplayName(id: string | null | undefined) {
+  return getCompanionItem(id)?.name ?? getCompanionItem(DEFAULT_COMPANION_ID)!.name
+}
+
 export function buildCompanionPreviewLoadout(
   loadout: CompanionLoadout,
   item: CompanionCatalogItem,

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useAppState } from '../../app/AppState'
 import type { ConversationSummary, VoiceReplyMode } from '../../app/model'
 import { AiLocalSheet } from './AiLocalSheet'
-import { getCompanionItem } from './companionCatalog'
+import { getCompanionDisplayName } from './companionCatalog'
 import { requestCompanionReply } from './companionChat'
 import { startSpeechCapture, speakCompanionReply, type SpeechPlayback } from './browserSpeech'
 import { useOptionalAppCommand } from './commands/AppCommandContext'
@@ -67,10 +67,11 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
 }) {
   const app = useAppState()
   const { state } = app
+  const appearanceName = getCompanionDisplayName(state.companion.equipped.appearance)
   const command = useOptionalAppCommand()
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 1, role: 'partner', text: `你好，我是${state.aiName}。想一起弄明白什么？` },
+    { id: 1, role: 'partner', text: `你好，我是${appearanceName}。想一起弄明白什么？` },
   ])
   const [conversation, setConversation] = useState<ConversationSnapshot>({
     status: 'idle',
@@ -214,7 +215,6 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
     })
   }
 
-  const appearanceName = getCompanionItem(state.companion.equipped.appearance)?.name ?? state.aiName
   const isConversing = messages.length > 1 || conversation.status !== 'idle'
   const busy = conversation.status === 'thinking' || conversation.status === 'speaking'
   const listening = conversation.status === 'listening' || conversation.status === 'transcribing'
@@ -227,7 +227,7 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
 
   const portal = (
     <div className="ai-panel-root" role="presentation">
-      <section className={`ai-panel-full ${isConversing ? 'is-conversing' : ''}`} role="dialog" aria-modal="true" aria-label="AI 学习伙伴">
+      <section className={`ai-panel-full ${isConversing ? 'is-conversing' : ''}`} role="dialog" aria-modal="true" aria-label={`${appearanceName} 的对话`}>
         <header className="ai-chat-header">
           <button type="button" aria-label="关闭" onClick={onClose} className="ai-chat-header__button"><ArrowLeft size={21} /></button>
           <div><span>智芽成长伙伴</span><strong>{appearanceName}</strong></div>
@@ -237,7 +237,7 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
           </div>
         </header>
 
-        <section className="ai-chat-companion" aria-label="当前 AI 伙伴八方向预览">
+        <section className="ai-chat-companion" aria-label={`当前 AI 伙伴${appearanceName} 八方向预览`}>
           <div className="ai-chat-companion__art">
             <CompanionRotator
               loadout={state.companion}
@@ -248,7 +248,7 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
           </div>
           <div className="ai-chat-companion__copy">
             <span className="ai-chat-companion__level">Lv.7 · 好奇心探索员</span>
-            <h1>{state.aiName}</h1>
+            <h1>{appearanceName}</h1>
             <p>{isConversing ? '我在认真听，也会陪你一步一步想清楚。' : '今天想一起发现什么？轻轻转动我，看看新装扮吧。'}</p>
             <span className="ai-chat-companion__privacy"><ShieldCheck size={13} /> 回答会遵守小学生安全规则</span>
           </div>
@@ -257,7 +257,7 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
         <main className="ai-chat-messages" role="log" aria-live="polite" aria-label="对话消息">
           {messages.map((message) => (
             <article key={message.id} className={`ai-chat-message ai-chat-message--${message.role}`}>
-              <span>{message.role === 'student' ? '我' : state.aiName}</span>
+              <span>{message.role === 'student' ? '我' : appearanceName}</span>
               <p>{message.text}</p>
             </article>
           ))}
