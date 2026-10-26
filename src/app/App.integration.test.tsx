@@ -38,7 +38,7 @@ describe('student app integration', () => {
     expect(screen.getByRole('heading', { name: '设置' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '退出当前账号' }))
     await user.click(screen.getByRole('button', { name: '确认退出' }))
-    expect(screen.getByRole('heading', { name: '欢迎来到数智学习世界' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '欢迎来到智芽' })).toBeInTheDocument()
   })
 
   it('completes the approved primary-only demonstration journey', async () => {

@@ -30,7 +30,7 @@ describe('authentication flow', () => {
 
     expect(screen.queryByRole('button', { name: '小学端' })).not.toBeInTheDocument()
     expect(screen.queryByText('页面初版，不会发送或保存真实账号和密码')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '欢迎来到数智学习世界' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '欢迎来到智芽' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '绒桃 Momo AI 伙伴形象' })).toBeInTheDocument()
   })
 
@@ -39,7 +39,7 @@ describe('authentication flow', () => {
 
     expect(screen.getByRole('img', { name: '智芽品牌标志' })).toBeInTheDocument()
     expect(screen.getByText('智芽')).toBeInTheDocument()
-    expect(screen.getByText('小学生的 AI 学习成长伙伴')).toBeInTheDocument()
+    expect(screen.getByText('小学生 AI 学习成长伙伴')).toBeInTheDocument()
     expect(screen.getByText('从好奇出发，学会思考与创造')).toBeInTheDocument()
     expect(screen.queryByText('让好奇发芽，让本领长大。')).not.toBeInTheDocument()
     expect(screen.queryByText('智芽 · AI 学习成长伙伴')).not.toBeInTheDocument()

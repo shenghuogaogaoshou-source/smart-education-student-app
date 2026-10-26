@@ -1,6 +1,7 @@
 import { ArrowLeft, Bell, Camera, CheckCircle2, Database, Eye, EyeOff, HelpCircle, Headphones, LayoutDashboard, Mic, MessageSquare, RotateCcw, ShieldCheck, ShieldOff, Smartphone, Sparkles, Trash2, UserRound, Volume2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useAppState } from '../../app/AppState'
+import { BRAND } from '../../app/brand'
 import { GRADE_LABELS, PRIMARY_GRADES, type PrimaryGrade } from '../../app/learning'
 import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from '../../app/model'
 import { getCompanionItem } from '../ai_companion/companionCatalog'
@@ -803,10 +804,10 @@ function AboutSection() {
   return (
     <>
       <section className="detail-card about-card">
-        <div className="about-logo">📚</div>
-        <h2>数智学习世界</h2>
-        <p className="muted">学生端 v1.0.0</p>
-        <p className="muted small">© 2026 数智教育 · 让每个孩子都拥有专属 AI 学习伙伴</p>
+        <div className="about-logo"><img src={BRAND.logoSrc} alt={BRAND.logoAlt} /></div>
+        <h2>{BRAND.name}</h2>
+        <p className="muted">{BRAND.version}</p>
+        <p className="muted small">{BRAND.copyright}</p>
       </section>
 
       <section className="choice-card">

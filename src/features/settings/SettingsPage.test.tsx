@@ -68,4 +68,17 @@ describe('settings page', () => {
 
     expect(loadAccountState(defaultState.accountId).voiceReplyMode).toBe('always')
   })
+
+  it('uses the approved 智芽 identity in about and rules', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: /^关于与规则/ }))
+
+    expect(screen.getByRole('img', { name: '智芽品牌标志' })).toHaveAttribute('src', '/brand/zhinya-mark.png')
+    expect(screen.getByRole('heading', { name: '智芽' })).toBeInTheDocument()
+    expect(screen.getByText('学生端 v1.1.0')).toBeInTheDocument()
+    expect(screen.getByText('© 2026 智芽 · 陪孩子安全、好奇地学习 AI')).toBeInTheDocument()
+    expect(screen.queryByText('数智学习世界')).not.toBeInTheDocument()
+  })
 })

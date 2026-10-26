@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronRight, LogOut, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../../app/AppState'
+import { BRAND } from '../../app/brand'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
 import { SettingDetailPage } from './SettingDetailPage'
 import { settingGroups } from './settingsData'
@@ -64,7 +65,7 @@ export function SettingsPage({
       case 'content': return ({ child: '儿童模式', teen: '青少年模式', general: '标准模式' } as const)[state.contentLevel]
       case 'storage': return `${state.storageUsed} / ${state.storageTotal} MB`
       case 'help': return '常见问题 · 客服'
-      case 'about': return 'v1.0.0 · 用户协议'
+      case 'about': return `${BRAND.version} · 用户协议`
       default: return ''
     }
   }

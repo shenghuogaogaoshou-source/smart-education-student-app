@@ -7,7 +7,7 @@ describe('application shell', () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: '欢迎来到数智学习世界' }),
+      screen.getByRole('heading', { name: '欢迎来到智芽' }),
     ).toBeInTheDocument()
   })
 })

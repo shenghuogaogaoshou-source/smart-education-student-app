@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, KeyRound, UserRound } from 'lucide-react'
 import { useAppState } from '../../app/AppState'
+import { BRAND } from '../../app/brand'
 import { LOGIN_COMPANION_HANDOFF_KEY, LoginCompanion } from '../ai_companion/LoginCompanion'
 import type { HandoffSnapshot } from '../ai_companion/CompanionHandoff'
 import { AuthLayout } from './AuthLayout'
@@ -62,8 +63,8 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
 
   return (
     <AuthLayout
-      title="欢迎来到数智学习世界"
-      subtitle="带上好奇心，一起发现 AI 的奇妙吧"
+      title={`欢迎来到${BRAND.name}`}
+      subtitle="带上好奇心，和你的 AI 成长伙伴一起发现新本领"
       companion={<LoginCompanion loadout={previewLoadout} onBoundsChange={updateCompanionBounds} />}
     >
       <form className="auth-card" onSubmit={submit}>

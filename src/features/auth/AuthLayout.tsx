@@ -1,4 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react'
+import { BRAND } from '../../app/brand'
 import './auth.css'
 
 type AuthLayoutProps = PropsWithChildren<{
@@ -16,13 +17,13 @@ export function AuthLayout({ title, subtitle, backAction, companion, showBrand =
       <div className="auth-ambient auth-ambient-two" />
       <section className={`auth-shell ${companion ? 'auth-shell--with-companion' : ''}`}>
         {showBrand && (
-          <div className="auth-brand-block" aria-label="智芽学习成长空间">
+          <div className="auth-brand-block" aria-label={`${BRAND.name}学习成长空间`}>
             <span className="auth-brand-mark">
-              <img src="/brand/zhinya-mark.png" alt="智芽品牌标志" />
+              <img src={BRAND.logoSrc} alt={BRAND.logoAlt} />
             </span>
             <span className="auth-brand-copy">
-              <strong>智芽</strong>
-              <span>小学生的 AI 学习成长伙伴</span>
+              <strong>{BRAND.name}</strong>
+              <span>{BRAND.positioning}</span>
             </span>
           </div>
         )}
