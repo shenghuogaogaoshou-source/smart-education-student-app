@@ -84,6 +84,17 @@ describe('course achievements', () => {
       .toBe('再试一次，订正后继续挑战')
   })
 
+  it('shows earned dates in the learner local calendar', () => {
+    const occurredAt = '2026-10-25T16:30:00.000Z'
+    const local = new Date(occurredAt)
+    const localDate = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`
+    const groups = deriveCourseAchievementGroups([
+      { ...eventFor('grade5-6', 'ael-1', 'knowledge-completed'), occurredAt },
+    ], 'student-a')
+
+    expect(groups['grade5-6'][0].statusText).toBe(`已获得 · ${localDate}`)
+  })
+
   it('summarizes all three groups against the fixed 49-medal total', () => {
     const groups = deriveCourseAchievementGroups(allEvents('grade3-4'), 'student-a')
     expect(getAchievementSummary(groups)).toEqual({

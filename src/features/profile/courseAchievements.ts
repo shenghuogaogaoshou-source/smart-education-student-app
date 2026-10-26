@@ -23,7 +23,11 @@ export type CourseAchievement = {
 export type CourseAchievementGroups = Record<GradeBand, CourseAchievement[]>
 
 function earnedDate(occurredAt: string): string {
-  return `已获得 · ${occurredAt.slice(0, 10)}`
+  const date = new Date(occurredAt)
+  const calendarDate = Number.isFinite(date.getTime())
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    : occurredAt.slice(0, 10)
+  return `已获得 · ${calendarDate}`
 }
 
 function latestDate(events: LearningEvent[]): string {
