@@ -20,6 +20,8 @@ type Action =
   | { type: 'complete-knowledge'; partId: CoursePartId; title: string; occurredAt: string }
   | { type: 'pass-test'; partId: CoursePartId; title: string; occurredAt: string }
   | { type: 'submit-quiz-result'; partId: CoursePartId; title: string; occurredAt: string; result: QuizResult }
+  | { type: 'complete-correction'; wrongAnswerId: string; occurredAt: string }
+  | { type: 'record-creative-work'; workId: string; occurredAt: string }
   | { type: 'replace-learning-plan'; tasks: LearningPlanTask[]; source: 'student' | 'ai' | 'fallback' }
   | { type: 'upsert-plan-task'; task: LearningPlanTask }
   | { type: 'remove-plan-task'; id: string }
@@ -212,6 +214,45 @@ function isQuizWrongAnswer(answer: QuizWrongAnswer): boolean {
     && typeof answer.explanation === 'string'
 }
 
+function completeCorrection(
+  state: AppState,
+  action: Extract<Action, { type: 'complete-correction' }>,
+): AppState {
+  const wrongAnswer = state.wrongAnswers.find((record) => record.id === action.wrongAnswerId)
+  if (!wrongAnswer || wrongAnswer.correctedAt) return state
+
+  return {
+    ...state,
+    wrongAnswers: state.wrongAnswers.map((record) => (
+      record.id === wrongAnswer.id ? { ...record, correctedAt: action.occurredAt } : record
+    )),
+    learningEvents: appendLearningEvent(state.learningEvents, createLearningEvent({
+      accountId: state.accountId,
+      gradeBand: wrongAnswer.gradeBand,
+      source: 'correction',
+      contentId: wrongAnswer.id,
+      action: 'correction-completed',
+      occurredAt: action.occurredAt,
+    })),
+  }
+}
+
+function recordCreativeWork(
+  state: AppState,
+  action: Extract<Action, { type: 'record-creative-work' }>,
+): AppState {
+  const event = createLearningEvent({
+    accountId: state.accountId,
+    gradeBand: getGradeBand(state.grade),
+    source: 'creative',
+    contentId: action.workId,
+    action: 'work-completed',
+    occurredAt: action.occurredAt,
+  })
+  const learningEvents = appendLearningEvent(state.learningEvents, event)
+  return learningEvents === state.learningEvents ? state : { ...state, learningEvents }
+}
+
 function purchase(
   state: AppState,
   action: Extract<Action, { type: 'purchase-companion-item' }>,
@@ -329,6 +370,8 @@ function reducer(state: AppState, action: Action): AppState {
     case 'complete-knowledge':
     case 'pass-test': return updateProgress(state, action)
     case 'submit-quiz-result': return submitQuizResult(state, action)
+    case 'complete-correction': return completeCorrection(state, action)
+    case 'record-creative-work': return recordCreativeWork(state, action)
     case 'replace-learning-plan': return replaceLearningPlan(state, action)
     case 'upsert-plan-task': return upsertPlanTask(state, action)
     case 'remove-plan-task': {
@@ -430,6 +473,8 @@ type AppStateContextValue = {
   completeKnowledge: (partId: CoursePartId, title: string) => void
   passTest: (partId: CoursePartId, title: string) => void
   submitQuizResult: (partId: CoursePartId, title: string, result: QuizResult) => void
+  completeCorrection: (wrongAnswerId: string) => void
+  recordCreativeWork: (workId: string, occurredAt?: string) => void
   replaceLearningPlan: (tasks: LearningPlanTask[], source: 'student' | 'ai' | 'fallback') => void
   upsertPlanTask: (task: LearningPlanTask) => void
   removePlanTask: (id: string) => void
@@ -508,6 +553,16 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       result,
       occurredAt: new Date().toISOString(),
     }),
+    completeCorrection: (wrongAnswerId) => dispatch({
+      type: 'complete-correction',
+      wrongAnswerId,
+      occurredAt: new Date().toISOString(),
+    }),
+    recordCreativeWork: (workId, occurredAt = new Date().toISOString()) => dispatch({
+      type: 'record-creative-work',
+      workId,
+      occurredAt,
+    }),
     replaceLearningPlan: (tasks, source) => dispatch({ type: 'replace-learning-plan', tasks, source }),
     upsertPlanTask: (task) => dispatch({ type: 'upsert-plan-task', task }),
     removePlanTask: (id) => dispatch({ type: 'remove-plan-task', id }),
@@ -573,4 +628,8 @@ export function useAppState() {
   const value = useContext(AppStateContext)
   if (!value) throw new Error('useAppState must be used inside AppStateProvider')
   return value
+}
+
+export function useOptionalAppState() {
+  return useContext(AppStateContext)
 }

@@ -7,7 +7,7 @@ import {
 import type { SaveWorkDraftInput, WorkRecord } from '../works/types'
 import { getGameConfig, type GameId } from './gameRegistry'
 
-type SaveDraft = (input: SaveWorkDraftInput) => Promise<Pick<WorkRecord, 'id'>>
+type SaveDraft = (input: SaveWorkDraftInput) => Promise<WorkRecord>
 
 const AI_TOOL_NAMES: Record<GameId, string> = {
   'brain-film': '脑洞放映厅',
@@ -18,11 +18,13 @@ export function GameWorkBridge({
   gameId,
   saveDraft,
   onStatus,
+  onWorkSaved,
   children,
 }: PropsWithChildren<{
   gameId: GameId
   saveDraft: SaveDraft
   onStatus?: (message: string) => void
+  onWorkSaved?: (record: WorkRecord) => void
 }>) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +66,7 @@ export function GameWorkBridge({
           workId: record.id,
         }, event.origin)
         onStatus?.('已保存到智芽·我的作品')
+        onWorkSaved?.(record)
       } catch {
         event.source?.postMessage({
           type: WORK_SAVE_FAILED,
@@ -78,7 +81,7 @@ export function GameWorkBridge({
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [gameId, onStatus, saveDraft])
+  }, [gameId, onStatus, onWorkSaved, saveDraft])
 
   return <div ref={containerRef} className="game-work-bridge">{children}</div>
 }

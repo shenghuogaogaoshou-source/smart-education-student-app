@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { WORK_SAVE_DRAFT, type GameSource } from '@zhiya/works-bridge'
 import { AppStateProvider } from './AppState'
+import { loadAccountState } from './companionAccountRepository'
 import { MainShell } from '../features/shell/MainShell'
 import { createMemoryWorkRepository } from '../features/works/memoryRepository'
 import type { WorkRepository } from '../features/works/types'
@@ -45,6 +46,14 @@ describe('game and works integration', () => {
     await user.click(screen.getByRole('button', { name: /脑洞放映厅/ }))
     dispatchGameDraft('brain-film', '云朵电影院')
     expect(await screen.findByText('已保存到智芽·我的作品')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(loadAccountState('chenxi_2026').learningEvents).toEqual([
+        expect.objectContaining({
+          action: 'work-completed',
+          source: 'creative',
+        }),
+      ])
+    })
     await user.click(screen.getByRole('button', { name: '返回首页' }))
 
     await user.click(screen.getByRole('button', { name: '我的' }))

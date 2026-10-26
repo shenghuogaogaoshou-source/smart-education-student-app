@@ -1,6 +1,8 @@
 import { ArrowLeft, LoaderCircle, RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useOptionalAppState } from '../../app/AppState'
 import { useOptionalWorks } from '../works/WorksProvider'
+import type { WorkRecord } from '../works/types'
 import { GameWorkBridge } from './GameWorkBridge'
 import { getGameConfig, type GameId } from './gameRegistry'
 import './games.css'
@@ -13,6 +15,7 @@ export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: (
   const [attempt, setAttempt] = useState(0)
   const [saveStatus, setSaveStatus] = useState('')
   const works = useOptionalWorks()
+  const appState = useOptionalAppState()
 
   useEffect(() => {
     if (loadState !== 'loading') return
@@ -24,6 +27,12 @@ export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: (
     setLoadState('loading')
     setAttempt((current) => current + 1)
   }
+
+  const handleWorkSaved = useCallback((record: WorkRecord) => {
+    if (record.source === 'brain-film' || record.source === 'creative-module') {
+      appState?.recordCreativeWork(record.id, record.createdAt)
+    }
+  }, [appState])
 
   return (
     <section className="embedded-game-page" aria-label={`${config.title}游戏`}>
@@ -42,7 +51,12 @@ export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: (
 
       <div className="embedded-game-stage">
         {works ? (
-          <GameWorkBridge gameId={gameId} saveDraft={works.saveDraft} onStatus={setSaveStatus}>
+          <GameWorkBridge
+            gameId={gameId}
+            saveDraft={works.saveDraft}
+            onStatus={setSaveStatus}
+            onWorkSaved={handleWorkSaved}
+          >
             <iframe
               key={attempt}
               title={config.title}

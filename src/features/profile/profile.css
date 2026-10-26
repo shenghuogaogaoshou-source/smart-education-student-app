@@ -3974,6 +3974,32 @@
   background: var(--surface-soft);
 }
 
+.wb-retry-options {
+  display: grid;
+  gap: 8px;
+}
+
+.wb-retry-option {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wb-retry-feedback {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #D96D8A 12%, transparent);
+  color: #9F3E5B;
+  font-size: calc(0.66rem * var(--font-scale));
+  line-height: 1.55;
+}
+
+.wb-retry-feedback.success {
+  background: color-mix(in srgb, #2F7A56 12%, transparent);
+  color: #2F7A56;
+}
+
 .wb-answer {
   display: grid;
   gap: 2px;

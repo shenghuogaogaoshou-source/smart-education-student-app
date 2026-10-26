@@ -1,13 +1,36 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { WORK_SAVE_DRAFT, WORK_SAVED } from '@zhiya/works-bridge'
+import type { WorkRecord } from '../works/types'
 import { GameWorkBridge } from './GameWorkBridge'
 
 describe('GameWorkBridge', () => {
   it('只接收当前 iframe 的已配置来源', async () => {
-    const saveDraft = vi.fn().mockResolvedValue({ id: 'work-1' })
+    const record: WorkRecord = {
+      id: 'work-1',
+      ownerId: 'chenxi_2026',
+      source: 'brain-film',
+      title: '云朵电影院',
+      description: '',
+      aiTools: ['脑洞放映厅'],
+      status: 'draft',
+      assetId: 'asset-1',
+      fileName: 'film.bhfilm',
+      mimeType: 'application/json',
+      byteSize: 4,
+      previewKind: 'video',
+      createdAt: '2026-10-26T09:00:00.000Z',
+      updatedAt: '2026-10-26T09:00:00.000Z',
+      likes: 0,
+      favorites: 0,
+      likedBy: [],
+      favoritedBy: [],
+      comments: [],
+    }
+    const saveDraft = vi.fn().mockResolvedValue(record)
+    const onWorkSaved = vi.fn()
     render(
-      <GameWorkBridge gameId="brain-film" saveDraft={saveDraft}>
+      <GameWorkBridge gameId="brain-film" saveDraft={saveDraft} onWorkSaved={onWorkSaved}>
         <iframe title="game" />
       </GameWorkBridge>,
     )
@@ -47,5 +70,6 @@ describe('GameWorkBridge', () => {
       sourceDraftId: 'film-1',
       aiTools: ['脑洞放映厅'],
     }))
+    expect(onWorkSaved).toHaveBeenCalledWith(record)
   })
 })
