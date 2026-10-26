@@ -7,30 +7,61 @@ import {
   type LearningEventAction,
 } from './learningEvents'
 
-const ACTION_CASES: Array<[
-  LearningEventAction,
-  'knowledge' | 'test' | 'correction' | 'creative' | 'schedule',
-  { curiosity: number; knowledge: number; problemSolving: number; creativity: number; planning: number },
-]> = [
-  ['knowledge-completed', 'knowledge', { curiosity: 2, knowledge: 4, problemSolving: 0, creativity: 0, planning: 0 }],
-  ['test-passed', 'test', { curiosity: 0, knowledge: 2, problemSolving: 4, creativity: 0, planning: 0 }],
-  ['correction-completed', 'correction', { curiosity: 0, knowledge: 0, problemSolving: 2, creativity: 0, planning: 2 }],
-  ['work-completed', 'creative', { curiosity: 2, knowledge: 0, problemSolving: 0, creativity: 4, planning: 0 }],
-  ['schedule-completed', 'schedule', { curiosity: 0, knowledge: 0, problemSolving: 0, creativity: 0, planning: 3 }],
-]
+type SourceForAction<Action extends LearningEventAction> = {
+  'knowledge-completed': 'knowledge'
+  'test-passed': 'test'
+  'correction-completed': 'correction'
+  'work-completed': 'creative'
+  'schedule-completed': 'schedule'
+}[Action]
+
+function expectApprovedDeltas<Action extends LearningEventAction>(
+  action: Action,
+  source: SourceForAction<Action>,
+  expected: ReturnType<typeof createLearningEvent>['dimensionDeltas'],
+) {
+  const input = {
+    accountId: 'student-a',
+    gradeBand: 'grade1-2',
+    source,
+    contentId: 'qmx-1',
+    action,
+    occurredAt: '2026-10-26T09:00:00.000Z',
+  } as Parameters<typeof createLearningEvent>[0]
+  const event = createLearningEvent(input)
+
+  expect(event.dimensionDeltas).toEqual(expected)
+}
 
 describe('learning events', () => {
-  it.each(ACTION_CASES)('maps %s to the approved dimensions', (action, source, expected) => {
-    const event = createLearningEvent({
-      accountId: 'student-a',
-      gradeBand: 'grade1-2',
-      source,
-      contentId: 'qmx-1',
-      action,
-      occurredAt: '2026-10-26T09:00:00.000Z',
+  it('maps completed knowledge to the approved dimensions', () => {
+    expectApprovedDeltas('knowledge-completed', 'knowledge', {
+      curiosity: 2, knowledge: 4, problemSolving: 0, creativity: 0, planning: 0,
     })
+  })
 
-    expect(event.dimensionDeltas).toEqual(expected)
+  it('maps a passed test to the approved dimensions', () => {
+    expectApprovedDeltas('test-passed', 'test', {
+      curiosity: 0, knowledge: 2, problemSolving: 4, creativity: 0, planning: 0,
+    })
+  })
+
+  it('maps a completed correction to the approved dimensions', () => {
+    expectApprovedDeltas('correction-completed', 'correction', {
+      curiosity: 0, knowledge: 0, problemSolving: 2, creativity: 0, planning: 2,
+    })
+  })
+
+  it('maps a completed work to the approved dimensions', () => {
+    expectApprovedDeltas('work-completed', 'creative', {
+      curiosity: 2, knowledge: 0, problemSolving: 0, creativity: 4, planning: 0,
+    })
+  })
+
+  it('maps a completed schedule item to the approved dimensions', () => {
+    expectApprovedDeltas('schedule-completed', 'schedule', {
+      curiosity: 0, knowledge: 0, problemSolving: 0, creativity: 0, planning: 3,
+    })
   })
 
   it('uses an account-band-action-content key as the stable id and suppresses duplicates', () => {
@@ -52,16 +83,15 @@ describe('learning events', () => {
   })
 
   it('rejects a known action paired with the wrong source', () => {
-    const invalidInput = {
+    // @ts-expect-error knowledge completion can only come from the knowledge source.
+    expect(() => createLearningEvent({
       accountId: 'student-a',
       gradeBand: 'grade1-2',
       source: 'test',
       contentId: 'qmx-1',
       action: 'knowledge-completed',
       occurredAt: '2026-10-26T09:00:00.000Z',
-    } as unknown as Parameters<typeof createLearningEvent>[0]
-
-    expect(() => createLearningEvent(invalidInput)).toThrow('学习事件的来源必须与完成动作匹配')
+    })).toThrow('学习事件的来源必须与完成动作匹配')
   })
 
   it('keeps otherwise identical records isolated by account and grade band', () => {

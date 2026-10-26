@@ -29,13 +29,13 @@ const GRADE_BANDS: GradeBand[] = ['grade1-2', 'grade3-4', 'grade5-6']
 const ACTIONS = Object.keys(LEARNING_EVENT_DELTAS) as LearningEventAction[]
 const SOURCES: LearningEventSource[] = ['knowledge', 'test', 'correction', 'creative', 'schedule']
 const DIMENSIONS: GrowthDimension[] = ['curiosity', 'knowledge', 'problemSolving', 'creativity', 'planning']
-const SOURCE_BY_ACTION: Record<LearningEventAction, LearningEventSource> = {
+const SOURCE_BY_ACTION = {
   'knowledge-completed': 'knowledge',
   'test-passed': 'test',
   'correction-completed': 'correction',
   'work-completed': 'creative',
   'schedule-completed': 'schedule',
-}
+} as const
 
 type LearningEventKeyInput = Pick<LearningEvent, 'accountId' | 'gradeBand' | 'action' | 'contentId'>
 type SourceByAction = typeof SOURCE_BY_ACTION
