@@ -61,4 +61,32 @@ describe('WorksGalleryPage', () => {
     expect((await repository.get('student-a', published.id))?.likes).toBe(1)
     expect((await repository.get('student-a', draft.id))?.likes).toBe(0)
   })
+
+  it('在精选列表和全部作品中复用演示作品媒体', async () => {
+    const repository = createMemoryWorkRepository()
+    const work = await repository.saveDraft('student-a', {
+      source: 'brain-film',
+      sourceDraftId: 'demo-video-1',
+      title: '会呼吸的时钟',
+      description: '',
+      aiTools: ['智芽创意助手'],
+      fileName: 'clockwork-morning.mp4',
+      blob: new Blob(['preview'], { type: 'video/mp4' }),
+    })
+    await repository.setStatus('student-a', work.id, 'published')
+
+    render(
+      <AppStateProvider>
+        <WorksProvider accountId="student-a" repository={repository}>
+          <WorksGalleryPage onBack={vi.fn()} />
+        </WorksProvider>
+      </AppStateProvider>,
+    )
+
+    const previews = await screen.findAllByRole('img', { name: '会呼吸的时钟' })
+    expect(previews).toHaveLength(2)
+    expect(previews.every((preview) => (
+      preview.getAttribute('src') === '/demo-works/posters/clockwork-morning.jpg'
+    ))).toBe(true)
+  })
 })

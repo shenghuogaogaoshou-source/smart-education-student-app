@@ -7,6 +7,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react'
+import { DEFAULT_DEMO_WORK_ACCOUNT, seedDemoWorks, type DemoAssetLoader } from './demoWorks'
 import { createIndexedDbWorkRepository } from './repository'
 import { localDemoModeration, reviewComment, WorkCommentRejected } from './moderation'
 import type {
@@ -53,8 +54,13 @@ function newId(prefix: string) {
 export function WorksProvider({
   accountId,
   repository,
+  demoAssetLoader,
   children,
-}: PropsWithChildren<{ accountId: string; repository?: WorkRepository }>) {
+}: PropsWithChildren<{
+  accountId: string
+  repository?: WorkRepository
+  demoAssetLoader?: DemoAssetLoader
+}>) {
   const [fallbackRepository] = useState(() => createIndexedDbWorkRepository())
   const activeRepository = repository ?? fallbackRepository
   const [works, setWorks] = useState<WorkRecord[]>([])
@@ -66,7 +72,10 @@ export function WorksProvider({
     setLoading(true)
     setError('')
     setWorks([])
-    activeRepository.list(accountId)
+    const records = accountId === DEFAULT_DEMO_WORK_ACCOUNT
+      ? seedDemoWorks(activeRepository, accountId, demoAssetLoader)
+      : activeRepository.list(accountId)
+    records
       .then((records) => {
         if (!cancelled) setWorks(records)
       })
@@ -79,7 +88,7 @@ export function WorksProvider({
     return () => {
       cancelled = true
     }
-  }, [accountId, activeRepository])
+  }, [accountId, activeRepository, demoAssetLoader])
 
   const run = useCallback(async <T,>(operation: () => Promise<T>) => {
     setError('')

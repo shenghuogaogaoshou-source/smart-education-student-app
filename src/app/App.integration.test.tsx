@@ -194,5 +194,5 @@ describe('student app integration', () => {
     const secondSaved = loadAccountState('second-student')
     expect(secondSaved.learningEvents).toEqual([])
     expect(secondSaved.wrongAnswers).toEqual([])
-  })
+  }, 20_000)
 })

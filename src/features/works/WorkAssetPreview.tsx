@@ -1,5 +1,6 @@
 import { Download, FileQuestion } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { getDemoWorkSpec } from './demoWorks'
 import type { WorkRecord } from './types'
 import './works.css'
 
@@ -21,12 +22,14 @@ export function WorkAssetPreview({
   work: WorkRecord
   getAsset: AssetLoader
 }) {
+  const demo = getDemoWorkSpec(work.sourceDraftId)
   const [blob, setBlob] = useState<Blob | null>(null)
   const [url, setUrl] = useState('')
   const [text, setText] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (demo) return undefined
     let cancelled = false
     let objectUrl = ''
     setError('')
@@ -51,15 +54,19 @@ export function WorkAssetPreview({
       if (objectUrl) URL.revokeObjectURL(objectUrl)
       setUrl('')
     }
-  }, [getAsset, work.assetId, work.previewKind])
+  }, [demo, getAsset, work.assetId, work.previewKind])
 
   if (error) return <p className="work-preview-error">{error}</p>
 
   switch (work.previewKind) {
     case 'image':
-      return url ? <img className="work-asset-media" src={url} alt={work.title} /> : <p className="work-preview-loading">正在读取图片…</p>
+      return demo?.previewKind === 'image'
+        ? <img className="work-asset-media" src={demo.assetPath} alt={work.title} />
+        : url ? <img className="work-asset-media" src={url} alt={work.title} /> : <p className="work-preview-loading">正在读取图片…</p>
     case 'video':
-      return url ? <video className="work-asset-media" src={url} controls /> : <p className="work-preview-loading">正在读取视频…</p>
+      return demo?.previewKind === 'video'
+        ? <video className="work-asset-media" src={demo.assetPath} poster={demo.posterPath} controls />
+        : url ? <video className="work-asset-media" src={url} controls /> : <p className="work-preview-loading">正在读取视频…</p>
     case 'audio':
       return url ? <audio className="work-asset-audio" src={url} controls /> : <p className="work-preview-loading">正在读取声音…</p>
     case 'pdf':

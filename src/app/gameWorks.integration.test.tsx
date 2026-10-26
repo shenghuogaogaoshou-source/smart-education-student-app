@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { WORK_SAVE_DRAFT, type GameSource } from '@zhiya/works-bridge'
@@ -69,7 +69,8 @@ describe('game and works integration', () => {
 
     await user.click(screen.getByRole('button', { name: '首页' }))
     expect(await screen.findByText('云朵电影院')).toBeInTheDocument()
-    const like = screen.getByRole('button', { name: '点赞作品' })
+    const homeCard = screen.getByText('云朵电影院').closest('.showcase-card') as HTMLElement
+    const like = within(homeCard).getByRole('button', { name: '点赞作品' })
     await user.click(like)
     expect(like).toHaveAttribute('aria-pressed', 'true')
     expect((await repository.list('chenxi_2026'))[0].likedBy).toEqual(['chenxi_2026'])

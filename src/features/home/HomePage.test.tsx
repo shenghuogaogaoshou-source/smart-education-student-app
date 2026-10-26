@@ -5,6 +5,7 @@ import { AppStateProvider } from '../../app/AppState'
 import { createDefaultState, defaultState } from '../../app/model'
 import { saveState } from '../../app/storage'
 import { createMemoryWorkRepository } from '../works/memoryRepository'
+import { DEFAULT_DEMO_WORK_ACCOUNT } from '../works/demoWorks'
 import { WorksProvider } from '../works/WorksProvider'
 import { homeCopy } from './homeData'
 import { HomePage } from './HomePage'
@@ -98,6 +99,29 @@ describe('home page', () => {
     const like = (await screen.findAllByRole('button', { name: '点赞作品' }))[0]
     await user.click(like)
     expect(like).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows the supplied artwork as real media cards in the public showcase', async () => {
+    const repository = createMemoryWorkRepository()
+    render(
+      <AppStateProvider>
+        <WorksProvider
+          accountId={DEFAULT_DEMO_WORK_ACCOUNT}
+          repository={repository}
+          demoAssetLoader={async (path) => new Blob([path], {
+            type: path.endsWith('.mp4') ? 'video/mp4' : 'image/webp',
+          })}
+        >
+          <HomePage />
+        </WorksProvider>
+      </AppStateProvider>,
+    )
+
+    expect(await screen.findByRole('img', { name: '会呼吸的时钟' })).toHaveAttribute(
+      'src',
+      '/demo-works/posters/clockwork-morning.jpg',
+    )
+    expect(screen.getAllByText('视频').length).toBeGreaterThan(0)
   })
 
   it('前两个精选入口按确认顺序打开游戏', async () => {

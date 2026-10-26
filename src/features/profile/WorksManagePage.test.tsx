@@ -66,4 +66,24 @@ describe('WorksManagePage', () => {
     expect(within(draftCard).getByRole('button', { name: '确认删除' })).toBeInTheDocument()
     expect(draftWork.id).toBeTruthy()
   })
+
+  it('为演示作品显示真实媒体缩略图', async () => {
+    const repository = createMemoryWorkRepository()
+    await repository.saveDraft('student-a', {
+      ...draft('云朵里的种子', 'demo-image-1'),
+      fileName: 'cloud-seed.webp',
+      blob: new Blob(['preview'], { type: 'image/webp' }),
+    })
+
+    render(
+      <WorksProvider accountId="student-a" repository={repository}>
+        <WorksManagePage onBack={vi.fn()} />
+      </WorksProvider>,
+    )
+
+    expect(await screen.findByRole('img', { name: '云朵里的种子' })).toHaveAttribute(
+      'src',
+      '/demo-works/images/cloud-seed.webp',
+    )
+  })
 })

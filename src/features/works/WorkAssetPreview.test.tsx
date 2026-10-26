@@ -47,4 +47,50 @@ describe('WorkAssetPreview', () => {
     )
     await vi.waitFor(() => assertElement(container))
   })
+
+  it('直接使用演示图片的静态资源而不读取浏览器素材库', () => {
+    const getAsset = vi.fn(async () => new Blob(['should-not-load']))
+    render(
+      <WorkAssetPreview
+        work={{
+          ...baseWork,
+          source: 'creative-module',
+          sourceDraftId: 'demo-image-1',
+          title: '云朵里的种子',
+          fileName: 'cloud-seed.webp',
+          previewKind: 'image',
+        }}
+        getAsset={getAsset}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: '云朵里的种子' })).toHaveAttribute(
+      'src',
+      '/demo-works/images/cloud-seed.webp',
+    )
+    expect(getAsset).not.toHaveBeenCalled()
+  })
+
+  it('演示视频使用静态视频与封面并保留播放控件', () => {
+    const getAsset = vi.fn(async () => new Blob(['should-not-load']))
+    const { container } = render(
+      <WorkAssetPreview
+        work={{
+          ...baseWork,
+          source: 'brain-film',
+          sourceDraftId: 'demo-video-1',
+          title: '会呼吸的时钟',
+          fileName: 'clockwork-morning.mp4',
+          previewKind: 'video',
+        }}
+        getAsset={getAsset}
+      />,
+    )
+
+    const video = container.querySelector('video')
+    expect(video).toHaveAttribute('src', '/demo-works/videos/clockwork-morning.mp4')
+    expect(video).toHaveAttribute('poster', '/demo-works/posters/clockwork-morning.jpg')
+    expect(video).toHaveAttribute('controls')
+    expect(getAsset).not.toHaveBeenCalled()
+  })
 })

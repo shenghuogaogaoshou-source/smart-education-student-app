@@ -2,6 +2,7 @@ import { Bookmark, CalendarDays, CalendarRange, ChevronLeft, Heart, Sparkles, Su
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { rankPublishedWorks, type RankingPeriod } from './moderation'
+import { WorkMediaThumbnail } from './WorkMediaThumbnail'
 import { useOptionalWorks } from './WorksProvider'
 import './works.css'
 
@@ -50,7 +51,10 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
           const saved = work.favoritedBy.includes(state.accountId)
           return (
             <article className="gallery-showcase-card" key={work.id}>
-              <div className="gallery-work-index">{String(index + 1).padStart(2, '0')}</div>
+              <div className="gallery-work-media" onClick={() => onWorkClick?.(work.id)}>
+                <WorkMediaThumbnail work={work} />
+                <div className="gallery-work-index">{String(index + 1).padStart(2, '0')}</div>
+              </div>
               <div className="gallery-work-copy" onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
                 <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
                 <h3>{work.title}</h3>
@@ -83,7 +87,7 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
           <div className="gallery-all-list">
             {allPublished.map((work) => (
               <article className="gallery-all-card" key={`all-${work.id}`} onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
-                <div className="gallery-all-placeholder"><span>{work.source === 'external-upload' ? '文件作品' : '创意作品'}</span></div>
+                <WorkMediaThumbnail work={work} className="gallery-all-media" />
                 <div className="gallery-all-info"><h3>{work.title}</h3><p>{work.aiTools.join(' · ')}</p></div>
               </article>
             ))}

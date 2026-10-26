@@ -35,8 +35,15 @@ function mockElementFromPoint(element: Element) {
 }
 
 describe('LearningSchedulePage', () => {
-  beforeEach(() => localStorage.clear())
-  afterEach(() => vi.unstubAllGlobals())
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-26T12:00:00+08:00'))
+    localStorage.clear()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
 
   async function addTodayCourse(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: '添加学习内容' }))

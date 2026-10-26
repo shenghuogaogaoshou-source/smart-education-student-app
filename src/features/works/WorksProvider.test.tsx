@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_DEMO_WORK_ACCOUNT } from './demoWorks'
 import { createMemoryWorkRepository } from './memoryRepository'
 import type { SaveWorkDraftInput } from './types'
 import { useWorks, WorksProvider } from './WorksProvider'
@@ -18,6 +19,7 @@ function Probe() {
   return (
     <>
       <span>{loading ? '加载中' : '加载完成'}</span>
+      <span aria-label="作品总数">{works.length}</span>
       {works.map((work) => <span key={work.id}>{work.title}</span>)}
     </>
   )
@@ -36,5 +38,23 @@ describe('WorksProvider', () => {
     rerender(<WorksProvider accountId="b" repository={repository}><Probe /></WorksProvider>)
     expect(await screen.findByText('B 的作品')).toBeInTheDocument()
     expect(screen.queryByText('A 的作品')).not.toBeInTheDocument()
+  })
+
+  it('为默认演示账号自动载入完整示例作品', async () => {
+    const repository = createMemoryWorkRepository()
+    render(
+      <WorksProvider
+        accountId={DEFAULT_DEMO_WORK_ACCOUNT}
+        repository={repository}
+        demoAssetLoader={async (path) => new Blob([path], {
+          type: path.endsWith('.mp4') ? 'video/mp4' : 'image/png',
+        })}
+      >
+        <Probe />
+      </WorksProvider>,
+    )
+
+    expect(await screen.findByText('会呼吸的时钟')).toBeInTheDocument()
+    expect(screen.getByLabelText('作品总数')).toHaveTextContent('25')
   })
 })

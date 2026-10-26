@@ -1,5 +1,6 @@
-import { ArrowRight, FolderKanban, Sparkles } from 'lucide-react'
+import { ArrowRight, Sparkles } from 'lucide-react'
 import type { GameId } from '../games/gameRegistry'
+import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
 import { useOptionalWorks } from '../works/WorksProvider'
 
 export function WorksWorkbench({
@@ -52,31 +53,34 @@ export function WorksWorkbench({
 
         {draft && (
           <div className="draft-work" onClick={() => onWorkClick?.(draft.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
-            <div className="draft-head"><span>正在创作</span><small>{draft.source === 'brain-film' ? '脑洞放映厅' : draft.source === 'creative-module' ? '创造模块' : '外部 AI 作品'}</small></div>
-            <h3>{draft.title}</h3>
-            <p>{draft.description || '这份草稿还在等你继续完成'}</p>
-            <div className="draft-action">
-              <small>灵感还在，继续完成它吧</small>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  if (draft.source === 'brain-film' || draft.source === 'creative-module') {
-                    onContinueCreate?.(draft.source)
-                  } else {
-                    onWorkClick?.(draft.id)
-                  }
-                }}
-              >
-                继续创作<ArrowRight aria-hidden="true" size={16} />
-              </button>
+            <WorkMediaThumbnail work={draft} className="draft-media" />
+            <div className="draft-copy">
+              <div className="draft-head"><span>正在创作</span><small>{draft.source === 'brain-film' ? '脑洞放映厅' : draft.source === 'creative-module' ? '创造模块' : '外部 AI 作品'}</small></div>
+              <h3>{draft.title}</h3>
+              <p>{draft.description || '这份草稿还在等你继续完成'}</p>
+              <div className="draft-action">
+                <small>灵感还在，继续完成它吧</small>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (draft.source === 'brain-film' || draft.source === 'creative-module') {
+                      onContinueCreate?.(draft.source)
+                    } else {
+                      onWorkClick?.(draft.id)
+                    }
+                  }}
+                >
+                  继续创作<ArrowRight aria-hidden="true" size={16} />
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {recent && (
           <div className="completed-work" onClick={() => onWorkClick?.(recent.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
-            <FolderKanban aria-hidden="true" />
+            <WorkMediaThumbnail work={recent} className="completed-media" />
             <div><span>{recent.status === 'published' ? '最近发布' : '最近更新'}</span><h3>{recent.title}</h3><p>{recent.status === 'published' ? `❤️ ${recent.likes} · ⭐ ${recent.favorites}` : '继续打磨你的创意'}</p></div>
             <button type="button" onClick={(event) => { event.stopPropagation(); onWorkClick?.(recent.id) }}>查看作品</button>
           </div>

@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, Clock3, Eye, FileText, FolderKanban, Loader, Plus, Send, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { UploadWorkDialog } from '../works/UploadWorkDialog'
+import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
 import { useOptionalWorks } from '../works/WorksProvider'
 import type { WorkRecord, WorkStatus } from '../works/types'
 import './profile.css'
@@ -106,7 +107,8 @@ export function WorksManagePage({
           return (
             <article key={work.id} className={`wm-card wm-status-card-${work.status}`}>
               <button className="wm-thumb" type="button" style={{ background: meta.color }} onClick={() => onWorkClick?.(work.id)} aria-label={`查看${work.title}`}>
-                <StatusIcon size={22} color="#fff" />
+                <WorkMediaThumbnail work={work} className="wm-card-media" />
+                <span className="wm-thumb-status" style={{ background: meta.dot }}><StatusIcon size={11} color="#fff" /></span>
               </button>
               <div className="wm-body">
                 <div className="wm-title-row">

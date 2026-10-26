@@ -2,6 +2,7 @@ import { Bookmark, Heart, MessageCircle, Send, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { rankPublishedWorks, type RankingPeriod } from '../works/moderation'
+import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
 import { useOptionalWorks } from '../works/WorksProvider'
 
 const periodLabels: Array<{ id: RankingPeriod; label: string }> = [
@@ -44,7 +45,10 @@ export function AchievementShowcase({ onWorkClick, onMoreWorks }: { onWorkClick?
           const saved = work.favoritedBy.includes(state.accountId)
           return (
             <article className="showcase-card" key={work.id}>
-              <div className="work-index">{String(index + 1).padStart(2, '0')}</div>
+              <div className="showcase-media" onClick={() => onWorkClick?.(work.id)}>
+                <WorkMediaThumbnail work={work} />
+                <div className="work-index">{String(index + 1).padStart(2, '0')}</div>
+              </div>
               <div className="work-copy" onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
                 <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
                 <h3>{work.title}</h3>
