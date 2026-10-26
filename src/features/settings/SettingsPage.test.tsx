@@ -1,12 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStateProvider } from '../../app/AppState'
 import { loadAccountState } from '../../app/companionAccountRepository'
 import { defaultState } from '../../app/model'
+import { saveState } from '../../app/storage'
 import { SettingsPage } from './SettingsPage'
 
 describe('settings page', () => {
+  beforeEach(() => localStorage.clear())
+
   it('organizes settings into five informative groups', () => {
     render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)
 
@@ -54,9 +57,33 @@ describe('settings page', () => {
     await user.click(screen.getByRole('button', { name: /伙伴与互动/ }))
 
     expect(screen.getByRole('img', { name: '绒桃 Momo AI 伙伴形象' })).toBeInTheDocument()
+    expect(screen.queryByText('小启')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('给 AI 伙伴起个名字')).not.toBeInTheDocument()
     expect(screen.queryByText('🤖')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '前往积分商城调整伙伴' }))
     expect(onOpenMall).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the equipped companion name instead of the legacy unified AI name', () => {
+    saveState({
+      ...defaultState,
+      companion: {
+        ...defaultState.companion,
+        owned: {
+          ...defaultState.companion.owned,
+          appearance: ['momo', 'cloudbloom'],
+        },
+        equipped: {
+          ...defaultState.companion.equipped,
+          appearance: 'cloudbloom',
+        },
+      },
+    })
+
+    render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)
+
+    expect(screen.getByRole('button', { name: /伙伴与互动，云绽 Cloudbloom/ })).toBeInTheDocument()
+    expect(screen.queryByText(/小启/)).not.toBeInTheDocument()
   })
 
   it('saves when the companion should speak text answers', async () => {

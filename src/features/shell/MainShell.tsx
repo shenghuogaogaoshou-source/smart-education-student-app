@@ -344,7 +344,12 @@ function MainShellBody() {
   if (view.kind === 'tools') {
     return (
       <main className={shellClassName}>
-        <LearningToolsDetailPage onBack={pop} />
+        <LearningToolsDetailPage
+          onBack={pop}
+          onOpenWrongBook={() => push({ kind: 'wrong-book' })}
+          onOpenFavorites={() => push({ kind: 'favorites' })}
+          onOpenHistory={() => push({ kind: 'history' })}
+        />
         <AiCompanion scene={companionScene} />
         <BottomNavigation activeTab={activeTab} onSelect={selectTab} />
       </main>

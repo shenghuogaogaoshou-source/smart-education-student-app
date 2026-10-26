@@ -10,6 +10,7 @@ import { CalendarPage } from './CalendarPage'
 import { ProfilePage } from './ProfilePage'
 import { ProfileDetailPage } from './ProfileDetailPage'
 import { ProfileEditPage } from './ProfileEditPage'
+import { LearningToolsDetailPage } from './LearningToolsDetailPage'
 
 function localDate(offset: number) {
   const now = new Date()
@@ -105,6 +106,83 @@ describe('profile dashboard', () => {
       expect(screen.getByText(dimension)).toBeInTheDocument()
     }
     expect(screen.getByText('正在认识你的学习方式')).toBeInTheDocument()
+  })
+
+  it('shows wrong-book counts from the saved answers instead of course totals', () => {
+    const state = createDefaultState()
+    state.wrongAnswers = [
+      {
+        id: 'wrong-pending',
+        gradeBand: 'grade5-6',
+        partId: 'ael-4',
+        questionId: 'ael-4-q1',
+        prompt: '待复习题目',
+        options: ['A', 'B'],
+        selectedIndex: 0,
+        answerIndex: 1,
+        explanation: '待复习解析',
+        occurredAt: '2026-10-26T09:00:00.000Z',
+        correctedAt: null,
+      },
+      {
+        id: 'wrong-reviewed',
+        gradeBand: 'grade5-6',
+        partId: 'ael-4',
+        questionId: 'ael-4-q2',
+        prompt: '已复习题目',
+        options: ['A', 'B'],
+        selectedIndex: 0,
+        answerIndex: 1,
+        explanation: '已复习解析',
+        occurredAt: '2026-10-25T09:00:00.000Z',
+        correctedAt: '2026-10-26T09:30:00.000Z',
+      },
+    ]
+    saveAccountState(state.accountId, state)
+
+    const view = render(
+      <AppStateProvider>
+        <ProfilePage onOpenSettings={vi.fn()} onOpenProfileDetail={vi.fn()} />
+      </AppStateProvider>,
+    )
+    const wrongBook = screen.getByText('错题本').closest('button')!
+    expect(within(wrongBook).getByText('2 道测试错题 · 1 道待复习')).toBeInTheDocument()
+
+    view.unmount()
+    render(
+      <AppStateProvider>
+        <LearningToolsDetailPage onBack={vi.fn()} />
+      </AppStateProvider>,
+    )
+    const notesTool = screen.getByText('错题本').closest('button')!
+    expect(within(notesTool).getByText('2')).toBeInTheDocument()
+  })
+
+  it('opens the three implemented tools instead of dead placeholder buttons', async () => {
+    const user = userEvent.setup()
+    const onOpenWrongBook = vi.fn()
+    const onOpenFavorites = vi.fn()
+    const onOpenHistory = vi.fn()
+
+    render(
+      <AppStateProvider>
+        <LearningToolsDetailPage
+          onBack={vi.fn()}
+          onOpenWrongBook={onOpenWrongBook}
+          onOpenFavorites={onOpenFavorites}
+          onOpenHistory={onOpenHistory}
+        />
+      </AppStateProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /^错题本/ }))
+    await user.click(screen.getByRole('button', { name: /^我的收藏/ }))
+    await user.click(screen.getByRole('button', { name: /^学习记录/ }))
+
+    expect(onOpenWrongBook).toHaveBeenCalledOnce()
+    expect(onOpenFavorites).toHaveBeenCalledOnce()
+    expect(onOpenHistory).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /智能翻译|知识搜索|内容摘要/ })).not.toBeInTheDocument()
   })
 
   it('renders live profile scores and the persisted gentle title', async () => {

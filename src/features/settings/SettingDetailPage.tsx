@@ -4,7 +4,7 @@ import { useAppState } from '../../app/AppState'
 import { BRAND } from '../../app/brand'
 import { GRADE_LABELS, PRIMARY_GRADES, type PrimaryGrade } from '../../app/learning'
 import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from '../../app/model'
-import { getCompanionItem } from '../ai_companion/companionCatalog'
+import { getCompanionDisplayName } from '../ai_companion/companionCatalog'
 import { PartnerAppearance } from '../ai_companion/PartnerAppearance'
 import { settingGroups } from './settingsData'
 
@@ -17,7 +17,7 @@ const RELATIONSHIP_LABEL: Record<GuardianInfo['relationship'], string> = {
 
 export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: string; onBack: () => void; onOpenMall: () => void }) {
   const app = useAppState()
-  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, resetAiPosition, setAiName, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
+  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, resetAiPosition, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
   const [notice, setNotice] = useState('')
   const item = settingGroups.flatMap((group) => group.items).find((entry) => entry.id === itemId)
   if (!item) return null
@@ -29,7 +29,7 @@ export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: stri
       {itemId === 'security' && <SecuritySection state={state} setTwoFactor={setTwoFactor} updatePassword={updatePassword} setNotice={setNotice} />}
       {itemId === 'guardian' && <GuardianSection state={state} setGuardian={setGuardian} setFamilyName={setFamilyName} setNotice={setNotice} />}
       {itemId === 'grade' && <GradeSection state={state} setGrade={setGrade} setNotice={setNotice} />}
-      {itemId === 'companion' && <CompanionSection state={state} setAiName={setAiName} setAiPersonality={setAiPersonality} resetAiPosition={resetAiPosition} setNotice={setNotice} onOpenMall={onOpenMall} />}
+      {itemId === 'companion' && <CompanionSection state={state} setAiPersonality={setAiPersonality} resetAiPosition={resetAiPosition} setNotice={setNotice} onOpenMall={onOpenMall} />}
       {itemId === 'voice' && <VoiceSection state={state} setVoiceEnabled={setVoiceEnabled} setAutoListen={setAutoListen} setVoiceMode={setVoiceMode} setVoiceReplyMode={setVoiceReplyMode} setNotice={setNotice} />}
       {itemId === 'memory' && <MemorySection state={state} setSaveHistory={setSaveHistory} setAiMemory={setAiMemory} clearHistory={clearHistory} setNotice={setNotice} />}
       {itemId === 'operation' && <OperationSection state={state} setConfirmDangerous={setConfirmDangerous} setGuardianApprove={setGuardianApprove} setSafeMode={setSafeMode} setNotice={setNotice} />}
@@ -297,17 +297,15 @@ const PERSONALITY_OPTIONS: Array<[AiPersonality, string, string]> = [
   ['serious', '认真严谨', '专注知识，少开玩笑'],
   ['encouraging', '鼓励成长', '肯定进步，激发信心'],
 ]
-function CompanionSection({ state, setAiName, setAiPersonality, resetAiPosition, setNotice, onOpenMall }: {
+function CompanionSection({ state, setAiPersonality, resetAiPosition, setNotice, onOpenMall }: {
   state: ReturnType<typeof useAppState>['state']
-  setAiName: (v: string) => void
   setAiPersonality: (v: AiPersonality) => void
   resetAiPosition: () => void
   setNotice: (s: string) => void
   onOpenMall: () => void
 }) {
-  const [nameInput, setNameInput] = useState(state.aiName)
   const loadout = state.companion
-  const appearanceName = getCompanionItem(loadout.equipped.appearance)?.name ?? state.aiName
+  const appearanceName = getCompanionDisplayName(loadout.equipped.appearance)
 
   return (
     <>
@@ -316,19 +314,11 @@ function CompanionSection({ state, setAiName, setAiPersonality, resetAiPosition,
         <div className="companion-settings-copy">
           <span className="companion-settings-eyebrow">当前伙伴</span>
           <div>
-            <strong>{state.aiName}</strong>
+            <strong>{appearanceName}</strong>
             <small>{PERSONALITY_OPTIONS.find(([k]) => k === state.aiPersonality)?.[1] ?? '鼓励成长'}</small>
           </div>
           <p>{appearanceName} · 当前服饰与装饰已同步到登录页和悬浮伙伴。</p>
           <button className="wide-muted companion-mall-link" type="button" onClick={onOpenMall}>前往积分商城调整伙伴</button>
-        </div>
-      </section>
-
-      <section className="choice-card">
-        <h2>AI 的名字</h2>
-        <div className="dialog-field">
-          <label>给 AI 伙伴起个名字</label>
-          <input className="plain-input" value={nameInput} maxLength={8} onChange={(e) => setNameInput(e.target.value)} onBlur={() => { if (nameInput.trim()) { setAiName(nameInput.trim()); setNotice('AI 名字已更新') } }} />
         </div>
       </section>
 

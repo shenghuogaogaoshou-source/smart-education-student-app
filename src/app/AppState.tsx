@@ -44,9 +44,7 @@ type Action =
   | { type: 'set-family-name'; name: string }
   | { type: 'remove-device'; index: number }
   // AI 伙伴
-  | { type: 'set-ai-name'; name: string }
   | { type: 'set-ai-personality'; personality: AiPersonality }
-  | { type: 'set-ai-skin'; skin: number }
   | { type: 'purchase-companion-item'; category: CompanionCategory; id: string; price: number; name: string; occurredAt: string }
   | { type: 'equip-companion-item'; category: CompanionCategory; id: string }
   | { type: 'unequip-companion-item'; category: Exclude<CompanionCategory, 'appearance'> }
@@ -424,9 +422,7 @@ function reducer(state: AppState, action: Action): AppState {
       ...state,
       devices: state.devices.filter((_, i) => i !== action.index),
     }
-    case 'set-ai-name': return { ...state, aiName: action.name }
     case 'set-ai-personality': return { ...state, aiPersonality: action.personality }
-    case 'set-ai-skin': return { ...state, aiSkin: action.skin }
     case 'purchase-companion-item': return purchase(state, action)
     case 'equip-companion-item': {
       const loadout = state.companion
@@ -504,9 +500,7 @@ type AppStateContextValue = {
   setGuardian: (guardian: GuardianInfo) => void
   setFamilyName: (name: string) => void
   removeDevice: (index: number) => void
-  setAiName: (name: string) => void
   setAiPersonality: (personality: AiPersonality) => void
-  setAiSkin: (skin: number) => void
   purchaseCompanionItem: (category: CompanionCategory, id: string, price: number, name?: string) => void
   equipCompanionItem: (category: CompanionCategory, id: string) => void
   unequipCompanionItem: (category: Exclude<CompanionCategory, 'appearance'>) => void
@@ -599,9 +593,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     setGuardian: (guardian) => dispatch({ type: 'set-guardian', guardian }),
     setFamilyName: (name) => dispatch({ type: 'set-family-name', name }),
     removeDevice: (index) => dispatch({ type: 'remove-device', index }),
-    setAiName: (name) => dispatch({ type: 'set-ai-name', name }),
     setAiPersonality: (personality) => dispatch({ type: 'set-ai-personality', personality }),
-    setAiSkin: (skin) => dispatch({ type: 'set-ai-skin', skin }),
     purchaseCompanionItem: (category, id, price, name = id) => dispatch({ type: 'purchase-companion-item', category, id, price, name, occurredAt: new Date().toISOString() }),
     equipCompanionItem: (category, id) => dispatch({ type: 'equip-companion-item', category, id }),
     unequipCompanionItem: (category) => dispatch({ type: 'unequip-companion-item', category }),

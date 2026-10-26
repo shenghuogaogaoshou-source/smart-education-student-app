@@ -130,16 +130,34 @@ describe('points mall companion catalogue', () => {
     expect(screen.getByRole('button', { name: '购买 云光花灯，180 积分' })).toBeInTheDocument()
   })
 
+  it('waits for explicit confirmation before spending points or granting an item', async () => {
+    const user = userEvent.setup()
+    renderMall(1280)
+
+    await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo，360 积分' }))
+
+    expect(screen.getByRole('dialog', { name: '确认购买云朵 Yunduo' })).toBeInTheDocument()
+    expect(screen.getByText('当前积分').parentElement).toHaveTextContent('1,280')
+    expect(loadAccountState(defaultState.accountId).companion.owned.appearance).not.toContain('yunduo')
+
+    await user.click(screen.getByRole('button', { name: '先不买' }))
+
+    expect(screen.queryByRole('dialog', { name: '确认购买云朵 Yunduo' })).not.toBeInTheDocument()
+    expect(screen.getByText('当前积分').parentElement).toHaveTextContent('1,280')
+    expect(loadAccountState(defaultState.accountId).companion.owned.appearance).not.toContain('yunduo')
+  })
+
   it.each([
     ['形象', '云朵 Yunduo', 920, '920'],
     ['服饰', '云朵小背包', 1120, '1,120'],
     ['装饰', '云光花灯', 1100, '1,100'],
-  ])('buys a %s directly from its card and deducts the correct points', async (category, name, expectedBalance, expectedDisplay) => {
+  ])('buys a %s from its card after confirmation and deducts the correct points', async (category, name, expectedBalance, expectedDisplay) => {
     const user = userEvent.setup()
     renderMall()
 
     await user.click(screen.getByRole('tab', { name: category }))
     await user.click(screen.getByRole('button', { name: `购买 ${name}，${1280 - expectedBalance} 积分` }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
 
     expect(screen.getByRole('dialog', { name: '现在换上吗？' })).toBeInTheDocument()
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent(expectedDisplay)
@@ -151,6 +169,7 @@ describe('points mall companion catalogue', () => {
 
     await user.click(screen.getByRole('button', { name: '查看 云朵 Yunduo' }))
     await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo' }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
     expect(screen.getByRole('dialog', { name: '现在换上吗？' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '暂不更换' }))
 
@@ -163,6 +182,7 @@ describe('points mall companion catalogue', () => {
 
     await user.click(screen.getByRole('button', { name: '查看 云朵 Yunduo' }))
     await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo' }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
     await user.click(screen.getByRole('button', { name: '现在换上' }))
 
     expect(screen.getByText('当前伙伴：云朵 Yunduo')).toBeInTheDocument()
@@ -178,6 +198,7 @@ describe('points mall companion catalogue', () => {
     ] as const) {
       await user.click(screen.getByRole('tab', { name: category }))
       await user.click(screen.getByRole('button', { name: `购买 ${name}，${price} 积分` }))
+      await user.click(screen.getByRole('button', { name: '确认购买' }))
       await user.click(screen.getByRole('button', { name: '现在换上' }))
     }
     view.unmount()
@@ -199,6 +220,7 @@ describe('points mall companion catalogue', () => {
 
     await user.click(screen.getByRole('button', { name: '查看 云朵 Yunduo' }))
     await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo' }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
 
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('920')
   })
@@ -210,6 +232,7 @@ describe('points mall companion catalogue', () => {
 
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('2,000')
     await user.click(screen.getByRole('button', { name: '购买 云朵 Yunduo，360 积分' }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
 
     const saved = loadAccountState(defaultState.accountId)
     expect(screen.getByText('当前积分').parentElement).toHaveTextContent('1,640')
@@ -353,6 +376,7 @@ describe('points mall companion catalogue', () => {
     const view = renderSurfaces()
     await user.click(screen.getByRole('tab', { name: '服饰' }))
     await user.click(screen.getByRole('button', { name: '购买 云朵小背包，160 积分' }))
+    await user.click(screen.getByRole('button', { name: '确认购买' }))
     await user.click(screen.getByRole('button', { name: '现在换上' }))
 
     expect(within(screen.getByRole('region', { name: '登录页伙伴预览' })).getByTestId('companion-attachment-cloud-backpack')).toBeInTheDocument()

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { BRAND } from '../../app/brand'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
+import { getCompanionDisplayName } from '../ai_companion/companionCatalog'
 import { SettingDetailPage } from './SettingDetailPage'
 import { settingGroups } from './settingsData'
 import './settings.css'
@@ -51,7 +52,7 @@ export function SettingsPage({
       case 'font': return ({ standard: '标准', large: '大号', xlarge: '特大号' } as const)[state.fontScale]
       case 'security': return state.passwordHint
       case 'guardian': return state.guardian.authorised ? `${state.guardian.name} · 已授权` : `${state.guardian.name} · 未授权`
-      case 'companion': return `${state.aiName} · ${({ gentle: '温柔', playful: '活泼', serious: '认真', encouraging: '鼓励' } as const)[state.aiPersonality]}`
+      case 'companion': return `${getCompanionDisplayName(state.companion.equipped.appearance)} · ${({ gentle: '温柔', playful: '活泼', serious: '认真', encouraging: '鼓励' } as const)[state.aiPersonality]}`
       case 'voice': return state.voiceEnabled ? `${state.voiceMode === 'warm' ? '温暖' : state.voiceMode === 'bright' ? '明亮' : '沉稳'} · 开启` : '已关闭'
       case 'memory': return state.aiMemoryEnabled ? `记忆开启 · ${state.historyCount} 条记录` : '记忆已关闭'
       case 'operation': return ({ strict: '严格保护', standard: '标准保护', relaxed: '轻松模式' } as const)[state.safeMode]

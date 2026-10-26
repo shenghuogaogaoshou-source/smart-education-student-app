@@ -20,8 +20,8 @@ export function LearningTools({
   const { state } = useAppState()
   const worksState = useOptionalWorks()
   const course = getCourseForBand(getGradeBand(state.grade))
-  const wrongQuestionCount = Math.min(6, course.quizzes.length)
-  const pendingWrongCount = Math.ceil(wrongQuestionCount * 2 / 3)
+  const wrongQuestionCount = state.wrongAnswers.length
+  const pendingWrongCount = state.wrongAnswers.filter((answer) => !answer.correctedAt).length
   const favoriteCount = (worksState?.works ?? []).filter((work) => (
     work.status === 'published'
     && (work.creatorId || work.ownerId) !== worksState?.accountId

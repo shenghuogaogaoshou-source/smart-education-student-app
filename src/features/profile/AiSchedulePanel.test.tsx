@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { BandProgress, PrimaryGrade } from '../../app/learning'
 import { createDefaultState } from '../../app/model'
 import type { DailyAvailability, LearningPlanTask } from '../../app/learningPlan'
 import { getCourseForGrade } from '../knowledge/courseCatalog'

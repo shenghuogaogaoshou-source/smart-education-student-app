@@ -16,7 +16,6 @@ import type { CoursePackage } from '../knowledge/courseCatalog'
 import { buildFallbackPlan, getPlanCandidates, validatePlanTasks } from './learningPlanner'
 import {
   requestScheduleSuggestion,
-  ScheduleSuggestionError,
   type ScheduleSuggestionRequest,
   type ScheduleSuggestionResult,
 } from './scheduleApi'

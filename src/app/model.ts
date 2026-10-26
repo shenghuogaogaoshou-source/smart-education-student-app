@@ -90,9 +90,7 @@ export type AppState = {
   guardian: GuardianInfo
   familyName: string
   devices: DeviceInfo[]
-  aiName: string
   aiPersonality: AiPersonality
-  aiSkin: number
   voiceEnabled: boolean
   autoListenEnabled: boolean
   voiceMode: VoiceMode
@@ -174,9 +172,7 @@ export function createDefaultState(): AppState {
       { name: '家里的学习平板', lastActive: '2 天前', current: false },
       { name: '爸爸的手机', lastActive: '3 周前', current: false },
     ],
-    aiName: '小启',
     aiPersonality: 'encouraging',
-    aiSkin: 0,
     voiceEnabled: true,
     autoListenEnabled: false,
     voiceMode: 'warm',

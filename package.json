@@ -23,15 +23,13 @@
     "test:all": "npm test -- --run && npm run test:server && npm run test:scripts && npm run test:games"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
     "@zxing/library": "^0.23.0",
     "jsqr": "^1.4.0",
     "lucide-react": "latest",
     "msedge-tts": "^2.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "latest",
-    "recharts": "^3.10.1"
+    "react-router-dom": "latest"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "latest",
@@ -39,11 +37,12 @@
     "@testing-library/user-event": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "^6.1.2",
     "fake-indexeddb": "^6.2.6",
     "jsdom": "latest",
     "sucrase": "^3.35.1",
     "typescript": "latest",
-    "vite": "latest",
-    "vitest": "latest"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }

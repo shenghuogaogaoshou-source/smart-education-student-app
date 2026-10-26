@@ -59,6 +59,7 @@ export function MallPage({ onBack }: { onBack: () => void }) {
   const { state, purchaseCompanionItem, equipCompanionItem, unequipCompanionItem } = useAppState()
   const [category, setCategory] = useState<MallCategory>('appearance')
   const [selectedItem, setSelectedItem] = useState<CompanionCatalogItem | null>(null)
+  const [purchaseConfirmItem, setPurchaseConfirmItem] = useState<CompanionCatalogItem | null>(null)
   const [equipPromptItem, setEquipPromptItem] = useState<CompanionCatalogItem | null>(null)
   const [previewDirection, setPreviewDirection] = useState<CompanionDirection>('front')
   const [toast, setToast] = useState('')
@@ -86,9 +87,26 @@ export function MallPage({ onBack }: { onBack: () => void }) {
       return
     }
 
-    purchaseCompanionItem(item.category, item.id, item.price, item.name)
     setSelectedItem(null)
-    setEquipPromptItem(item)
+    setPurchaseConfirmItem(item)
+  }
+
+  const confirmPurchase = () => {
+    if (!purchaseConfirmItem) return
+    if (balance < purchaseConfirmItem.price) {
+      setPurchaseConfirmItem(null)
+      showToast('积分不够哦，继续学习攒积分吧！')
+      return
+    }
+
+    purchaseCompanionItem(
+      purchaseConfirmItem.category,
+      purchaseConfirmItem.id,
+      purchaseConfirmItem.price,
+      purchaseConfirmItem.name,
+    )
+    setPurchaseConfirmItem(null)
+    setEquipPromptItem(purchaseConfirmItem)
     setCategory('my')
   }
 
@@ -289,6 +307,32 @@ export function MallPage({ onBack }: { onBack: () => void }) {
                 <Sparkles aria-hidden="true" size={14} />购买 {selectedItem.name} · {selectedItem.price} 积分
               </button>
             )}
+          </section>
+        </div>
+      )}
+
+      {purchaseConfirmItem && (
+        <div className="mall-dialog-backdrop">
+          <section
+            className="mall-dialog mall-purchase-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`确认购买${purchaseConfirmItem.name}`}
+          >
+            <div className="mall-equip-dialog-icon"><ShoppingBag aria-hidden="true" size={24} /></div>
+            <h2>确认购买{purchaseConfirmItem.name}？</h2>
+            <p>
+              将花费 <strong>{purchaseConfirmItem.price} 积分</strong>，
+              购买后还剩 <strong>{balance - purchaseConfirmItem.price} 积分</strong>。
+            </p>
+            <div className="mall-dialog-actions">
+              <button className="mall-dialog-muted" type="button" onClick={() => setPurchaseConfirmItem(null)}>
+                先不买
+              </button>
+              <button className="mall-dialog-primary" type="button" onClick={confirmPurchase}>
+                确认购买
+              </button>
+            </div>
           </section>
         </div>
       )}

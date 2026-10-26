@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
 
 function processSpec(name, cwd, args, command = process.execPath, env = {}, resilient = false) {
   return { name, cwd, command, args, env, resilient }
@@ -15,8 +16,16 @@ function pythonExecutable() {
   return candidates.find((candidate) => existsSync(candidate)) ?? 'python'
 }
 
+function resolveViteCli(appRoot) {
+  const appRequire = createRequire(join(appRoot, 'package.json'))
+  const packagePath = appRequire.resolve('vite/package.json')
+  const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'))
+  const binPath = typeof packageJson.bin === 'string' ? packageJson.bin : packageJson.bin?.vite
+  if (!binPath) throw new Error(`Vite CLI not declared by ${packagePath}`)
+  return resolve(dirname(packagePath), binPath)
+}
+
 export function buildDevProcessSpecs(root, forwardedArgs) {
-  const rootVite = join(root, 'node_modules', 'vite', 'bin', 'vite.js')
   const brainFilmRoot = join(root, 'apps', 'brain-film')
   const creativeModuleRoot = join(root, 'apps', 'creative-module')
 
@@ -30,9 +39,9 @@ export function buildDevProcessSpecs(root, forwardedArgs) {
       { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
       true,
     ),
-    processSpec('zhiya-web', root, [rootVite, ...forwardedArgs]),
+    processSpec('zhiya-web', root, [resolveViteCli(root), ...forwardedArgs]),
     processSpec('brain-film', brainFilmRoot, [
-      join(brainFilmRoot, 'node_modules', 'vite', 'bin', 'vite.js'),
+      resolveViteCli(brainFilmRoot),
       '--host',
       '127.0.0.1',
       '--port',
@@ -40,7 +49,7 @@ export function buildDevProcessSpecs(root, forwardedArgs) {
       '--strictPort',
     ]),
     processSpec('creative-module', creativeModuleRoot, [
-      join(creativeModuleRoot, 'node_modules', 'vite', 'bin', 'vite.js'),
+      resolveViteCli(creativeModuleRoot),
       '--host',
       '127.0.0.1',
       '--port',

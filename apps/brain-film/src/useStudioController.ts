@@ -15,7 +15,7 @@ function readHasDraft(): boolean {
   } catch { return false }
 }
 
-export function useStudioController(root: RefObject<HTMLDivElement>) {
+export function useStudioController(root: RefObject<HTMLDivElement | null>) {
   const bridge = useRef<StudioBridge | null>(null)
   const history = useRef<Stage[]>([])
   const active = useRef<Stage>('title')
