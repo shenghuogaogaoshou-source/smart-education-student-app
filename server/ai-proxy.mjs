@@ -245,6 +245,7 @@ export function createCompanionRequestListener({
   allowedOrigins = parseAllowedOrigins(),
   handleApi = handleCompanionApiRequest,
   synthesize = synthesizeSpeech,
+  brainOrigin = process.env.BRAIN_INTERNAL_ORIGIN || '',
 } = {}) {
   return async function companionRequestListener(request, response) {
     const path = request.url?.split('?')[0] ?? ''
@@ -257,9 +258,23 @@ export function createCompanionRequestListener({
     if (request.method === 'POST' && path === '/api/tts') {
       try {
         const body = await readJson(request)
-        const audio = await synthesize(body?.text, body?.voice)
+        let audio
+        let contentType = 'audio/mpeg'
+        if (brainOrigin) {
+          const upstream = await fetch(brainOrigin.replace(/\/$/, '') + '/api/tts', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ text: body?.text, voice: body?.voice }),
+            signal: AbortSignal.timeout(30_000),
+          })
+          if (!upstream.ok) throw new Error('tts_failed')
+          audio = Buffer.from(await upstream.arrayBuffer())
+          contentType = upstream.headers.get('content-type') || 'audio/wav'
+        } else {
+          audio = await synthesize(body?.text, body?.voice)
+        }
         response.writeHead(200, {
-          'content-type': 'audio/mpeg',
+          'content-type': contentType,
           'cache-control': 'no-store',
           ...corsHeaders,
         })

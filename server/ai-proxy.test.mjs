@@ -11,6 +11,34 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 describe('AI companion proxy routes', () => {
+  it('uses the configured brain service for production TTS when available', async () => {
+    const upstream = createServer((request, response) => {
+      expect(request.url).toBe('/api/tts')
+      response.writeHead(200, { 'content-type': 'audio/wav' })
+      response.end(Buffer.from('wav-audio'))
+    }).listen(0, '127.0.0.1')
+    await new Promise((resolve) => upstream.once('listening', resolve))
+    const listener = createCompanionRequestListener({
+      allowedOrigins: new Set(['*']),
+      brainOrigin: 'http://127.0.0.1:' + upstream.address().port,
+    })
+    const server = createServer(listener).listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    try {
+      const response = await fetch('http://127.0.0.1:' + server.address().port + '/api/tts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: '你好', voice: 'female' }),
+      })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('audio/wav')
+      expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('wav-audio')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+      await new Promise((resolve) => upstream.close(resolve))
+    }
+  })
+
   it('reflects only explicitly allowed origins from the reusable listener', async () => {
     const listener = createCompanionRequestListener({
       allowedOrigins: new Set(['https://localhost']),
