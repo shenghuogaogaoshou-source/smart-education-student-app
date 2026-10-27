@@ -78,7 +78,7 @@ export async function recognize(body, {
     let finishReason
     try {
       const response = await fetchImpl(`${base.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST', signal: timeoutSignalFactory(25_000),
+        method: 'POST', signal: timeoutSignalFactory(90_000),
         headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
         body: JSON.stringify({ model, max_tokens: attempt ? 10000 : 6000, response_format: { type: 'json_object' }, messages }),
       })

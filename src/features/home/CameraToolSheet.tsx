@@ -78,7 +78,7 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
     if (!tool) return
     const controller = new AbortController(); request.current = controller
     setBusy(true); setError(''); setNotice(''); setResult(null)
-    const timeout = window.setTimeout(() => controller.abort(), 130000)
+    const timeout = window.setTimeout(() => controller.abort(), 210000)
     try {
       let scanResult: ToolResult | null = null
       if (tool.id === 'scan') scanResult = await scanImage(image)

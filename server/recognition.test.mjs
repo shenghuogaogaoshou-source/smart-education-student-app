@@ -50,7 +50,7 @@ test('retries truncated provider response and includes extensions', async (t) =>
   assert.equal(calls, 2)
 })
 
-test('uses DashScope qwen3-vl-plus with a 25 second timeout and retries one provider failure', async () => {
+test('uses DashScope qwen3-vl-plus with a 90 second timeout and retries one provider failure', async () => {
   const calls = []
   const timeoutValues = []
   const result = { title: '叶子', output: '这是叶片。', uncertainty: '请对照原图。', evidence: ['能看到叶脉'], steps: [{ title: '观察', detail: '先看形状和叶脉' }], introduction: { overview: '叶片帮助植物制造养分。', funFact: '叶脉还能运输水分。', question: '叶脉像什么形状？' } }
@@ -68,7 +68,7 @@ test('uses DashScope qwen3-vl-plus with a 25 second timeout and retries one prov
   assert.equal(calls.length, 2)
   assert.equal(calls[0].url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions')
   assert.equal(JSON.parse(calls[0].options.body).model, 'qwen3-vl-plus')
-  assert.deepEqual(timeoutValues, [25000, 25000])
+  assert.deepEqual(timeoutValues, [90000, 90000])
 })
 
 test('returns a safe local result after both vision attempts fail', async () => {
