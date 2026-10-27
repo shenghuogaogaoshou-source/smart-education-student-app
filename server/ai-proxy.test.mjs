@@ -1,10 +1,65 @@
 import { describe, expect, it, vi } from 'vitest'
-import { handleCompanionApiRequest, loadLocalEnvironmentFiles, startProxyServer } from './ai-proxy.mjs'
+import { createServer } from 'node:http'
+import {
+  createCompanionRequestListener,
+  handleCompanionApiRequest,
+  loadLocalEnvironmentFiles,
+  startProxyServer,
+} from './ai-proxy.mjs'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 describe('AI companion proxy routes', () => {
+  it('reflects only explicitly allowed origins from the reusable listener', async () => {
+    const listener = createCompanionRequestListener({
+      allowedOrigins: new Set(['https://localhost']),
+      handleApi: async () => ({ status: 200, body: { ok: true } }),
+    })
+    const server = createServer(listener).listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const origin = `http://127.0.0.1:${server.address().port}`
+    try {
+      const allowed = await fetch(`${origin}/api/health`, {
+        headers: { origin: 'https://localhost' },
+      })
+      expect(allowed.status).toBe(200)
+      expect(allowed.headers.get('access-control-allow-origin')).toBe('https://localhost')
+
+      const unknown = await fetch(`${origin}/api/health`, {
+        headers: { origin: 'https://unknown.example' },
+      })
+      expect(unknown.status).toBe(200)
+      expect(unknown.headers.get('access-control-allow-origin')).toBeNull()
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
+
+  it('returns a non-secret health response through the reusable listener', async () => {
+    const listener = createCompanionRequestListener({
+      allowedOrigins: new Set(['https://localhost']),
+      handleApi: async ({ method, path }) => ({
+        status: method === 'GET' && path === '/api/health' ? 200 : 404,
+        body: method === 'GET' && path === '/api/health'
+          ? { ok: true, companion: { configured: true } }
+          : { error: 'not_found' },
+      }),
+    })
+    const server = createServer(listener).listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    try {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/health`, {
+        headers: { origin: 'https://localhost' },
+      })
+      const body = await response.json()
+      expect(body).toEqual({ ok: true, companion: { configured: true } })
+      expect(JSON.stringify(body)).not.toMatch(/secret|token|api.?key|process\.env/i)
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
+
   it('loads the root environment before the server fallback without replacing existing values', () => {
     const dir = mkdtempSync(join(tmpdir(), 'zhiya-env-'))
     const rootFile = join(dir, 'root.env')

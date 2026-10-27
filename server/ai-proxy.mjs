@@ -12,8 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
 const HOST = process.env.COMPANION_PROXY_HOST || '127.0.0.1'
 const MAX_BODY_BYTES = 16 * 1024
-const CORS_HEADERS = {
-  'access-control-allow-origin': '*',
+const CORS_BASE_HEADERS = {
   'access-control-allow-methods': 'GET,POST,OPTIONS',
   'access-control-allow-headers': 'content-type',
   'access-control-max-age': '86400',
@@ -36,11 +35,29 @@ export function loadLocalEnvironmentFiles(paths, target = process.env) {
   return target
 }
 
-function sendJson(response, status, body) {
+export function parseAllowedOrigins(raw = process.env.ALLOWED_ORIGINS || '') {
+  return new Set(raw.split(',').map((value) => value.trim()).filter(Boolean))
+}
+
+function corsHeadersForRequest(request, allowedOrigins) {
+  const origin = request.headers.origin
+  const allowOrigin = origin && allowedOrigins.has(origin)
+    ? origin
+    : allowedOrigins.has('*')
+      ? '*'
+      : null
+  return {
+    ...CORS_BASE_HEADERS,
+    ...(allowOrigin ? { 'access-control-allow-origin': allowOrigin } : {}),
+    ...(allowOrigin && allowOrigin !== '*' ? { vary: 'origin' } : {}),
+  }
+}
+
+function sendJson(response, status, body, corsHeaders = {}) {
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
-    ...CORS_HEADERS,
+    ...corsHeaders,
   })
   response.end(JSON.stringify(body))
 }
@@ -224,29 +241,34 @@ export async function handleCompanionApiRequest(
   }
 }
 
-export function startProxyServer(port = PORT, host = HOST) {
-  const server = createServer(async (request, response) => {
+export function createCompanionRequestListener({
+  allowedOrigins = parseAllowedOrigins(),
+  handleApi = handleCompanionApiRequest,
+  synthesize = synthesizeSpeech,
+} = {}) {
+  return async function companionRequestListener(request, response) {
     const path = request.url?.split('?')[0] ?? ''
+    const corsHeaders = corsHeadersForRequest(request, allowedOrigins)
     if (request.method === 'OPTIONS') {
-      response.writeHead(204, CORS_HEADERS)
+      response.writeHead(204, corsHeaders)
       response.end()
       return
     }
     if (request.method === 'POST' && path === '/api/tts') {
       try {
         const body = await readJson(request)
-        const audio = await synthesizeSpeech(body?.text, body?.voice)
+        const audio = await synthesize(body?.text, body?.voice)
         response.writeHead(200, {
           'content-type': 'audio/mpeg',
           'cache-control': 'no-store',
-          ...CORS_HEADERS,
+          ...corsHeaders,
         })
         response.end(audio)
       } catch (error) {
         const code = error instanceof Error ? error.message : 'tts_failed'
         sendJson(response, code === 'invalid_input' || code === 'text_too_long' ? 400 : 502, {
           error: code === 'invalid_input' || code === 'text_too_long' ? code : 'tts_failed',
-        })
+        }, corsHeaders)
       }
       return
     }
@@ -264,12 +286,19 @@ export function startProxyServer(port = PORT, host = HOST) {
       body = await readJson(request, limit)
     } catch (error) {
       const code = error instanceof Error ? error.message : 'invalid_json'
-      sendJson(response, code === 'body_too_large' ? 413 : 400, { error: code })
+      sendJson(response, code === 'body_too_large' ? 413 : 400, { error: code }, corsHeaders)
       return
     }
-    const result = await handleCompanionApiRequest({ method: request.method, path, body })
-    sendJson(response, result.status, result.body)
-  })
+    const result = await handleApi({ method: request.method, path, body })
+    sendJson(response, result.status, result.body, corsHeaders)
+  }
+}
+
+export function startProxyServer(port = PORT, host = HOST) {
+  const localAllowedOrigins = process.env.ALLOWED_ORIGINS
+    ? parseAllowedOrigins()
+    : new Set(['*'])
+  const server = createServer(createCompanionRequestListener({ allowedOrigins: localAllowedOrigins }))
 
   server.listen(port, host, () => {
     console.log(`AI companion proxy running at http://${host}:${port}`)
