@@ -28,13 +28,18 @@ function resolveViteCli(appRoot) {
 export function buildDevProcessSpecs(root, forwardedArgs) {
   const brainFilmRoot = join(root, 'apps', 'brain-film')
   const creativeModuleRoot = join(root, 'apps', 'creative-module')
+  const lanMode = process.env.ZHIYA_LAN === '1'
+  const backendHost = lanMode ? '0.0.0.0' : '127.0.0.1'
+  const brainHostArgs = lanMode ? ['--lan'] : ['--host', '127.0.0.1']
 
   return [
-    processSpec('ai-proxy', root, [join(root, 'server', 'ai-proxy.mjs')], process.execPath, {}, true),
+    processSpec('ai-proxy', root, [join(root, 'server', 'ai-proxy.mjs')], process.execPath, {
+      COMPANION_PROXY_HOST: backendHost,
+    }, true),
     processSpec(
       'brain-api',
       brainFilmRoot,
-      ['server.py', '--host', '127.0.0.1', '--port', '8766'],
+      ['server.py', ...brainHostArgs, '--port', '8766'],
       pythonExecutable(),
       { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
       true,

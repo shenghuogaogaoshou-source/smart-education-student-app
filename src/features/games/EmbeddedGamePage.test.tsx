@@ -10,7 +10,7 @@ describe('embedded game page', () => {
     render(<EmbeddedGamePage gameId="brain-film" onBack={onBack} />)
 
     const frame = screen.getByTitle('脑洞放映厅')
-    expect(frame).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
+    expect(frame).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261027-1')
     fireEvent.load(frame)
     expect(screen.getByText('游戏已就绪')).toBeInTheDocument()
 

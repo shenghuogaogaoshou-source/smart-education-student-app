@@ -20,6 +20,31 @@ describe('AI companion proxy routes', () => {
     })
   })
 
+  it('allows native WebView requests and CORS preflight', async () => {
+    const server = startProxyServer(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const origin = `http://127.0.0.1:${server.address().port}`
+    try {
+      const preflight = await fetch(`${origin}/api/health`, {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://localhost',
+          'access-control-request-method': 'GET',
+        },
+      })
+      expect(preflight.status).toBe(204)
+      expect(preflight.headers.get('access-control-allow-origin')).toBe('*')
+
+      const health = await fetch(`${origin}/api/health`, {
+        headers: { origin: 'https://localhost' },
+      })
+      expect(health.status).toBe(200)
+      expect(health.headers.get('access-control-allow-origin')).toBe('*')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
+
   it('exposes a non-secret health summary even when vision is not configured', async () => {
     const result = await handleCompanionApiRequest({ method: 'GET', path: '/api/health', body: {} }, {
       apiKey: '', visionApiKey: '', visionModel: 'qwen3-vl-plus',

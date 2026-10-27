@@ -1,8 +1,9 @@
+import { isNativeApp } from '../../app/mobileApi'
+
 type RecognitionResultItem = {
   0?: { transcript?: string }
   isFinal?: boolean
 }
-
 type RecognitionEventLike = {
   resultIndex?: number
   results?: ArrayLike<RecognitionResultItem>
@@ -47,7 +48,79 @@ export type SpeechPlayback = {
   cancel: () => void
 }
 
+function startNativeSpeechCapture({
+  onInterim,
+  onComplete,
+  onError,
+}: SpeechCaptureCallbacks): SpeechCapture {
+  let active = true
+  let latestTranscript = ''
+  let plugin: typeof import('@capacitor-community/speech-recognition')['SpeechRecognition'] | null = null
+  const listenerHandles: Array<{ remove: () => Promise<void> }> = []
+
+  const cleanup = () => {
+    for (const handle of listenerHandles.splice(0)) void handle.remove()
+  }
+
+  const finish = (error?: SpeechCaptureErrorReason) => {
+    if (!active) return
+    active = false
+    cleanup()
+    const transcript = latestTranscript.trim()
+    if (transcript) onComplete(transcript)
+    else onError(error ?? 'no-speech')
+  }
+
+  void (async () => {
+    const module = await import('@capacitor-community/speech-recognition')
+    plugin = module.SpeechRecognition
+    const availability = await plugin.available()
+    if (!availability.available) {
+      finish('start-failed')
+      return
+    }
+
+    let permission = await plugin.checkPermissions()
+    if (permission.speechRecognition === 'prompt' || permission.speechRecognition === 'prompt-with-rationale') {
+      permission = await plugin.requestPermissions()
+    }
+    if (permission.speechRecognition !== 'granted') {
+      finish('permission-denied')
+      return
+    }
+
+    listenerHandles.push(await plugin.addListener('partialResults', ({ matches }) => {
+      if (!active) return
+      const transcript = matches?.[0]?.trim() ?? ''
+      if (!transcript) return
+      latestTranscript = transcript
+      onInterim?.(transcript)
+    }))
+    listenerHandles.push(await plugin.addListener('listeningState', ({ status }) => {
+      if (status === 'stopped') finish()
+    }))
+
+    await plugin.start({
+      language: 'zh-CN',
+      maxResults: 1,
+      prompt: '请说出你想问的问题',
+      partialResults: true,
+      popup: false,
+    })
+  })().catch(() => finish('start-failed'))
+
+  return {
+    stop: () => { void plugin?.stop() },
+    cancel: () => {
+      active = false
+      cleanup()
+      void plugin?.stop()
+    },
+  }
+}
+
 export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCaptureCallbacks): SpeechCapture | null {
+  if (isNativeApp()) return startNativeSpeechCapture({ onInterim, onComplete, onError })
   const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition
   if (!Recognition) return null
 
@@ -111,6 +184,27 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
 }
 
 export function speakCompanionReply(text: string, enabled: boolean, onEnd?: () => void): SpeechPlayback | null {
+  if (enabled && isNativeApp()) {
+    let stopped = false
+    void import('@capacitor-community/text-to-speech').then(async ({ TextToSpeech, QueueStrategy }) => {
+      await TextToSpeech.stop()
+      if (stopped) return
+      await TextToSpeech.speak({
+        text,
+        lang: 'zh-CN',
+        rate: .96,
+        pitch: 1,
+        queueStrategy: QueueStrategy.Flush,
+      })
+      if (!stopped) onEnd?.()
+    }).catch(() => onEnd?.())
+    return {
+      cancel: () => {
+        stopped = true
+        void import('@capacitor-community/text-to-speech').then(({ TextToSpeech }) => TextToSpeech.stop())
+      },
+    }
+  }
   if (!enabled || typeof window.speechSynthesis === 'undefined' || typeof window.SpeechSynthesisUtterance === 'undefined') return null
 
   const synthesis = window.speechSynthesis

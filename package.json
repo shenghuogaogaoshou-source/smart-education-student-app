@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "node server/dev.mjs",
+    "dev:lan": "node scripts/start-lan-backend.mjs",
     "dev:web": "vite",
     "build:web": "tsc -b && vite build",
     "build:games": "node scripts/build-embedded-games.mjs",
@@ -20,9 +21,16 @@
     "test:scripts": "node --test scripts/*.test.mjs",
     "import:brain-film": "node scripts/import-brain-film-work.mjs",
     "test:games": "npm test --workspace @zhiya/brain-film && npm run test:py --workspace @zhiya/brain-film && npm test --workspace @zhiya/creative-module",
-    "test:all": "npm test -- --run && npm run test:server && npm run test:scripts && npm run test:games"
+    "test:all": "npm test -- --run && npm run test:server && npm run test:scripts && npm run test:games",
+    "package:source": "node scripts/package-source-app.mjs",
+    "package:complete": "node scripts/package-complete-app.mjs",
+    "android:build": "node scripts/build-android.mjs"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@zxing/library": "^0.23.0",
     "jsqr": "^1.4.0",
     "lucide-react": "latest",
@@ -32,6 +40,7 @@
     "react-router-dom": "latest"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",

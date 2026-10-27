@@ -1,0 +1,17 @@
+{
+  "name": "zhiya-app-backend",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node start-all.mjs",
+    "start:ai": "node server/ai-proxy.mjs",
+    "test": "node --test tests/*.test.mjs && vitest run server/ai-proxy.test.mjs server/companionIntent.test.mjs server/companionPolicy.test.mjs server/tts.test.mjs && node --test server/recognition.test.mjs"
+  },
+  "dependencies": {
+    "msedge-tts": "2.1.0"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

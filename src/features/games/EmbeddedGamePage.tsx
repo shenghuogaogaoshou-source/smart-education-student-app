@@ -1,16 +1,22 @@
 import { ArrowLeft, LoaderCircle, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAppState } from '../../app/AppState'
+import { isNativeApp, readMobileApiOrigins } from '../../app/mobileApi'
 import { useOptionalWorks } from '../works/WorksProvider'
 import type { WorkRecord } from '../works/types'
 import { GameWorkBridge } from './GameWorkBridge'
-import { getGameConfig, type GameId } from './gameRegistry'
+import { getGameConfig, withGameApiOrigin, type GameId } from './gameRegistry'
 import './games.css'
 
 type LoadState = 'loading' | 'ready' | 'failed'
 
 export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: () => void }) {
   const config = getGameConfig(gameId)
+  const mobileOrigins = readMobileApiOrigins(isNativeApp())
+  const gameUrl = withGameApiOrigin(
+    config.url,
+    isNativeApp() ? (gameId === 'brain-film' ? mobileOrigins.brainOrigin : mobileOrigins.aiOrigin) : '',
+  )
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [attempt, setAttempt] = useState(0)
   const [saveStatus, setSaveStatus] = useState('')
@@ -60,7 +66,7 @@ export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: (
             <iframe
               key={attempt}
               title={config.title}
-              src={config.url}
+              src={gameUrl}
               allow="camera; microphone; fullscreen"
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={() => setLoadState('ready')}
@@ -70,7 +76,7 @@ export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: (
           <iframe
             key={attempt}
             title={config.title}
-            src={config.url}
+            src={gameUrl}
             allow="camera; microphone; fullscreen"
             referrerPolicy="strict-origin-when-cross-origin"
             onLoad={() => setLoadState('ready')}

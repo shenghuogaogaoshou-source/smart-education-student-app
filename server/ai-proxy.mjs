@@ -10,7 +10,14 @@ import { buildSchedulePayload, normalizeScheduleRequest, validateScheduleRespons
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
+const HOST = process.env.COMPANION_PROXY_HOST || '127.0.0.1'
 const MAX_BODY_BYTES = 16 * 1024
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,OPTIONS',
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+}
 
 loadLocalEnvironmentFiles([
   join(__dirname, '..', '.env.local'),
@@ -33,6 +40,7 @@ function sendJson(response, status, body) {
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    ...CORS_HEADERS,
   })
   response.end(JSON.stringify(body))
 }
@@ -216,9 +224,14 @@ export async function handleCompanionApiRequest(
   }
 }
 
-export function startProxyServer(port = PORT) {
+export function startProxyServer(port = PORT, host = HOST) {
   const server = createServer(async (request, response) => {
     const path = request.url?.split('?')[0] ?? ''
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204, CORS_HEADERS)
+      response.end()
+      return
+    }
     if (request.method === 'POST' && path === '/api/tts') {
       try {
         const body = await readJson(request)
@@ -226,6 +239,7 @@ export function startProxyServer(port = PORT) {
         response.writeHead(200, {
           'content-type': 'audio/mpeg',
           'cache-control': 'no-store',
+          ...CORS_HEADERS,
         })
         response.end(audio)
       } catch (error) {
@@ -257,8 +271,8 @@ export function startProxyServer(port = PORT) {
     sendJson(response, result.status, result.body)
   })
 
-  server.listen(port, '127.0.0.1', () => {
-    console.log(`AI companion proxy running at http://127.0.0.1:${port}`)
+  server.listen(port, host, () => {
+    console.log(`AI companion proxy running at http://${host}:${port}`)
   })
   return server
 }

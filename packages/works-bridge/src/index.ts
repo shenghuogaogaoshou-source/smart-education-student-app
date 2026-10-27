@@ -90,3 +90,46 @@ export function requestDraftSave(input: SaveDraftInput, timeoutMs = 8000): Promi
     postDraftToHost(input)
   })
 }
+
+export function installGameApiShim(service: 'ai' | 'brain') {
+  const queryOrigin = new URLSearchParams(window.location.search).get('apiOrigin')
+  if (queryOrigin && /^https?:\/\//.test(queryOrigin)) {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (typeof input === 'string' && input.startsWith('/api/')) {
+        return originalFetch(`${queryOrigin}${input}`, init)
+      }
+      return originalFetch(input, init)
+    }
+    return
+  }
+
+  const capacitor = (window as Window & {
+    Capacitor?: { isNativePlatform?: () => boolean }
+  }).Capacitor
+  const nativeMarker = (() => {
+    try {
+      return localStorage.getItem('zhiya.nativeApp') === '1'
+    } catch {
+      return false
+    }
+  })()
+  if (capacitor?.isNativePlatform?.() !== true && !nativeMarker) return
+
+  let origins: { aiOrigin?: string; brainOrigin?: string } = {}
+  try {
+    origins = JSON.parse(localStorage.getItem('zhiya.mobileApiOrigins') ?? '{}')
+  } catch {
+    return
+  }
+  const origin = service === 'brain' ? origins.brainOrigin : origins.aiOrigin
+  if (!origin) return
+
+  const originalFetch = window.fetch.bind(window)
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    if (typeof input === 'string' && input.startsWith('/api/')) {
+      return originalFetch(`${origin}${input}`, init)
+    }
+    return originalFetch(input, init)
+  }
+}

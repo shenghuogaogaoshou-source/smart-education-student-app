@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { apiFetch } from '../../app/mobileApi'
 import type { DayStory } from './content/storyContent'
 
 // 播读最小单元：一段旁白、一句对话、或一个板块的文本
@@ -7,7 +8,6 @@ export type ReadSegment = {
   anchor: string // 对应页面元素 id，用于高亮与自动滚动
   panelIndex: number | null // 属于第几页绘本；null 表示目标/小课堂/挑战等板块
 }
-
 // 把一天的故事展开成按顺序朗读的句子列表
 export function buildStorySegments(story: DayStory): ReadSegment[] {
   const segments: ReadSegment[] = []
@@ -97,7 +97,7 @@ export function useReadAloud(segments: ReadSegment[]) {
       try {
         let url = urlCacheRef.current.get(segment.text)
         if (!url) {
-          const response = await fetch('/api/tts', {
+          const response = await apiFetch('/api/tts', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ text: segment.text }),

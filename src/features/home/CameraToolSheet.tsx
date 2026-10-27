@@ -5,11 +5,11 @@ import { readImage, scanImage, toolDetails, type ToolResult } from './recognitio
 import './recognitionTools.css'
 import { RecognitionResultView, extensionTitle } from './RecognitionResultView'
 import { readResult } from './readResult'
+import { apiFetch } from '../../app/mobileApi'
 
 export function CameraToolSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return open ? <ToolDialog onClose={onClose} /> : null
 }
-
 function ToolDialog({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<number | null>(null)
   const [image, setImage] = useState('')
@@ -83,7 +83,7 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
       let scanResult: ToolResult | null = null
       if (tool.id === 'scan') scanResult = await scanImage(image)
       if (controller.signal.aborted) return
-      const response = await fetch('/api/companion/recognize', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ tool: tool.id, image: scanResult ? '' : image, text: scanResult ? scanResult.output : text, target }) })
+      const response = await apiFetch('/api/companion/recognize', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ tool: tool.id, image: scanResult ? '' : image, text: scanResult ? scanResult.output : text, target }) })
       const data = await response.json()
       if (!response.ok) {
         const messages: Record<string, string> = { vision_not_configured: '图片识别服务尚未配置，请联系管理员。', text_not_configured: '文字分析服务尚未配置，请联系管理员。', invalid_input: '请检查输入内容或重新选择图片。', invalid_result: '这次没有整理好结果，请重试；如果是整页试卷，可以分题拍摄。', result_too_long: '这一页内容较多，请分段或分题拍摄，让文字更清楚。' }

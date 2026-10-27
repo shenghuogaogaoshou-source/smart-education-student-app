@@ -5,6 +5,7 @@ import { BRAND } from '../../app/brand'
 import { GRADE_BAND_LABELS, GRADE_LABELS, getGradeBand, type PrimaryGrade } from '../../app/learning'
 import { getCompanionDisplayName } from '../ai_companion/companionCatalog'
 import { SettingDetailPage } from './SettingDetailPage'
+import { MobileServiceCard } from './MobileServiceCard'
 import { settingGroups } from './settingsData'
 import './settings.css'
 
@@ -75,6 +76,7 @@ export function SettingsPage({
     <div className="settings-page">
       <header className="settings-topbar"><button type="button" aria-label="返回我的" onClick={onBack}><ArrowLeft aria-hidden="true" /></button><h1>设置</h1><span /></header>
       <section className="account-status"><div><strong>当前学习账号</strong><span>{gradeSummary} · 数据保存在本机</span></div><b>本地正常</b></section>
+      <MobileServiceCard />
       {settingGroups.map((group) => (
         <section className="settings-group" key={group.id}>
           <h2>{group.title}</h2>

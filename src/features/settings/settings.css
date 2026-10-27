@@ -978,3 +978,65 @@
     object-fit: contain;
     filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--ink) 14%, transparent));
 }
+.mobile-service-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.mobile-service-fields label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.mobile-service-fields input {
+  width: 100%;
+  border: 1px solid rgba(91, 120, 94, .22);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: rgba(255, 255, 255, .86);
+  color: var(--ink);
+  font: inherit;
+}
+
+.mobile-service-card > p {
+  margin: -4px 16px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mobile-service-actions {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px 14px;
+}
+
+.mobile-service-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #eef6e8;
+  color: #40613d;
+  font-weight: 700;
+}
+
+.mobile-service-actions button:last-child {
+  background: #5b785e;
+  color: #fff;
+}
+
+.mobile-service-actions button:disabled {
+  opacity: .55;
+}
+
+.mobile-service-status {
+  color: #52734f !important;
+  font-weight: 700;
+}

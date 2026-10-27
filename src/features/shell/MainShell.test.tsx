@@ -141,7 +141,7 @@ describe('main shell navigation', () => {
 
     await user.click(screen.getByRole('button', { name: /脑洞放映厅/ }))
 
-    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
+    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261027-1')
     expect(screen.queryByRole('navigation', { name: '主要导航' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI伙伴' })).not.toBeInTheDocument()
 
@@ -158,7 +158,7 @@ describe('main shell navigation', () => {
     await user.click(screen.getByRole('button', { name: '我的' }))
     await user.click(screen.getByRole('button', { name: /第一件作品正在等你/ }))
 
-    expect(screen.getByTitle('创造模块')).toHaveAttribute('src', 'http://127.0.0.1:5192/?gameVersion=20261021-3')
+    expect(screen.getByTitle('创造模块')).toHaveAttribute('src', 'http://127.0.0.1:5192/?gameVersion=20261027-1')
     expect(screen.queryByRole('heading', { name: '继续创作' })).not.toBeInTheDocument()
   })
 
@@ -169,7 +169,7 @@ describe('main shell navigation', () => {
     await user.click(screen.getByRole('button', { name: '我的' }))
     await user.click(screen.getByRole('button', { name: /第一件作品正在等你/ }))
 
-    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261021-3')
+    expect(screen.getByTitle('脑洞放映厅')).toHaveAttribute('src', 'http://127.0.0.1:5191/?gameVersion=20261027-1')
   })
 
   it('opens the exact knowledge chapter from the next plan card', async () => {

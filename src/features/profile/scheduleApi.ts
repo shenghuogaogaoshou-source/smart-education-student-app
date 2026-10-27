@@ -6,6 +6,7 @@ import {
   type PrimaryGrade,
 } from '../../app/learning'
 import type { DailyAvailability, LearningPlanTask } from '../../app/learningPlan'
+import { apiFetch } from '../../app/mobileApi'
 
 type CatalogKind = 'knowledge' | 'test'
 
@@ -15,7 +16,6 @@ export type ScheduleCatalogItem = {
   title: string
   suggestedMinutes: number
 }
-
 export type ScheduleWrongQuestionSummary =
   | string
   | { partId: CoursePartId; kind: CatalogKind }
@@ -132,7 +132,7 @@ export async function requestScheduleSuggestion(
   signal?: AbortSignal,
 ): Promise<ScheduleSuggestionResult> {
   if (!PRIMARY_GRADES.includes(request.grade)) throw new ScheduleSuggestionError(400, 'invalid_request')
-  const response = await fetch('/api/companion/schedule', {
+  const response = await apiFetch('/api/companion/schedule', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),

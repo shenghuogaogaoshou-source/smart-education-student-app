@@ -9,31 +9,42 @@ type GameConfig = {
   allowedOrigin: string
 }
 
-const GAME_BUNDLE_VERSION = '20261021-3'
+const GAME_BUNDLE_VERSION = '20261027-1'
 const DEFAULT_GAME_ID: GameId = 'brain-film'
 
 const registry = {
   'brain-film': {
     title: '脑洞放映厅',
     devUrl: 'http://127.0.0.1:5191',
-    productionUrl: '/embedded-games/brain-film/',
+    productionUrl: '/embedded-games/brain-film/index.html',
   },
   'creative-module': {
     title: '创造模块',
     devUrl: 'http://127.0.0.1:5192',
-    productionUrl: '/embedded-games/creative-module/',
+    productionUrl: '/embedded-games/creative-module/index.html',
   },
 } as const
 
 export function getGameConfig(id: GameId): GameConfig {
   const config = registry[id]
   const baseUrl = import.meta.env.PROD ? config.productionUrl : config.devUrl
-  const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+  const normalizedBaseUrl = baseUrl.endsWith('/') || /\.html$/i.test(baseUrl) ? baseUrl : `${baseUrl}/`
   const url = `${normalizedBaseUrl}?gameVersion=${GAME_BUNDLE_VERSION}`
   return {
     ...config,
     url,
     allowedOrigin: new URL(url, window.location.origin).origin,
+  }
+}
+
+export function withGameApiOrigin(url: string, origin?: string) {
+  if (!origin) return url
+  try {
+    const gameUrl = new URL(url, window.location.origin)
+    gameUrl.searchParams.set('apiOrigin', origin)
+    return gameUrl.href
+  } catch {
+    return url
   }
 }
 

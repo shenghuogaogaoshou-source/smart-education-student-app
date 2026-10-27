@@ -1013,6 +1013,18 @@ class Handler(BaseHTTPRequestHandler):
     server_version = 'BHFilm/' + APP_VERSION
     protocol_version = 'HTTP/1.1'
 
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'content-type')
+        self.send_header('Access-Control-Max-Age', '86400')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
     def handle(self):
         """客户端提前断开(关页面、拖进度条、浏览器预连接)时安静关掉这条连接,
            不要让 socketserver 把整段 traceback 打进日志 —— 那不是服务器的错。"""

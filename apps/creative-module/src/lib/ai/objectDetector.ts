@@ -21,8 +21,8 @@ const MODEL_LOAD_TIMEOUT_MS = 45000
 /** 官方 GCS 模型地址（lite_mobilenet_v2 体积小、速度快） */
 const GCS_URL =
   'https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json'
-/** 本地打包地址（运行 fetch 脚本后存在） */
-const LOCAL_URL = '/models/coco-ssd/model.json'
+/** 本地打包地址（运行 fetch 脚本后存在；相对地址兼容 APK iframe 子路径） */
+const LOCAL_URL = new URL('models/coco-ssd/model.json', document.baseURI).href
 
 let engine: DetectorEngine = 'none'
 let modelPromise: Promise<cocoSsd.ObjectDetection> | null = null

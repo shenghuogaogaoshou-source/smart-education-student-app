@@ -1,9 +1,12 @@
 import { AppErrorBoundary } from './app/AppErrorBoundary'
+import { installGameApiShim } from '@zhiya/works-bridge'
 import './app/preferences.css'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import '../css/style.css'
 import './app.css'
+
+installGameApiShim('brain')
 
 /* 游戏主体是命令式 DOM(studioEngine 直接挂 onclick/listener),React 的错误边界收不到它抛的错。
    这里兜一层:真出意外时给用户一个能点的「重新打开」,而不是半死界面。 */

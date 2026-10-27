@@ -19,14 +19,14 @@ interface OceanSceneProps {
 
 // 真实图片清单（已知 ground-truth，仅用于计分；分类器本身不知道标签）
 const IMAGE_MANIFEST = [
-  { src: '/images/ocean/fish_1.jpg', kind: '鱼' },
-  { src: '/images/ocean/fish_2.jpg', kind: '鱼' },
-  { src: '/images/ocean/fish_3.jpg', kind: '鱼' },
-  { src: '/images/ocean/fish_4.jpg', kind: '鱼' },
-  { src: '/images/ocean/trash_1.jpg', kind: '垃圾' },
-  { src: '/images/ocean/trash_2.jpg', kind: '垃圾' },
-  { src: '/images/ocean/trash_3.jpg', kind: '垃圾' },
-  { src: '/images/ocean/trash_4.jpg', kind: '垃圾' },
+  { src: new URL('images/ocean/fish_1.jpg', document.baseURI).href, kind: '鱼' },
+  { src: new URL('images/ocean/fish_2.jpg', document.baseURI).href, kind: '鱼' },
+  { src: new URL('images/ocean/fish_3.jpg', document.baseURI).href, kind: '鱼' },
+  { src: new URL('images/ocean/fish_4.jpg', document.baseURI).href, kind: '鱼' },
+  { src: new URL('images/ocean/trash_1.jpg', document.baseURI).href, kind: '垃圾' },
+  { src: new URL('images/ocean/trash_2.jpg', document.baseURI).href, kind: '垃圾' },
+  { src: new URL('images/ocean/trash_3.jpg', document.baseURI).href, kind: '垃圾' },
+  { src: new URL('images/ocean/trash_4.jpg', document.baseURI).href, kind: '垃圾' },
 ]
 
 // ---- 时序参数（秒）----

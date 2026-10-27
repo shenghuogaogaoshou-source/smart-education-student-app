@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import { useAppState } from '../../../app/AppState'
+import { apiFetch } from '../../../app/mobileApi'
 import { getPointsBalance } from '../../../app/points'
 import { useOptionalSessionCredential } from '../../auth/sessionCredential'
 import { COMPANION_CATALOG } from '../companionCatalog'
@@ -38,7 +39,7 @@ const AppCommandContext = createContext<AppCommandContextValue | null>(null)
 async function requestCompanionIntent(text: string, _source: CommandSource, companionId: string): Promise<InterpretedIntent> {
   const localIntent = interpretLocalCommand(text)
   if (localIntent) return localIntent
-  const response = await fetch('/api/companion/interpret', {
+  const response = await apiFetch('/api/companion/interpret', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ companionId, text: text.trim().replace(/\s+/g, ' ').slice(0, 160) }),
