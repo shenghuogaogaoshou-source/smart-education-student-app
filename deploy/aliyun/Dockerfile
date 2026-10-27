@@ -10,7 +10,7 @@ ENV NODE_ENV=production \
 
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=300 -o Acquire::http::Pipeline-Depth=0 update \
-    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=300 -o Acquire::http::Pipeline-Depth=0 install -y --no-install-recommends python3 ffmpeg fonts-noto-cjk ca-certificates \
+    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=300 -o Acquire::http::Pipeline-Depth=0 install -y --no-install-recommends python3 ffmpeg fonts-wqy-zenhei ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

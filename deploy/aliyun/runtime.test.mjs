@@ -14,7 +14,7 @@ test('Docker image contains the mixed Node, Python, FFmpeg and Chinese font runt
   assert.match(dockerfile, /node:22-bookworm-slim/)
   assert.match(dockerfile, /python3/)
   assert.match(dockerfile, /ffmpeg/)
-  assert.match(dockerfile, /fonts-noto-cjk/)
+  assert.match(dockerfile, /fonts-wqy-zenhei/)
   assert.match(dockerfile, /HEALTHCHECK[\s\S]*127\.0\.0\.1:8080\/api\/health/)
   assert.match(dockerfile, /DATA_DIR=\/data/)
 })
