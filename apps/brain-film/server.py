@@ -47,7 +47,8 @@ APP_VERSION = '5.1'
 ARK_HOST = 'ark.cn-beijing.volces.com'
 ZHIPU_HOST = 'open.bigmodel.cn'
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(HERE, 'data')
+DEFAULT_DATA_DIR = os.path.join(HERE, 'data')
+DATA_DIR = os.path.abspath(os.environ.get('DATA_DIR') or DEFAULT_DATA_DIR)
 DB_PATH = os.path.join(DATA_DIR, 'bh.db')
 LOG_PATH = os.path.join(DATA_DIR, 'server.log')
 FILM_DIR = os.path.join(DATA_DIR, 'films')
@@ -72,7 +73,11 @@ MAX_FILM_SEGMENTS = 10          # 一部片子最多几段镜头(和前端 filmP
 FILM_W, FILM_H, FILM_FPS = 1280, 720, 24
 
 NO_AI = False
-ENV = {}
+ENV = {
+    key: os.environ[key]
+    for key in ['VIDEO_LIMIT_PER_DAY']
+    if os.environ.get(key)
+}
 PROXY = ''          # 走代理时形如 http://127.0.0.1:7890
 
 
@@ -118,7 +123,7 @@ def load_env(path=None, environ=None):
                 env[k] = v
     for k in ['ZHIPU_API_KEY', 'ZHIPU_MODEL', 'ARK_API_KEY', 'ARK_MODEL', 'ARK_SIZE',
               'VIDEO_API_KEY', 'VIDEO_MODEL', 'VOICE_API_KEY', 'VOICE_MODEL', 'VOICE_VOICE', 'VOICE_SPEED',
-              'HTTPS_PROXY', 'HTTP_PROXY']:
+              'VIDEO_LIMIT_PER_DAY', 'HTTPS_PROXY', 'HTTP_PROXY']:
         if environ.get(k):
             env[k] = environ[k]
     return env
