@@ -93,14 +93,27 @@ export function requestDraftSave(input: SaveDraftInput, timeoutMs = 8000): Promi
 
 export function installGameApiShim(service: 'ai' | 'brain') {
   const queryOrigin = new URLSearchParams(window.location.search).get('apiOrigin')
-  if (queryOrigin && /^https?:\/\//.test(queryOrigin)) {
+  const normalizeOrigin = (value: string) => {
+    try {
+      const url = new URL(value)
+      return (url.protocol === 'http:' || url.protocol === 'https:') ? url.origin : ''
+    } catch {
+      return ''
+    }
+  }
+  const rewriteFetch = (origin: string) => {
+    const targetOrigin = service === 'brain' ? `${origin}/brain` : origin
     const originalFetch = window.fetch.bind(window)
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       if (typeof input === 'string' && input.startsWith('/api/')) {
-        return originalFetch(`${queryOrigin}${input}`, init)
+        return originalFetch(`${targetOrigin}${input}`, init)
       }
       return originalFetch(input, init)
     }
+  }
+  const explicitOrigin = queryOrigin ? normalizeOrigin(queryOrigin) : ''
+  if (explicitOrigin) {
+    rewriteFetch(explicitOrigin)
     return
   }
 
@@ -116,20 +129,21 @@ export function installGameApiShim(service: 'ai' | 'brain') {
   })()
   if (capacitor?.isNativePlatform?.() !== true && !nativeMarker) return
 
-  let origins: { aiOrigin?: string; brainOrigin?: string } = {}
+  let origin = ''
   try {
-    origins = JSON.parse(localStorage.getItem('zhiya.mobileApiOrigins') ?? '{}')
+    origin = normalizeOrigin(localStorage.getItem('zhiya.mobileApiOrigin') ?? '')
+    if (!origin) {
+      const legacy = JSON.parse(localStorage.getItem('zhiya.mobileApiOrigins') ?? '{}') as { aiOrigin?: unknown }
+      origin = typeof legacy.aiOrigin === 'string' ? normalizeOrigin(legacy.aiOrigin) : ''
+      if (origin) {
+        localStorage.setItem('zhiya.mobileApiOrigin', origin)
+        localStorage.removeItem('zhiya.mobileApiOrigins')
+      }
+    }
   } catch {
     return
   }
-  const origin = service === 'brain' ? origins.brainOrigin : origins.aiOrigin
   if (!origin) return
 
-  const originalFetch = window.fetch.bind(window)
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-    if (typeof input === 'string' && input.startsWith('/api/')) {
-      return originalFetch(`${origin}${input}`, init)
-    }
-    return originalFetch(input, init)
-  }
+  rewriteFetch(origin)
 }

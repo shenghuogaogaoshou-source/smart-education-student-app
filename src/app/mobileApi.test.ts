@@ -1,36 +1,52 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  normalizeBackendOrigin,
-  readMobileApiOrigins,
-  resolveApiUrl,
-  saveMobileApiOrigins,
-} from './mobileApi'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+async function loadMobileApi() {
+  vi.resetModules()
+  return import('./mobileApi')
+}
 
 describe('mobile API configuration', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('normalizes a LAN host with an explicit service port', () => {
-    expect(normalizeBackendOrigin('192.168.1.20:8787')).toBe('http://192.168.1.20:8787')
-    expect(normalizeBackendOrigin(' https://school.example/api/ ')).toBe('https://school.example')
+  beforeEach(() => {
+    localStorage.clear()
+    vi.unstubAllEnvs()
   })
 
-  it('stores independent AI and brain-film origins', () => {
-    saveMobileApiOrigins('http://10.0.0.2:8787', 'http://10.0.0.2:8766')
-    expect(readMobileApiOrigins(true)).toEqual({
-      aiOrigin: 'http://10.0.0.2:8787',
-      brainOrigin: 'http://10.0.0.2:8766',
-    })
+  it('uses one fixed HTTPS origin for every production native service', async () => {
+    vi.stubEnv('VITE_NATIVE_RELEASE', '1')
+    vi.stubEnv('VITE_PRODUCTION_API_ORIGIN', 'https://api.zhiya.test')
+    const { readMobileApiConfig, resolveApiUrl } = await loadMobileApi()
+
+    expect(readMobileApiConfig(true)).toEqual({ apiOrigin: 'https://api.zhiya.test' })
+    expect(resolveApiUrl('/api/health', 'ai', true)).toBe('https://api.zhiya.test/api/health')
+    expect(resolveApiUrl('/api/health', 'brain', true)).toBe('https://api.zhiya.test/brain/api/health')
   })
 
-  it('keeps browser relative API calls working', () => {
+  it('rejects a production origin that is not HTTPS', async () => {
+    vi.stubEnv('VITE_NATIVE_RELEASE', '1')
+    vi.stubEnv('VITE_PRODUCTION_API_ORIGIN', 'http://api.zhiya.test')
+    const { readMobileApiConfig } = await loadMobileApi()
+
+    expect(() => readMobileApiConfig(true)).toThrow(/HTTPS/)
+  })
+
+  it('migrates the legacy AI origin to one origin and derives the brain prefix', async () => {
+    vi.stubEnv('VITE_NATIVE_RELEASE', '0')
+    vi.stubEnv('VITE_PRODUCTION_API_ORIGIN', '')
+    localStorage.setItem('zhiya.mobileApiOrigins', JSON.stringify({
+      aiOrigin: 'https://api.zhiya.test',
+      brainOrigin: 'https://legacy-brain.test',
+    }))
+    const { readMobileApiConfig, resolveApiUrl } = await loadMobileApi()
+
+    expect(readMobileApiConfig(false)).toEqual({ apiOrigin: 'https://api.zhiya.test' })
+    expect(localStorage.getItem('zhiya.mobileApiOrigin')).toBe('https://api.zhiya.test')
+    expect(localStorage.getItem('zhiya.mobileApiOrigins')).toBeNull()
+    expect(resolveApiUrl('/api/health', 'brain', true)).toBe('https://api.zhiya.test/brain/api/health')
+  })
+
+  it('keeps browser relative API calls working', async () => {
+    vi.stubEnv('VITE_NATIVE_RELEASE', '0')
+    const { resolveApiUrl } = await loadMobileApi()
     expect(resolveApiUrl('/api/companion/reply', 'ai', false)).toBe('/api/companion/reply')
-  })
-
-  it('routes native WebView API calls to the configured LAN backend', () => {
-    saveMobileApiOrigins('http://10.0.0.2:8787', 'http://10.0.0.2:8766')
-    expect(resolveApiUrl('/api/companion/reply', 'ai', true))
-      .toBe('http://10.0.0.2:8787/api/companion/reply')
-    expect(resolveApiUrl('/api/health', 'brain', true))
-      .toBe('http://10.0.0.2:8766/api/health')
   })
 })

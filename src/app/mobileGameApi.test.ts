@@ -10,11 +10,11 @@ describe('embedded game mobile API bridge', () => {
     window.history.replaceState({}, '', '/')
   })
 
-  it('routes brain-film API calls to the configured LAN server inside the WebView', async () => {
+  it('derives the brain prefix from one API origin in the WebView', async () => {
     localStorage.setItem('zhiya.nativeApp', '1')
     localStorage.setItem('zhiya.mobileApiOrigins', JSON.stringify({
-      aiOrigin: 'http://10.0.0.8:8787',
-      brainOrigin: 'http://10.0.0.8:8766',
+      aiOrigin: 'https://api.zhiya.test',
+      brainOrigin: 'https://legacy-brain.test',
     }))
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -22,19 +22,30 @@ describe('embedded game mobile API bridge', () => {
     installGameApiShim('brain')
     await fetch('/api/health')
 
-    expect(fetchMock).toHaveBeenCalledWith('http://10.0.0.8:8766/api/health', undefined)
+    expect(fetchMock).toHaveBeenCalledWith('https://api.zhiya.test/brain/api/health', undefined)
   })
 
-  it('accepts an API origin passed explicitly by the parent WebView', async () => {
-    window.history.replaceState({}, '', '/?apiOrigin=http%3A%2F%2F10.0.0.9%3A8766')
-    expect(window.location.search).toContain('apiOrigin')
+  it('uses the same origin without a prefix for the creative module', async () => {
+    localStorage.setItem('zhiya.nativeApp', '1')
+    localStorage.setItem('zhiya.mobileApiOrigin', 'https://api.zhiya.test')
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    installGameApiShim('ai')
+    await fetch('/api/health')
+
+    expect(fetchMock).toHaveBeenCalledWith('https://api.zhiya.test/api/health', undefined)
+  })
+
+  it('accepts one base origin explicitly from the parent WebView', async () => {
+    window.history.replaceState({}, '', '/?apiOrigin=https%3A%2F%2Fapi.zhiya.test')
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     installGameApiShim('brain')
     await fetch('/api/health')
 
-    expect(fetchMock).toHaveBeenCalledWith('http://10.0.0.9:8766/api/health', undefined)
+    expect(fetchMock).toHaveBeenCalledWith('https://api.zhiya.test/brain/api/health', undefined)
   })
 
   it('leaves relative game API calls untouched outside the native app', async () => {

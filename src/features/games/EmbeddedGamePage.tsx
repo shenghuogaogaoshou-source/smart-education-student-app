@@ -1,7 +1,7 @@
 import { ArrowLeft, LoaderCircle, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAppState } from '../../app/AppState'
-import { isNativeApp, readMobileApiOrigins } from '../../app/mobileApi'
+import { isNativeApp, readMobileApiConfig } from '../../app/mobileApi'
 import { useOptionalWorks } from '../works/WorksProvider'
 import type { WorkRecord } from '../works/types'
 import { GameWorkBridge } from './GameWorkBridge'
@@ -12,10 +12,10 @@ type LoadState = 'loading' | 'ready' | 'failed'
 
 export function EmbeddedGamePage({ gameId, onBack }: { gameId: GameId; onBack: () => void }) {
   const config = getGameConfig(gameId)
-  const mobileOrigins = readMobileApiOrigins(isNativeApp())
+  const mobileConfig = readMobileApiConfig()
   const gameUrl = withGameApiOrigin(
     config.url,
-    isNativeApp() ? (gameId === 'brain-film' ? mobileOrigins.brainOrigin : mobileOrigins.aiOrigin) : '',
+    isNativeApp() ? mobileConfig.apiOrigin : '',
   )
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [attempt, setAttempt] = useState(0)

@@ -1,14 +1,13 @@
 export type ApiService = 'ai' | 'brain'
 
-export type MobileApiOrigins = {
-  aiOrigin: string
-  brainOrigin: string
+export type MobileApiConfig = {
+  apiOrigin: string
 }
 
-const STORAGE_KEY = 'zhiya.mobileApiOrigins'
+const LEGACY_STORAGE_KEY = 'zhiya.mobileApiOrigins'
+const STORAGE_KEY = 'zhiya.mobileApiOrigin'
 const NATIVE_MARKER_KEY = 'zhiya.nativeApp'
-const DEFAULT_AI_ORIGIN = import.meta.env.VITE_DEFAULT_AI_ORIGIN ?? ''
-const DEFAULT_BRAIN_ORIGIN = import.meta.env.VITE_DEFAULT_BRAIN_ORIGIN ?? ''
+const PRODUCTION_API_ORIGIN = import.meta.env.VITE_PRODUCTION_API_ORIGIN ?? ''
 
 type CapacitorLike = {
   isNativePlatform?: () => boolean
@@ -17,6 +16,10 @@ type CapacitorLike = {
 export function isNativeApp() {
   const capacitor = (window as Window & { Capacitor?: CapacitorLike }).Capacitor
   return capacitor?.isNativePlatform?.() === true
+}
+
+export function isProductionNativeRelease() {
+  return import.meta.env.VITE_NATIVE_RELEASE === '1'
 }
 
 export function normalizeBackendOrigin(value: string) {
@@ -30,37 +33,64 @@ export function normalizeBackendOrigin(value: string) {
   }
 }
 
-function readStoredOrigins(): Partial<MobileApiOrigins> {
+export function normalizeProductionApiOrigin(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) throw new Error('Production API origin is required')
+  let url: URL
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<MobileApiOrigins>
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    url = new URL(trimmed)
   } catch {
-    return {}
+    throw new Error('Production API origin is invalid')
+  }
+  if (url.protocol !== 'https:') throw new Error('Production API origin must use HTTPS')
+  if (url.username || url.password) throw new Error('Production API origin must not contain credentials')
+  if (url.pathname !== '/' || url.search || url.hash) {
+    throw new Error('Production API origin must not contain a path, query or fragment')
+  }
+  return url.origin
+}
+
+function migrateLegacyOrigin() {
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (!raw) return ''
+    const legacy = JSON.parse(raw) as { aiOrigin?: unknown }
+    const origin = typeof legacy.aiOrigin === 'string' ? normalizeBackendOrigin(legacy.aiOrigin) : ''
+    if (origin) localStorage.setItem(STORAGE_KEY, origin)
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
+    return origin
+  } catch {
+    return ''
   }
 }
 
-export function readMobileApiOrigins(native = isNativeApp()): MobileApiOrigins {
-  const stored = readStoredOrigins()
-  return {
-    aiOrigin: normalizeBackendOrigin(stored.aiOrigin ?? '') || (native ? normalizeBackendOrigin(DEFAULT_AI_ORIGIN) : ''),
-    brainOrigin: normalizeBackendOrigin(stored.brainOrigin ?? '') || (native ? normalizeBackendOrigin(DEFAULT_BRAIN_ORIGIN) : ''),
+function readStoredApiOrigin() {
+  try {
+    const current = normalizeBackendOrigin(localStorage.getItem(STORAGE_KEY) ?? '')
+    return current || migrateLegacyOrigin()
+  } catch {
+    return ''
   }
 }
 
-export function saveMobileApiOrigins(aiOrigin: string, brainOrigin: string) {
-  const normalized = {
-    aiOrigin: normalizeBackendOrigin(aiOrigin),
-    brainOrigin: normalizeBackendOrigin(brainOrigin),
+export function readMobileApiConfig(productionNative = isProductionNativeRelease()): MobileApiConfig {
+  if (productionNative) {
+    return { apiOrigin: normalizeProductionApiOrigin(PRODUCTION_API_ORIGIN) }
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+  return { apiOrigin: readStoredApiOrigin() }
+}
+
+export function saveMobileApiOrigin(apiOrigin: string) {
+  const normalized = normalizeBackendOrigin(apiOrigin)
+  if (normalized) localStorage.setItem(STORAGE_KEY, normalized)
   return normalized
 }
 
 export function resolveApiUrl(path: string, service: ApiService = 'ai', native = isNativeApp()) {
   if (!native || !path.startsWith('/api/')) return path
-  const origins = readMobileApiOrigins(true)
-  const origin = service === 'brain' ? origins.brainOrigin : origins.aiOrigin
-  return origin ? `${origin}${path}` : path
+  const { apiOrigin } = readMobileApiConfig()
+  if (!apiOrigin) return path
+  return service === 'brain' ? `${apiOrigin}/brain${path}` : `${apiOrigin}${path}`
 }
 
 export function apiFetch(input: string, init?: RequestInit, service: ApiService = 'ai') {
@@ -70,8 +100,5 @@ export function apiFetch(input: string, init?: RequestInit, service: ApiService 
 export function installMobileApiRuntime() {
   if (!isNativeApp()) return
   localStorage.setItem(NATIVE_MARKER_KEY, '1')
-  const stored = readStoredOrigins()
-  if (!stored.aiOrigin && !stored.brainOrigin) {
-    saveMobileApiOrigins(DEFAULT_AI_ORIGIN, DEFAULT_BRAIN_ORIGIN)
-  }
+  if (!isProductionNativeRelease()) readMobileApiConfig(false)
 }
