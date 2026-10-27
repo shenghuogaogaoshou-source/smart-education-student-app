@@ -1,15 +1,17 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
+const releaseBuild = process.env.VITE_NATIVE_RELEASE === '1'
+
 const config: CapacitorConfig = {
   appId: 'com.zhiya.education',
   appName: '智芽',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: true,
+    cleartext: !releaseBuild,
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: !releaseBuild,
   },
   plugins: {
     SpeechRecognition: {

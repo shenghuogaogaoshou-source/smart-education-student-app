@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { selectLanIPv4 } from './build-android.mjs'
+import {
+  publishSingleApk,
+  releaseApkPath,
+  releaseGradleCommand,
+  selectLanIPv4,
+  validateProductionOrigin,
+} from './build-android.mjs'
 
 test('uses an explicit Android backend host first', () => {
   assert.equal(selectLanIPv4({
@@ -21,4 +30,40 @@ test('skips loopback and virtual adapters when choosing a LAN host', () => {
 
 test('falls back to the Android emulator host when no LAN adapter exists', () => {
   assert.equal(selectLanIPv4({ interfaces: {} }), '10.0.2.2')
+})
+
+test('accepts only an HTTPS production API origin', () => {
+  assert.equal(validateProductionOrigin('https://api.example.test'), 'https://api.example.test')
+  assert.equal(validateProductionOrigin(' https://api.example.test/ '), 'https://api.example.test')
+  assert.throws(() => validateProductionOrigin('http://10.0.0.2:8080'), /HTTPS/)
+  assert.throws(() => validateProductionOrigin('https://api.example.test/v1'), /path/)
+  assert.throws(() => validateProductionOrigin('https://user:pass@api.example.test'), /credentials/)
+})
+
+test('release pipeline uses the release Gradle task and release APK output', () => {
+  assert.deepEqual(releaseGradleCommand(), ['gradlew.bat', 'assembleRelease'])
+  assert.equal(
+    releaseApkPath('C:\\project'),
+    join('C:\\project', 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
+  )
+})
+
+test('publishes exactly one APK without deleting anything outside the delivery directory', () => {
+  const root = mkdtempSync(join(tmpdir(), 'zhiya-release-'))
+  const source = join(root, 'app-release.apk')
+  const output = join(root, '运行文件')
+  const sibling = join(root, '签名')
+  mkdirSync(output)
+  mkdirSync(sibling)
+  writeFileSync(source, 'signed-apk')
+  writeFileSync(join(output, 'old.apk'), 'old')
+  writeFileSync(join(output, 'notes.txt'), 'old')
+  writeFileSync(join(sibling, 'keep.jks'), 'keep')
+
+  const published = publishSingleApk(source, output)
+
+  assert.equal(published, join(output, '智芽.apk'))
+  assert.equal(readFileSync(published, 'utf8'), 'signed-apk')
+  assert.deepEqual(readdirSync(output), ['智芽.apk'])
+  assert.equal(existsSync(join(sibling, 'keep.jks')), true)
 })

@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningKeys = [
+    'ZHIYA_ANDROID_KEYSTORE_PATH',
+    'ZHIYA_ANDROID_KEYSTORE_PASSWORD',
+    'ZHIYA_ANDROID_KEY_ALIAS',
+    'ZHIYA_ANDROID_KEY_PASSWORD',
+]
+def releaseSigningValues = releaseSigningKeys.collectEntries { key ->
+    [(key): System.getenv(key)]
+}
+def releaseSigningConfigured = releaseSigningKeys.every { key ->
+    releaseSigningValues[key]?.trim()
+}
+
 android {
     namespace = "com.zhiya.education"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,11 +29,30 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseSigningValues.ZHIYA_ANDROID_KEYSTORE_PATH)
+                storePassword releaseSigningValues.ZHIYA_ANDROID_KEYSTORE_PASSWORD
+                keyAlias releaseSigningValues.ZHIYA_ANDROID_KEY_ALIAS
+                keyPassword releaseSigningValues.ZHIYA_ANDROID_KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name == 'assembleRelease' } && !releaseSigningConfigured) {
+        throw new GradleException("Release signing is incomplete. Set the required ZHIYA_ANDROID signing variables.")
     }
 }
 

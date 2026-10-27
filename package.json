@@ -26,7 +26,8 @@
     "test:all": "npm test -- --run && npm run test:server && npm run test:scripts && npm run test:games",
     "package:source": "node scripts/package-source-app.mjs",
     "package:complete": "node scripts/package-complete-app.mjs",
-    "android:build": "node scripts/build-android.mjs"
+    "android:build": "node scripts/build-android.mjs",
+    "android:release": "node scripts/build-android.mjs release"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
