@@ -1,0 +1,19 @@
+services:
+  zhiya-backend:
+    build:
+      context: ../..
+      dockerfile: deploy/aliyun/Dockerfile
+    image: zhiya-backend:latest
+    restart: unless-stopped
+    init: true
+    env_file:
+      - /opt/zhiya/secrets/zhiya.env
+    environment:
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+      PORT: "8080"
+      BRAIN_INTERNAL_ORIGIN: http://127.0.0.1:8766
+    volumes:
+      - /opt/zhiya/data:/data
+    ports:
+      - "127.0.0.1:8080:8080"

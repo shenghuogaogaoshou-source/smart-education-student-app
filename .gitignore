@@ -7,6 +7,10 @@ node_modules/
 !.env.example
 .env.local
 server/.env.local
+deploy/aliyun/.env
+*.jks
+*.keystore
+android/keystore.properties
 
 # Build output
 dist/

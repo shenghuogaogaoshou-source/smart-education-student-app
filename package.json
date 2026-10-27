@@ -16,6 +16,8 @@
     "build": "npm run build:web && npm run build:games",
     "preview": "vite preview",
     "ai:server": "node server/ai-proxy.mjs",
+    "cloud:gateway": "node server/cloudGateway.mjs",
+    "test:cloud-runtime": "node --test deploy/aliyun/runtime.test.mjs",
     "test": "vitest",
     "test:server": "vitest run --config vitest.server.config.ts && node --test server/devProcesses.test.mjs server/devSupervisor.test.mjs server/recognition.test.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
