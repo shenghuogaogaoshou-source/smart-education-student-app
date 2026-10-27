@@ -8,7 +8,8 @@ ENV NODE_ENV=production \
     PORT=8080 \
     BRAIN_INTERNAL_ORIGIN=http://127.0.0.1:8766
 
-RUN apt-get update \
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends python3 ffmpeg fonts-noto-cjk ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
