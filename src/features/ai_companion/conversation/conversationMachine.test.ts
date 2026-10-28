@@ -58,6 +58,7 @@ describe('companion conversation controller', () => {
       companionId: 'momo',
       question: '彩虹为什么有颜色？',
       signal: expect.any(AbortSignal),
+      onDelta: expect.any(Function),
     })
   })
 
@@ -155,5 +156,32 @@ describe('companion conversation controller', () => {
       errorReason: null,
     })
     expect(harness.capture.cancel).not.toHaveBeenCalled()
+  })
+
+  it('publishes streamed reply deltas and starts speech only after completion', async () => {
+    const speakReply = vi.fn(() => ({ cancel: vi.fn() }))
+    const requestReply = vi.fn(async ({ onDelta }: { onDelta?: (text: string) => void }) => {
+      onDelta?.('我是你的')
+      onDelta?.(' AI 学习伙伴。')
+      return '我是你的 AI 学习伙伴。'
+    })
+    const controller = createConversationController({
+      startCapture: (callbacks) => {
+        callbacks.onComplete('你叫什么名字')
+        return { stop: vi.fn(), cancel: vi.fn() }
+      },
+      requestReply,
+      speakReply,
+      getCompanionId: () => 'momo',
+      getVoiceEnabled: () => true,
+    })
+
+    controller.start()
+
+    await vi.waitFor(() => expect(speakReply).toHaveBeenCalledOnce())
+    expect(requestReply).toHaveBeenCalledWith(expect.objectContaining({
+      onDelta: expect.any(Function),
+    }))
+    expect(speakReply).toHaveBeenCalledWith('我是你的 AI 学习伙伴。', true, expect.any(Function))
   })
 })

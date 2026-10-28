@@ -388,4 +388,29 @@ describe('AI companion proxy routes', () => {
       await new Promise((resolve) => server.close(resolve))
     }
   })
+
+  it('streams a validated companion reply as SSE deltas', async () => {
+    const listener = createCompanionRequestListener({
+      allowedOrigins: new Set(['*']),
+      createReply: async () => '我是你的 AI 学习伙伴。',
+    })
+    const server = createServer(listener).listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const origin = `http://127.0.0.1:${server.address().port}`
+    try {
+      const response = await fetch(`${origin}/api/companion/reply/stream`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ companionId: 'momo', question: '你是谁' }),
+      })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toContain('text/event-stream')
+      const text = await response.text()
+      expect(text).toContain('event: delta')
+      expect(text).toContain('event: done')
+      expect(text).toContain('我是你的 AI 学习伙伴。')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
 })

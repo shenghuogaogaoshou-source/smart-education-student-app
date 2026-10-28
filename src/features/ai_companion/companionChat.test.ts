@@ -13,7 +13,7 @@ describe('requestCompanionReply', () => {
     await expect(requestCompanionReply({ companionId: 'yunduo', question: '  彩虹为什么有颜色？  ' }))
       .resolves.toBe('当然可以，我们从一个小问题开始。')
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply/stream', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ companionId: 'yunduo', question: '彩虹为什么有颜色？' }),
     }))
@@ -39,7 +39,7 @@ describe('requestCompanionReply', () => {
       signal: controller.signal,
     })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply/stream', expect.objectContaining({
       body: JSON.stringify({ companionId: 'momo', question: '问'.repeat(160) }),
     }))
     expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal)
@@ -55,5 +55,28 @@ describe('requestCompanionReply', () => {
       .resolves.toBe('我们再一起想想。')
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('parses streamed deltas and returns the completed reply', async () => {
+    const encoder = new TextEncoder()
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('event: delta\ndata: {"text":"我是你的"}\n\n'))
+        controller.enqueue(encoder.encode('event: delta\ndata: {"text":" AI 学习伙伴。"}\n\n'))
+        controller.enqueue(encoder.encode('event: done\ndata: {"reply":"我是你的 AI 学习伙伴。"}\n\n'))
+        controller.close()
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    })))
+    const onDelta = vi.fn()
+
+    await expect(requestCompanionReply({ companionId: 'momo', question: '你是谁', onDelta }))
+      .resolves.toBe('我是你的 AI 学习伙伴。')
+
+    expect(onDelta).toHaveBeenNthCalledWith(1, '我是你的')
+    expect(onDelta).toHaveBeenNthCalledWith(2, '我是你的 AI 学习伙伴。')
   })
 })

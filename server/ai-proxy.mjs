@@ -278,6 +278,7 @@ export async function handleCompanionApiRequest(
 export function createCompanionRequestListener({
   allowedOrigins = parseAllowedOrigins(),
   handleApi = handleCompanionApiRequest,
+  createReply: createReplyImpl = createReply,
   synthesize = synthesizeSpeech,
   brainOrigin = process.env.BRAIN_INTERNAL_ORIGIN || '',
   taskService,
@@ -320,6 +321,32 @@ export function createCompanionRequestListener({
         sendJson(response, 404, { error: 'task_not_found' }, corsHeaders)
       } else {
         sendJson(response, 200, task, corsHeaders)
+      }
+      return
+    }
+
+    if (request.method === 'POST' && path === '/api/companion/reply/stream') {
+      let body
+      try {
+        body = await readJson(request)
+        const reply = await createReplyImpl(body)
+        response.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-accel-buffering': 'no',
+          ...corsHeaders,
+        })
+        for (let index = 0; index < reply.length; index += 10) {
+          const text = reply.slice(index, index + 10)
+          response.write(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`)
+        }
+        response.write(`event: done\ndata: ${JSON.stringify({ reply })}\n\n`)
+        response.end()
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'provider_error'
+        sendJson(response, code === 'invalid_json' ? 400 : 502, {
+          error: code === 'invalid_json' ? 'invalid_json' : 'provider_error',
+        }, corsHeaders)
       }
       return
     }

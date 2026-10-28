@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { requestSpeechAudio, speakCompanionReply, startSpeechCapture } from './browserSpeech'
+import {
+  requestSpeechAudio,
+  speakCompanionReply,
+  startNativeSpeechCaptureForTest,
+  startSpeechCapture,
+} from './browserSpeech'
 
 type Result = { 0: { transcript: string }; isFinal: boolean }
 type RecognitionTestEvent = { resultIndex?: number; results?: ArrayLike<Result> }
@@ -173,5 +178,52 @@ describe('browser speech capture', () => {
 
     expect(() => speakCompanionReply('你好', true, onEnd)).not.toThrow()
     expect(onEnd).toHaveBeenCalledOnce()
+  })
+
+  it('submits the latest transcript when Android never emits a stopped event', async () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const listeners = new Map<string, (payload: any) => void>()
+    const plugin = {
+      available: vi.fn(async () => ({ available: true })),
+      checkPermissions: vi.fn(async () => ({ speechRecognition: 'granted' })),
+      requestPermissions: vi.fn(async () => ({ speechRecognition: 'granted' })),
+      addListener: vi.fn(async (name: string, listener: (payload: any) => void) => {
+        listeners.set(name, listener)
+        return { remove: vi.fn(async () => undefined) }
+      }),
+      start: vi.fn(async () => ({ matches: [] })),
+      stop: vi.fn(async () => undefined),
+    }
+    const capture = startNativeSpeechCaptureForTest(
+      { onComplete, onError: vi.fn() },
+      { plugin },
+    )
+    await vi.waitFor(() => expect(plugin.start).toHaveBeenCalled())
+    listeners.get('partialResults')?.({ matches: ['你叫什么名字呀'] })
+    capture.stop()
+    await vi.advanceTimersByTimeAsync(700)
+    expect(onComplete).toHaveBeenCalledWith('你叫什么名字呀')
+  })
+
+  it('stops immediately after initialization if the finger was released too early', async () => {
+    let finishStart: ((value: { matches: string[] }) => void) | undefined
+    const plugin = {
+      available: vi.fn(async () => ({ available: true })),
+      checkPermissions: vi.fn(async () => ({ speechRecognition: 'granted' })),
+      requestPermissions: vi.fn(async () => ({ speechRecognition: 'granted' })),
+      addListener: vi.fn(async () => ({ remove: vi.fn(async () => undefined) })),
+      start: vi.fn((): Promise<{ matches: string[] }> => new Promise((resolve) => {
+        finishStart = resolve
+      })),
+      stop: vi.fn(async () => undefined),
+    }
+    const capture = startNativeSpeechCaptureForTest(
+      { onComplete: vi.fn(), onError: vi.fn() },
+      { plugin },
+    )
+    capture.stop()
+    finishStart?.({ matches: [] })
+    await vi.waitFor(() => expect(plugin.stop).toHaveBeenCalled())
   })
 })

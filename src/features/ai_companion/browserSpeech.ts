@@ -49,6 +49,18 @@ export type SpeechPlayback = {
   cancel: () => void
 }
 
+type NativeSpeechPlugin = {
+  available: () => Promise<{ available: boolean }>
+  checkPermissions: () => Promise<{ speechRecognition: string }>
+  requestPermissions: () => Promise<{ speechRecognition: string }>
+  addListener: (
+    eventName: 'partialResults' | 'listeningState',
+    listener: (payload: any) => void,
+  ) => Promise<{ remove: () => Promise<void> }>
+  start: (options: Record<string, unknown>) => Promise<{ matches?: string[] }>
+  stop: () => Promise<void>
+}
+
 export async function requestSpeechAudio(text: string, signal?: AbortSignal): Promise<Blob> {
   const response = await requestWithRetry('/api/tts', {
     method: 'POST',
@@ -65,17 +77,31 @@ export async function requestSpeechAudio(text: string, signal?: AbortSignal): Pr
   return audio
 }
 
-function startNativeSpeechCapture({
-  onInterim,
-  onComplete,
-  onError,
-}: SpeechCaptureCallbacks): SpeechCapture {
+function createNativeSpeechCapture(
+  { onInterim, onComplete, onError }: SpeechCaptureCallbacks,
+  {
+    loadPlugin,
+    stopFinalizeMs = 700,
+    maxListeningMs = 12_000,
+  }: {
+    loadPlugin: () => Promise<NativeSpeechPlugin>
+    stopFinalizeMs?: number
+    maxListeningMs?: number
+  },
+): SpeechCapture {
   let active = true
+  let stopRequested = false
   let latestTranscript = ''
-  let plugin: typeof import('@capacitor-community/speech-recognition')['SpeechRecognition'] | null = null
+  let plugin: NativeSpeechPlugin | null = null
+  let stopTimer: ReturnType<typeof setTimeout> | null = null
+  let listeningTimer: ReturnType<typeof setTimeout> | null = null
   const listenerHandles: Array<{ remove: () => Promise<void> }> = []
 
   const cleanup = () => {
+    if (stopTimer !== null) clearTimeout(stopTimer)
+    if (listeningTimer !== null) clearTimeout(listeningTimer)
+    stopTimer = null
+    listeningTimer = null
     for (const handle of listenerHandles.splice(0)) void handle.remove()
   }
 
@@ -88,21 +114,35 @@ function startNativeSpeechCapture({
     else onError(error ?? 'no-speech')
   }
 
+  const armListeningTimeout = () => {
+    if (listeningTimer !== null) clearTimeout(listeningTimer)
+    listeningTimer = setTimeout(() => finish(), maxListeningMs)
+  }
+
   void (async () => {
-    const module = await import('@capacitor-community/speech-recognition')
-    plugin = module.SpeechRecognition
+    plugin = await loadPlugin()
+    if (!active) return
     const availability = await plugin.available()
+    if (!active) return
     if (!availability.available) {
       finish('start-failed')
       return
     }
 
     let permission = await plugin.checkPermissions()
+    if (!active) return
     if (permission.speechRecognition === 'prompt' || permission.speechRecognition === 'prompt-with-rationale') {
       permission = await plugin.requestPermissions()
     }
+    if (!active) return
     if (permission.speechRecognition !== 'granted') {
       finish('permission-denied')
+      return
+    }
+
+    if (stopRequested) {
+      await plugin.stop()
+      finish()
       return
     }
 
@@ -111,6 +151,7 @@ function startNativeSpeechCapture({
       const transcript = matches?.[0]?.trim() ?? ''
       if (!transcript) return
       latestTranscript = transcript
+      armListeningTimeout()
       onInterim?.(transcript)
     }))
     listenerHandles.push(await plugin.addListener('listeningState', ({ status }) => {
@@ -124,16 +165,48 @@ function startNativeSpeechCapture({
       partialResults: true,
       popup: false,
     })
+    if (stopRequested) void plugin.stop()
+    armListeningTimeout()
   })().catch(() => finish('start-failed'))
 
   return {
-    stop: () => { void plugin?.stop() },
+    stop: () => {
+      if (!active || stopRequested) return
+      stopRequested = true
+      void plugin?.stop()
+      if (stopTimer !== null) clearTimeout(stopTimer)
+      stopTimer = setTimeout(() => finish(), stopFinalizeMs)
+    },
     cancel: () => {
       active = false
       cleanup()
       void plugin?.stop()
     },
   }
+}
+
+export function startNativeSpeechCaptureForTest(
+  callbacks: SpeechCaptureCallbacks,
+  { plugin, stopFinalizeMs = 700, maxListeningMs = 12_000 }: {
+    plugin: NativeSpeechPlugin
+    stopFinalizeMs?: number
+    maxListeningMs?: number
+  },
+): SpeechCapture {
+  return createNativeSpeechCapture(callbacks, {
+    loadPlugin: async () => plugin,
+    stopFinalizeMs,
+    maxListeningMs,
+  })
+}
+
+function startNativeSpeechCapture(callbacks: SpeechCaptureCallbacks): SpeechCapture {
+  return createNativeSpeechCapture(callbacks, {
+    loadPlugin: async () => {
+      const module = await import('@capacitor-community/speech-recognition')
+      return module.SpeechRecognition as NativeSpeechPlugin
+    },
+  })
 }
 
 export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCaptureCallbacks): SpeechCapture | null {

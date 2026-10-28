@@ -40,8 +40,9 @@ export class TaskClientError extends Error {
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
 
 function taskError(status: number, body: unknown) {
-  const code = body && typeof body === 'object' && typeof body.error === 'string'
-    ? body.error.replace(/[^a-z0-9_-]/gi, '_').slice(0, 64)
+  const record = body && typeof body === 'object' ? body as Record<string, unknown> : null
+  const code = typeof record?.error === 'string'
+    ? record.error.replace(/[^a-z0-9_-]/gi, '_').slice(0, 64)
     : 'task_request_failed'
   return new TaskClientError(status, code)
 }

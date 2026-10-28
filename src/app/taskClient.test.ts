@@ -45,7 +45,7 @@ describe('shared task client', () => {
     })
 
     expect(result.status).toBe('succeeded')
-    expect(timeout.mock.calls[0][1]).toBe(1000)
+    expect(timeout).toHaveBeenCalledWith(expect.any(Function), 1000)
   })
 
   it('retries one temporary task read failure', async () => {

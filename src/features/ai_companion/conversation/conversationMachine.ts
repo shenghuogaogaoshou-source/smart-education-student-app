@@ -28,6 +28,7 @@ type ReplyRequest = {
   companionId: string
   question: string
   signal: AbortSignal
+  onDelta?: (reply: string) => void
 }
 
 type ConversationDependencies = {
@@ -95,6 +96,10 @@ export function createConversationController(deps: ConversationDependencies) {
         companionId: deps.getCompanionId(),
         question,
         signal: controller.signal,
+        onDelta: (partialReply) => {
+          if (controller.signal.aborted || currentVersion !== requestVersion) return
+          update({ status: 'speaking', reply: partialReply, errorReason: null })
+        },
       })
       if (controller.signal.aborted || currentVersion !== requestVersion) return
       requestController = null

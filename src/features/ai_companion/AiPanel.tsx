@@ -109,13 +109,13 @@ export function AiPanel({ onClose, onOpenPrivacySettings }: {
 
   const [conversationController] = useState(() => createConversationController({
     startCapture: startSpeechCapture,
-    requestReply: async ({ companionId, question, signal }) => {
+    requestReply: async ({ companionId, question, signal, onDelta }) => {
       if (looksLikeAppCommand(question)) {
         if (!commandRef.current) return '现在还没有连接应用控制，可以先问我一个学习问题。'
         const result = await commandRef.current.submitText(question, sourceRef.current)
         return result.message
       }
-      return requestCompanionReply({ companionId, question, signal })
+      return requestCompanionReply({ companionId, question, signal, onDelta })
     },
     speakReply: speakCompanionReply,
     getCompanionId: () => companionIdRef.current,
