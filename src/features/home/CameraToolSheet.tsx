@@ -7,7 +7,7 @@ import { RecognitionResultView, extensionTitle } from './RecognitionResultView'
 import { readResult } from './readResult'
 import { requestWithRetry } from '../../app/apiRequest'
 import { isNativeApp, readNativeTaskApiOrigin } from '../../app/mobileApi'
-import { createTask, pollTask, type TaskView } from '@zhiya/task-client'
+import { createTask, pollTask, TaskClientError, type TaskView } from '@zhiya/task-client'
 
 export type VisionTaskHandle = {
   taskId: string
@@ -73,16 +73,26 @@ function ToolDialog({
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [camera, setCamera] = useState(false)
+  const [cameraStarting, setCameraStarting] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [loadingImage, setLoadingImage] = useState(false)
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
   const dialog = useRef<HTMLElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const stream = useRef<MediaStream | null>(null)
+  const cameraPending = useRef(false)
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const tool = selected === null ? null : toolDetails[selected]
-  const stopCamera = () => { stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; setCamera(false) }
+  const stopCamera = () => {
+    stream.current?.getTracks().forEach(track => track.stop())
+    stream.current = null
+    cameraPending.current = false
+    setCameraStarting(false)
+    setCameraReady(false)
+    setCamera(false)
+  }
   useEffect(() => {
     const oldFocus = document.activeElement as HTMLElement | null
     const overflow = document.body.style.overflow
@@ -91,6 +101,13 @@ function ToolDialog({
     return () => { stopReadingRef.current?.(); generation.current++; request.current?.abort(); request.current = null; stream.current?.getTracks().forEach(t => t.stop()); document.body.style.overflow = overflow; oldFocus?.focus() }
   }, [])
   useEffect(() => { if (camera && video.current) video.current.srcObject = stream.current }, [camera])
+  useEffect(() => {
+    const stopWhenHidden = () => {
+      if (document.visibilityState === 'hidden') stopCamera()
+    }
+    document.addEventListener('visibilitychange', stopWhenHidden)
+    return () => document.removeEventListener('visibilitychange', stopWhenHidden)
+  }, [])
   const reset = () => {
     stopReading()
     setDragging(false); dragDepth.current = 0
@@ -111,13 +128,16 @@ function ToolDialog({
     finally { if (token === generation.current) setLoadingImage(false) }
   }
   async function startCamera() {
+    if (cameraPending.current || camera) return
+    cameraPending.current = true
+    setCameraStarting(true)
     const token = ++generation.current
     setError('')
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前设备无法打开相机，请检查系统相机权限。')
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1600 } }, audio: false })
       if (token !== generation.current) { media.getTracks().forEach(t => t.stop()); return }
-      stream.current = media; setCamera(true)
+      stream.current = media; setCameraReady(false); setCamera(true)
     } catch (error) {
       if (token !== generation.current) return
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -129,6 +149,9 @@ function ToolDialog({
       } else {
         setError('无法打开相机，请检查系统相机权限后再试。')
       }
+    } finally {
+      cameraPending.current = false
+      if (token === generation.current) setCameraStarting(false)
     }
   }
   function openCamera() {
@@ -220,7 +243,18 @@ function ToolDialog({
     } catch (e) {
       if (request.current !== controller) return
       const timedOut = controller.signal.aborted || (e instanceof DOMException && e.name === 'TimeoutError')
-      setError(timedOut ? '处理时间有点久，已经停下啦。请检查网络后再试一次。' : e instanceof Error ? e.message : '处理失败，请重试。')
+      const message = timedOut
+        ? '处理时间有点久，已经停下啦。请检查网络后再试一次。'
+        : e instanceof TaskClientError
+          ? e.code === 'invalid_input'
+            ? '图片或文字没有通过检查，请重新选择后再试。'
+            : '识别任务暂时提交不了，请检查网络后再试。'
+          : e instanceof TypeError
+            ? '网络连接暂时不可用，请检查网络后再试。'
+            : e instanceof Error
+              ? e.message
+              : '处理失败，请重试。'
+      setError(message)
     }
     finally { clearTimeout(timeout); if (request.current === controller) { setBusy(false); request.current = null } }
   }
@@ -276,10 +310,10 @@ function ToolDialog({
         {!result && <>
           <div className={`recognition-drop-hint${dragging ? ' is-dragging' : ''}`} role="status">{dragging ? '松开鼠标，上传这张图片' : '也可以将一张图片拖到此面板上传'}</div>
           <div className="recognition-input-actions">
-            <button type="button" disabled={busy || camera || loadingImage} onClick={openCamera}><Camera size={18} />打开相机</button>
+            <button type="button" disabled={busy || camera || cameraStarting || loadingImage} onClick={openCamera}><Camera size={18} />{cameraStarting ? '正在请求相机权限…' : '打开相机'}</button>
             <label className={busy || loadingImage ? 'is-disabled' : ''}><ImagePlus size={18} />上传图片<input type="file" aria-label="上传图片" accept="image/jpeg,image/png,image/webp" disabled={busy || loadingImage || camera} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
           </div>
-          {camera && <div className="recognition-camera"><video ref={video} autoPlay playsInline muted /><button type="button" onClick={capture}>拍下这张</button><button type="button" onClick={stopCamera}>关闭相机</button></div>}
+          {camera && <div className="recognition-camera"><video ref={video} autoPlay playsInline muted onLoadedMetadata={() => setCameraReady(true)} />{!cameraReady && <p role="status">正在准备相机画面…</p>}<button type="button" disabled={!cameraReady} onClick={capture}>拍下这张</button><button type="button" onClick={stopCamera}>关闭相机</button></div>}
           {loadingImage && <p role="status">正在准备图片…</p>}
           {image && <div className="recognition-image"><img src={image} alt="待识别图片" /><button type="button" disabled={busy} onClick={() => setImage('')}>移除图片</button></div>}
           {!requiresImage && <label className="recognition-field">{tool.id === 'solve' ? '题目内容' : '文字内容'}<textarea maxLength={4000} value={text} disabled={busy} placeholder="输入要处理的文字，也可以上传图片…" onChange={e => { setText(e.target.value) }} /><small>{text.length} / 4000</small></label>}

@@ -67,3 +67,22 @@ test('publishes exactly one APK without deleting anything outside the delivery d
   assert.deepEqual(readdirSync(output), ['智芽.apk'])
   assert.equal(existsSync(join(sibling, 'keep.jks')), true)
 })
+
+test('release manifest exposes only required permissions and app-specific files', () => {
+  const root = new URL('../android/app/src/main/', import.meta.url)
+  const manifest = readFileSync(new URL('AndroidManifest.xml', root), 'utf8')
+  const filePaths = readFileSync(new URL('res/xml/file_paths.xml', root), 'utf8')
+
+  assert.match(manifest, /android:allowBackup="false"/)
+  assert.doesNotMatch(manifest, /READ_MEDIA_IMAGES/)
+  assert.doesNotMatch(manifest, /READ_EXTERNAL_STORAGE/)
+  assert.doesNotMatch(filePaths, /external-path[^>]*path="\."/)
+  assert.match(filePaths, /external-files-path/)
+})
+
+test('release build enables code and resource shrinking', () => {
+  const buildGradle = readFileSync(new URL('../android/app/build.gradle', import.meta.url), 'utf8')
+
+  assert.match(buildGradle, /minifyEnabled\s+true/)
+  assert.match(buildGradle, /shrinkResources\s+true/)
+})

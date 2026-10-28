@@ -822,6 +822,13 @@
     font-weight: 700;
 }
 
+.perm-system-managed {
+  max-width: 9.5rem;
+  text-align: right;
+  line-height: 1.35;
+  white-space: normal;
+}
+
 .perm-granted {
     background: color-mix(in srgb, #2da44e 12%, var(--surface));
     color: #2da44e;

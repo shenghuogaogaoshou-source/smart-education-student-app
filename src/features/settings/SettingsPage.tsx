@@ -60,10 +60,7 @@ export function SettingsPage({
       case 'notifications': return ({ important: '仅重要消息', all: '全部消息', off: '已关闭' } as const)[state.notifications]
       case 'sound': return state.soundEnabled ? `声音${state.soundVolume}%${state.hapticEnabled ? ' · 触感开启' : ''}` : '声音已关闭'
       case 'privacy': return state.showLearningStats ? '统计可见 · 好友查找关闭' : '统计已隐藏'
-      case 'permissions': {
-        const granted = [state.cameraPermission, state.micPermission, state.albumPermission].filter(p => p === 'granted').length
-        return `3 项权限 · ${granted} 项已授权`
-      }
+      case 'permissions': return '相机、麦克风 · 由系统管理'
       case 'content': return ({ child: '儿童模式', teen: '青少年模式', general: '标准模式' } as const)[state.contentLevel]
       case 'storage': return `${state.storageUsed} / ${state.storageTotal} MB`
       case 'help': return '常见问题 · 客服'

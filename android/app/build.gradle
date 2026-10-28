@@ -41,7 +41,8 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }

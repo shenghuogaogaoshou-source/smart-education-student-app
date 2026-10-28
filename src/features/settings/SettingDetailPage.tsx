@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { useAppState } from '../../app/AppState'
 import { BRAND } from '../../app/brand'
 import { GRADE_LABELS, PRIMARY_GRADES, type PrimaryGrade } from '../../app/learning'
-import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type PermissionStatus, type SafeMode, type VoiceMode, type VoiceReplyMode } from '../../app/model'
+import { type AiPersonality, type ContentLevel, type FontScale, type GuardianInfo, type SafeMode, type VoiceMode, type VoiceReplyMode } from '../../app/model'
 import { getCompanionDisplayName } from '../ai_companion/companionCatalog'
 import { PartnerAppearance } from '../ai_companion/PartnerAppearance'
 import { settingGroups } from './settingsData'
@@ -17,7 +17,7 @@ const RELATIONSHIP_LABEL: Record<GuardianInfo['relationship'], string> = {
 
 export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: string; onBack: () => void; onOpenMall: () => void }) {
   const app = useAppState()
-  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, resetAiPosition, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setCameraPermission, setMicPermission, setAlbumPermission, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
+  const { state, setFontScale, setGrade, setNotifications, setTwoFactor, updatePassword, setGuardian, setFamilyName, resetAiPosition, setAiPersonality, setVoiceEnabled, setAutoListen, setVoiceMode, setVoiceReplyMode, setSaveHistory, setAiMemory, clearHistory, setConfirmDangerous, setGuardianApprove, setSafeMode, setSoundEnabled, setSoundVolume, setHapticEnabled, setShowStats, setFriendFind, setDataCollection, setContentLevel, setPersonalizedRec, setAutoClean, clearCache } = app
   const [notice, setNotice] = useState('')
   const item = settingGroups.flatMap((group) => group.items).find((entry) => entry.id === itemId)
   if (!item) return null
@@ -35,7 +35,7 @@ export function SettingDetailPage({ itemId, onBack, onOpenMall }: { itemId: stri
       {itemId === 'operation' && <OperationSection state={state} setConfirmDangerous={setConfirmDangerous} setGuardianApprove={setGuardianApprove} setSafeMode={setSafeMode} setNotice={setNotice} />}
       {itemId === 'sound' && <SoundSection state={state} setSoundEnabled={setSoundEnabled} setSoundVolume={setSoundVolume} setHapticEnabled={setHapticEnabled} setNotice={setNotice} />}
       {itemId === 'privacy' && <PrivacySection state={state} setShowStats={setShowStats} setFriendFind={setFriendFind} setDataCollection={setDataCollection} setNotice={setNotice} />}
-      {itemId === 'permissions' && <PermissionsSection state={state} setCameraPermission={setCameraPermission} setMicPermission={setMicPermission} setAlbumPermission={setAlbumPermission} setNotice={setNotice} />}
+      {itemId === 'permissions' && <PermissionsSection />}
       {itemId === 'content' && <ContentSection state={state} setContentLevel={setContentLevel} setPersonalizedRec={setPersonalizedRec} setNotice={setNotice} />}
       {itemId === 'storage' && <StorageSection state={state} setAutoClean={setAutoClean} clearCache={clearCache} setNotice={setNotice} />}
       {itemId === 'help' && <HelpSection />}
@@ -617,24 +617,19 @@ function PrivacySection({ state, setShowStats, setFriendFind, setDataCollection,
 }
 
 /* ---------- 相机、麦克风与相册 ---------- */
-const PERMISSION_LABEL: Record<PermissionStatus, string> = { granted: '已授权', denied: '已拒绝', prompt: '未设置' }
-const PERMISSION_ICON: Record<PermissionStatus, string> = { granted: '✓', denied: '✕', prompt: '…' }
-
-function PermissionsSection({ state, setCameraPermission, setMicPermission, setAlbumPermission, setNotice }: {
-  state: ReturnType<typeof useAppState>['state']
-  setCameraPermission: (v: PermissionStatus) => void
-  setMicPermission: (v: PermissionStatus) => void
-  setAlbumPermission: (v: PermissionStatus) => void
-  setNotice: (s: string) => void
-}) {
+function PermissionsSection() {
   const perms = [
-    { key: 'camera' as const, label: '相机', desc: '拍照上传作业、AI 拍照解题', icon: <Camera aria-hidden="true" size={22} />, status: state.cameraPermission, set: setCameraPermission },
-    { key: 'mic' as const, label: '麦克风', desc: '语音对话、口语测评', icon: <Mic aria-hidden="true" size={22} />, status: state.micPermission, set: setMicPermission },
-    { key: 'album' as const, label: '相册', desc: '查看和选择本地图片', icon: <LayoutDashboard aria-hidden="true" size={22} />, status: state.albumPermission, set: setAlbumPermission },
+    { key: 'camera' as const, label: '相机', desc: '拍照识物、题目解析和内容检查', icon: <Camera aria-hidden="true" size={22} /> },
+    { key: 'mic' as const, label: '麦克风', desc: '长按伙伴进行语音问答', icon: <Mic aria-hidden="true" size={22} /> },
+    { key: 'album' as const, label: '相册', desc: '选择图片时使用 Android 系统文件选择器', icon: <LayoutDashboard aria-hidden="true" size={22} /> },
   ]
 
   return (
     <>
+      <section className="choice-card">
+        <h2>由系统管理</h2>
+        <p>首次使用相机或麦克风时，Android 会直接弹出系统授权框。智芽不能代替系统预先允许或拒绝。</p>
+      </section>
       {perms.map((p) => (
         <section className="choice-card" key={p.key}>
           <div className="security-row">
@@ -643,19 +638,14 @@ function PermissionsSection({ state, setCameraPermission, setMicPermission, setA
               <strong>{p.label}</strong>
               <small>{p.desc}</small>
             </div>
-            <span className={`perm-badge perm-${p.status}`}>{PERMISSION_ICON[p.status]} {PERMISSION_LABEL[p.status]}</span>
-          </div>
-          <div className="segmented-choices" style={{ marginTop: 10 }}>
-            <button type="button" aria-pressed={p.status === 'granted'} onClick={() => { p.set('granted'); setNotice(`${p.label}：已授权`) }}>允许</button>
-            <button type="button" aria-pressed={p.status === 'prompt'} onClick={() => { p.set('prompt'); setNotice(`${p.label}：使用时询问`) }}>询问</button>
-            <button type="button" aria-pressed={p.status === 'denied'} onClick={() => { p.set('denied'); setNotice(`${p.label}：已拒绝`) }}>拒绝</button>
+            <span className="perm-badge perm-system-managed">由 Android 系统管理</span>
           </div>
         </section>
       ))}
 
       <section className="choice-card">
-        <h2>提示</h2>
-        <p>部分权限需在浏览器或系统设置中开启。应用内设置仅作为首次访问时的默认选择。</p>
+        <h2>之前拒绝过怎么办？</h2>
+        <p>请打开手机“设置 &gt; 应用 &gt; 智芽 &gt; 权限”，手动开启相机或麦克风；相册图片通过系统文件选择器读取，不需要额外授予整个相册的访问权限。</p>
       </section>
     </>
   )

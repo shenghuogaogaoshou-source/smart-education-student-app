@@ -1,7 +1,7 @@
 import { act, render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TaskView } from '@zhiya/task-client'
+import { TaskClientError, type TaskView } from '@zhiya/task-client'
 import { CameraToolSheet } from './CameraToolSheet'
 import { cameraTools } from './homeData'
 import { readResult } from './readResult'
@@ -91,6 +91,30 @@ describe('recognition tools', () => {
     })))
     expect(await screen.findByRole('button', { name: '拍下这张' })).toBeInTheDocument()
     expect(clickInput).not.toHaveBeenCalled()
+  })
+
+  it('does not start multiple camera streams while permission is pending', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    let resolveMedia: ((stream: { getTracks: () => Array<{ stop: () => void }> }) => void) | undefined
+    const getUserMedia = vi.fn(() => new Promise<{ getTracks: () => Array<{ stop: () => void }> }>((resolve) => {
+      resolveMedia = resolve
+    }))
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia },
+    })
+    const user = userEvent.setup()
+    render(<CameraToolSheet open onClose={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: '拍照识物' }))
+    await user.click(screen.getByRole('button', { name: '打开相机' }))
+
+    expect(getUserMedia).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: '正在请求相机权限…' })).toBeDisabled()
+    await act(async () => resolveMedia?.({ getTracks: () => [] }))
   })
 
   it('guides a refused camera permission to Android settings', async () => {
@@ -205,6 +229,33 @@ describe('recognition tools', () => {
       'task-vision-api',
       expect.objectContaining({ baseUrl: 'https://api.zhiya.test' }),
     )
+  })
+
+  it('shows a friendly message when the task service cannot be reached', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    localStorage.setItem('zhiya.mobileApiOrigin', 'https://api.zhiya.test')
+    const createTask = vi.fn().mockRejectedValue(new TaskClientError(undefined, 'task_request_failed'))
+    render(
+      <CameraToolSheet
+        open
+        onClose={vi.fn()}
+        initialTool={0}
+        initialImage="data:image/jpeg;base64,YQ=="
+        createTaskImpl={createTask}
+      />,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '开始分析' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('识别任务暂时提交不了')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('task_request_failed')
   })
 })
 

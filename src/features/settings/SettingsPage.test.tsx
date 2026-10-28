@@ -34,6 +34,19 @@ describe('settings page', () => {
     expect(screen.queryByRole('dialog', { name: '确认更改学段' })).not.toBeInTheDocument()
   })
 
+  it('shows Android-managed permissions instead of simulated allow and deny switches', async () => {
+    const user = userEvent.setup()
+    render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)
+
+    await user.click(screen.getByRole('button', { name: /相机、麦克风与相册/ }))
+
+    expect(screen.getByRole('heading', { name: '相机、麦克风与相册' })).toBeInTheDocument()
+    expect(screen.getAllByText('由 Android 系统管理').length).toBeGreaterThan(0)
+    expect(screen.getByText(/首次使用相机或麦克风时/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '允许' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '拒绝' })).not.toBeInTheDocument()
+  })
+
   it('changes font scale locally and confirms logout on screen', async () => {
     const user = userEvent.setup()
     render(<AppStateProvider><SettingsPage onBack={vi.fn()} /></AppStateProvider>)

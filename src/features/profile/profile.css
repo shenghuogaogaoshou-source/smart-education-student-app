@@ -4967,6 +4967,49 @@
   font-size: calc(0.66rem * var(--font-scale));
 }
 
+@media (max-width: 430px) {
+  .works-manage-content {
+    padding-inline: 14px;
+  }
+
+  .works-manage-content .rewards-summary {
+    gap: 8px;
+  }
+
+  .works-manage-content .rewards-stat {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 10px;
+  }
+
+  .works-manage-content .rewards-stat svg {
+    grid-row: auto;
+  }
+
+  .works-manage-content .wm-card {
+    padding: 12px;
+  }
+
+  .works-manage-content .wm-title-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .works-manage-content .wm-title-row strong {
+    flex: 1 1 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .works-manage-content .wm-actions {
+    gap: 6px;
+  }
+
+  .works-manage-content .wm-action-danger {
+    margin-left: auto;
+  }
+}
+
 /* ===== 继续创作页 ===== */
 .cc-project-card {
   display: grid;
