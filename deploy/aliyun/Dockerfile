@@ -18,6 +18,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/brain-film/package.json ./apps/brain-film/package.json
 COPY apps/creative-module/package.json ./apps/creative-module/package.json
+COPY packages/task-client/package.json ./packages/task-client/package.json
 COPY packages/works-bridge/package.json ./packages/works-bridge/package.json
 RUN npm ci --omit=dev --ignore-scripts
 
