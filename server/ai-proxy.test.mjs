@@ -164,7 +164,7 @@ describe('AI companion proxy routes', () => {
   })
 
   it('sends a filtered schedule request and returns server-validated tasks', async () => {
-    const date = new Date()
+    const date = new Date(Date.now() + 86_400_000)
     const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     const body = {
       grade: 'grade5', phone: 'private',
