@@ -5,7 +5,7 @@
 //   3) 生成现实中相似物品的图片（火山方舟 seedream）
 //   4) 导出作品 JSON / 导出实物图
 // ============================================================
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ShieldCheck,
   Sparkles,
@@ -26,12 +26,18 @@ import {
   buildProductPrompt,
   downloadImage,
   downloadText,
-  generateProductImage,
   localCheck,
   summarizeCircuit,
   type ArtworkIssue,
 } from '../../lib/artwork'
 import { creativeDraftId, saveArtworkToZhiya } from '../../integration/saveToZhiya'
+import {
+  clearProductImageTask,
+  readProductImageTask,
+  restoreProductImageTask,
+  startProductImageTask,
+} from '../../lib/productImageTask'
+import type { TaskView } from '@zhiya/task-client'
 
 const SEV_STYLE = {
   error: { color: 'var(--red)', bg: 'rgba(198,107,90,0.12)', icon: XCircle, label: '必须修' },
@@ -64,6 +70,42 @@ export function WorkCheckPanel({ onClose }: { onClose: () => void }) {
   const errorCount = allIssues.filter((i) => i.severity === 'error').length
   const warnCount = allIssues.filter((i) => i.severity === 'warning').length
 
+  const productImageSource = (task: TaskView): string => {
+    const body = task.result as { data?: { b64_json?: string; url?: string }[]; src?: string } | undefined
+    const item = body?.data?.[0]
+    if (item?.b64_json) return `data:image/jpeg;base64,${item.b64_json}`
+    return item?.url ?? body?.src ?? ''
+  }
+
+  useEffect(() => {
+    const stored = readProductImageTask()
+    if (!stored) return
+    let active = true
+    setImagePrompt(stored.prompt)
+    setImaging(true)
+    void restoreProductImageTask().then((task) => {
+      if (!active || !task) return
+      if (task.status !== 'succeeded') {
+        setImageError(task.error || '图片任务没有完成，请重试。')
+        return
+      }
+      const src = productImageSource(task)
+      if (!src) {
+        setImageError('图片任务完成了，但没有返回图片，请重试。')
+        return
+      }
+      setImageSrc(src)
+      clearProductImageTask()
+    }).catch(() => {
+      if (active) setImageError('图片任务暂时无法恢复，请重试。')
+    }).finally(() => {
+      if (active) setImaging(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
   const runCheck = async () => {
     setChecking(true)
     setCheckError('')
@@ -85,12 +127,19 @@ export function WorkCheckPanel({ onClose }: { onClose: () => void }) {
   const runImage = async () => {
     setImaging(true)
     setImageError('')
-    setImageSrc('')
     try {
       const prompt = buildProductPrompt(nodes, title)
       setImagePrompt(prompt)
-      const src = await generateProductImage(prompt)
+      const clientTaskId = globalThis.crypto?.randomUUID?.() ?? `product-image-${Date.now()}`
+      await startProductImageTask(prompt, clientTaskId)
+      const finished = await restoreProductImageTask()
+      if (!finished || finished.status !== 'succeeded') {
+        throw new Error(finished?.error || '图片任务没有完成，请重试。')
+      }
+      const src = productImageSource(finished)
+      if (!src) throw new Error('图片任务完成了，但没有返回图片，请重试。')
       setImageSrc(src)
+      clearProductImageTask()
     } catch (err) {
       setImageError((err as Error).message || '生成图片失败，请重试')
     } finally {
@@ -257,7 +306,7 @@ export function WorkCheckPanel({ onClose }: { onClose: () => void }) {
             style={{ border: '2px solid var(--ink)', background: 'var(--orange)', boxShadow: '2px 2px 0 0 var(--ink)' }}
           >
             {imaging ? <Loader2 size={13} className="spin-slow" /> : <Sparkles size={13} />}
-            {imaging ? '正在画…（约 10 秒）' : imageError ? '再次生成实物图' : '生成实物图'}
+            {imaging ? '正在画 · 通常需要 20—40 秒' : imageError ? '再次生成实物图' : '生成实物图'}
           </button>
           {imageError && (
             <p className="mt-2 rounded-md px-2 py-1.5 text-[11.5px] text-red-sig" style={{ border: '1.5px solid var(--red)', background: 'rgba(198,107,90,0.1)' }}>
