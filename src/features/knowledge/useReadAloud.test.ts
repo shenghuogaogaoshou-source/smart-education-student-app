@@ -228,4 +228,53 @@ describe('useReadAloud', () => {
     act(() => result.current.prev())
     await waitFor(() => expect(result.current.index).toBe(0))
   })
+
+  it('uses cloud-backed reading on native even without browser speech synthesis', async () => {
+    const browserSpeech = window.speechSynthesis
+    let finishCurrent: (() => void) | null = null
+    const cancel = vi.fn()
+    const playText = vi.fn((_text: string, _enabled: boolean, onEnd?: () => void) => {
+      finishCurrent = onEnd ?? null
+      return { cancel }
+    })
+
+    try {
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: undefined })
+      Object.defineProperty(window, 'Capacitor', {
+        configurable: true,
+        value: { isNativePlatform: () => true },
+      })
+      const { result, unmount } = renderHook(() => useReadAloud(sampleSegments, { playText }))
+
+      expect(result.current.supported).toBe(true)
+      act(() => result.current.play(0))
+      expect(playText).toHaveBeenCalledWith(
+        '今天的目标：认识 AI 是会看、会听、会帮忙的聪明工具。',
+        true,
+        expect.any(Function),
+      )
+      act(() => finishCurrent?.())
+      expect(result.current.index).toBe(1)
+
+      unmount()
+      expect(cancel).toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: browserSpeech })
+      delete (window as Window & { Capacitor?: unknown }).Capacitor
+    }
+  })
+
+  it('stops active reading when the app moves to the background', async () => {
+    vi.stubGlobal('fetch', audioMock())
+    const { result } = renderHook(() => useReadAloud(sampleSegments))
+    act(() => result.current.play())
+    await waitFor(() => expect(result.current.engine).toBe('server'))
+    expect(result.current.status).toBe('playing')
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+    expect(result.current.status).toBe('idle')
+    expect(result.current.index).toBe(-1)
+  })
 })

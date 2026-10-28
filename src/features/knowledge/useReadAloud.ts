@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { apiFetch } from '../../app/mobileApi'
+import { apiFetch, isNativeApp } from '../../app/mobileApi'
+import { speakCompanionReply, type SpeechPlayback } from '../ai_companion/browserSpeech'
 import type { DayStory } from './content/storyContent'
 
 // 播读最小单元：一段旁白、一句对话、或一个板块的文本
@@ -45,8 +46,18 @@ function pickZhVoice(): SpeechSynthesisVoice | null {
 export type ReadAloudStatus = 'idle' | 'playing' | 'paused'
 export type ReadAloudEngine = 'server' | 'local'
 
-export function useReadAloud(segments: ReadSegment[]) {
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+export type UseReadAloudOptions = {
+  isNative?: boolean
+  playText?: (text: string, enabled: boolean, onEnd?: () => void) => SpeechPlayback | null
+}
+
+export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptions = {}) {
+  const native = options.isNative ?? isNativeApp()
+  const localSpeechSupported = typeof window !== 'undefined'
+    && typeof window.speechSynthesis?.getVoices === 'function'
+    && typeof window.SpeechSynthesisUtterance === 'function'
+  const supported = native || localSpeechSupported
+  const playText = options.playText ?? speakCompanionReply
   const [status, setStatus] = useState<ReadAloudStatus>('idle')
   const [index, setIndex] = useState(-1)
   const [engine, setEngine] = useState<ReadAloudEngine>('local')
@@ -62,6 +73,7 @@ export function useReadAloud(segments: ReadSegment[]) {
   const serverOkRef = useRef<boolean | null>(null)
   const engineRef = useRef<ReadAloudEngine>('local')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const nativePlaybackRef = useRef<SpeechPlayback | null>(null)
   const urlCacheRef = useRef(new Map<string, string>())
 
   const finish = useCallback(() => {
@@ -69,9 +81,11 @@ export function useReadAloud(segments: ReadSegment[]) {
     indexRef.current = -1
     setIndex(-1)
     setStatus('idle')
-    if (supported) window.speechSynthesis.cancel()
+    nativePlaybackRef.current?.cancel()
+    nativePlaybackRef.current = null
+    if (localSpeechSupported) window.speechSynthesis.cancel()
     audioRef.current?.pause()
-  }, [supported])
+  }, [localSpeechSupported])
 
   // ---------- 服务端神经语音 ----------
   const ensureAudio = useCallback(() => {
@@ -133,7 +147,7 @@ export function useReadAloud(segments: ReadSegment[]) {
   // ---------- 本地 speechSynthesis 兜底 ----------
   const speakLocalAt = useCallback(
     (playIndex: number) => {
-      if (!supported) return
+      if (!localSpeechSupported) return
       const segment = segmentsRef.current[playIndex]
       if (!segment) return
       engineRef.current = 'local'
@@ -161,7 +175,7 @@ export function useReadAloud(segments: ReadSegment[]) {
         synth.speak(utterance)
       }, 80)
     },
-    [supported],
+    [localSpeechSupported],
   )
 
   speakLocalRef.current = speakLocalAt
@@ -178,6 +192,20 @@ export function useReadAloud(segments: ReadSegment[]) {
       setIndex(nextIndex)
       setStatus('playing')
 
+      if (native) {
+        nativePlaybackRef.current?.cancel()
+        nativePlaybackRef.current = null
+        engineRef.current = 'server'
+        setEngine('server')
+        const playback = playText(segmentsRef.current[nextIndex].text, true, () => {
+          nativePlaybackRef.current = null
+          if (activeRef.current) speakAtRef.current(indexRef.current + 1)
+        })
+        if (playback) nativePlaybackRef.current = playback
+        else finish()
+        return
+      }
+
       // 停掉可能在播放的声音
       window.speechSynthesis.cancel()
       audioRef.current?.pause()
@@ -191,7 +219,7 @@ export function useReadAloud(segments: ReadSegment[]) {
         speakLocalAt(nextIndex)
       }
     },
-    [supported, finish, speakServerAt, speakLocalAt],
+    [native, playText, finish, speakServerAt, speakLocalAt],
   )
 
   speakAtRef.current = speakAt
@@ -200,7 +228,9 @@ export function useReadAloud(segments: ReadSegment[]) {
     (from?: number) => {
       if (!supported) return
       if (from === undefined && status === 'paused' && activeRef.current) {
-        if (engineRef.current === 'server') {
+        if (native) {
+          speakAt(indexRef.current)
+        } else if (engineRef.current === 'server') {
           void audioRef.current?.play().catch(() => {})
         } else {
           window.speechSynthesis.resume()
@@ -211,18 +241,21 @@ export function useReadAloud(segments: ReadSegment[]) {
       activeRef.current = true
       speakAt(from ?? Math.max(indexRef.current, 0))
     },
-    [supported, status, speakAt],
+    [native, supported, status, speakAt],
   )
 
   const pause = useCallback(() => {
     if (!supported || status !== 'playing') return
-    if (engineRef.current === 'server') {
+    if (native) {
+      nativePlaybackRef.current?.cancel()
+      nativePlaybackRef.current = null
+    } else if (engineRef.current === 'server') {
       audioRef.current?.pause()
     } else {
       window.speechSynthesis.pause()
     }
     setStatus('paused')
-  }, [supported, status])
+  }, [native, supported, status])
 
   const stop = useCallback(() => finish(), [finish])
 
@@ -238,16 +271,29 @@ export function useReadAloud(segments: ReadSegment[]) {
   useEffect(() => {
     if (!supported) return
     // 触发一次语音列表加载，避免首次本地播报拿不到中文语音
-    window.speechSynthesis.getVoices()
-    window.speechSynthesis.onvoiceschanged = () => {}
+    if (localSpeechSupported) {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.onvoiceschanged = () => {}
+    }
     return () => {
       activeRef.current = false
-      window.speechSynthesis.cancel()
+      nativePlaybackRef.current?.cancel()
+      nativePlaybackRef.current = null
+      if (localSpeechSupported) window.speechSynthesis.cancel()
       audioRef.current?.pause()
       for (const url of urlCacheRef.current.values()) URL.revokeObjectURL(url)
       urlCacheRef.current.clear()
     }
-  }, [supported, segments])
+  }, [localSpeechSupported, segments, supported])
+
+  useEffect(() => {
+    if (!supported) return
+    const stopInBackground = () => {
+      if (document.visibilityState === 'hidden') finish()
+    }
+    document.addEventListener('visibilitychange', stopInBackground)
+    return () => document.removeEventListener('visibilitychange', stopInBackground)
+  }, [finish, supported])
 
   return {
     supported,
