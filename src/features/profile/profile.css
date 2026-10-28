@@ -4898,6 +4898,7 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--line);
@@ -4930,14 +4931,20 @@
 }
 
 .wm-action-danger {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 68px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid rgb(190 94 80 / 38%);
+  border-radius: 999px;
+  background: #fff8f5;
+  color: #a95449;
+  font-size: calc(0.68rem * var(--font-scale));
+  font-weight: 750;
+  white-space: nowrap;
   margin-left: auto;
 }
 

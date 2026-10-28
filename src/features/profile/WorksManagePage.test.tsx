@@ -85,7 +85,11 @@ describe('WorksManagePage', () => {
 
     const deleteButton = within(draftCard).getByRole('button', { name: '删除作品' })
     await user.click(deleteButton)
-    expect(within(draftCard).getByRole('button', { name: '确认删除' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: '删除《云朵电影院》？' })
+    expect(dialog).toHaveTextContent('删除后无法恢复')
+    expect(within(draftCard).queryByRole('button', { name: '确认删除' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: '确认删除' }))
+    await waitFor(() => expect(screen.queryByText('云朵电影院')).not.toBeInTheDocument())
     expect(draftWork.id).toBeTruthy()
   })
 

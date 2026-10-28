@@ -1,5 +1,7 @@
-import { ArrowLeft, Check, Clock3, Eye, FileText, FolderKanban, Loader, Plus, Send, Trash2 } from 'lucide-react'
+import { Check, Clock3, Eye, FileText, FolderKanban, Loader, Plus, Send, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { MobilePageHeader } from '../../components/MobilePageHeader'
 import { UploadWorkDialog } from '../works/UploadWorkDialog'
 import { WorkMediaThumbnail } from '../works/WorkMediaThumbnail'
 import { useOptionalWorks } from '../works/WorksProvider'
@@ -49,6 +51,7 @@ export function WorksManagePage({
   const [filter, setFilter] = useState<WorkFilter>(() => filters.includes(initialFilter as WorkFilter) ? initialFilter as WorkFilter : '全部')
   const [uploadOpen, setUploadOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [actionError, setActionError] = useState('')
 
   const counts = useMemo(() => ({
@@ -66,18 +69,30 @@ export function WorksManagePage({
     setActionError('')
     try {
       await action()
+      return true
     } catch {
       setActionError('操作没有完成，请稍后再试。')
+      return false
     }
+  }
+
+  const confirmDeleteWork = works.find((work) => work.id === confirmDeleteId)
+
+  const deleteWork = async () => {
+    if (!confirmDeleteWork || !worksState) return
+    setDeleteBusy(true)
+    const deleted = await runAction(() => worksState.remove(confirmDeleteWork.id))
+    setDeleteBusy(false)
+    if (deleted) setConfirmDeleteId('')
   }
 
   return (
     <div className="rewards-page works-manage-page">
-      <header className="profile-page-header">
-        <button className="profile-back" type="button" onClick={onBack} aria-label="返回"><ArrowLeft size={20} /></button>
-        <h1>作品管理</h1>
-        <button className="wm-header-upload" type="button" onClick={() => setUploadOpen(true)}><Plus size={15} />上传作品</button>
-      </header>
+      <MobilePageHeader
+        title="作品管理"
+        onBack={onBack}
+        action={<button className="wm-header-upload" type="button" onClick={() => setUploadOpen(true)}><Plus size={15} />上传作品</button>}
+      />
 
       <div className="rewards-summary">
         <button className={`rewards-stat clickable ${filter === '全部' ? 'active' : ''}`} type="button" onClick={() => setFilter('全部')}>
@@ -129,14 +144,9 @@ export function WorksManagePage({
                 {work.status === 'published' && <button type="button" className="wm-action-ghost" onClick={() => onWorkClick?.(work.id)}><Eye size={14} />查看</button>}
                 {work.status === 'published' && <button type="button" className="wm-action-ghost" onClick={() => runAction(() => worksState!.makePrivate(work.id))}><Eye size={14} />仅自己</button>}
                 {work.status === 'private' && <button type="button" className="wm-action-primary" onClick={() => runAction(() => worksState!.submitForReview(work.id))}><Send size={14} />发布</button>}
-                {confirmDeleteId === work.id ? (
-                  <>
-                    <button type="button" className="wm-action-danger" onClick={() => runAction(async () => { await worksState!.remove(work.id); setConfirmDeleteId('') })}>确认删除</button>
-                    <button type="button" className="wm-action-ghost" onClick={() => setConfirmDeleteId('')}>取消</button>
-                  </>
-                ) : (
-                  <button type="button" className="wm-action-danger" aria-label="删除作品" onClick={() => setConfirmDeleteId(work.id)}><Trash2 size={14} /></button>
-                )}
+                <button type="button" className="wm-action-danger" aria-label="删除作品" onClick={() => setConfirmDeleteId(work.id)}>
+                  <Trash2 size={14} />删除
+                </button>
               </div>
             </article>
           )
@@ -151,6 +161,18 @@ export function WorksManagePage({
           <div><button type="button" className="wm-action-primary" onClick={() => onContinueCreate?.()}>去创作</button><button type="button" className="wm-action-ghost" onClick={() => setUploadOpen(true)}>上传 AI 作品</button></div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteWork)}
+        title={confirmDeleteWork ? `删除《${confirmDeleteWork.title}》？` : '删除作品？'}
+        description="删除后无法恢复，作品文件也不会再保留。请确认这是你想删除的作品。"
+        confirmLabel="确认删除"
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setConfirmDeleteId('')
+        }}
+        onConfirm={() => { void deleteWork() }}
+      />
 
       <UploadWorkDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </div>
