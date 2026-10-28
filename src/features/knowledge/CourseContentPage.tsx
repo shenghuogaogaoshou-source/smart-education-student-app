@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, ExternalLink, Lightbulb, Pause, Play, PlayCircle, SkipBack, SkipForward, Square, Target } from 'lucide-react'
+import { BookOpen, ExternalLink, Lightbulb, Pause, Play, PlayCircle, SkipBack, SkipForward, Square, Target } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppState } from '../../app/AppState'
 import { getGradeBand, type PrimaryGrade } from '../../app/learning'
@@ -6,6 +6,7 @@ import { getGrade56LessonDetail, type Grade56LessonDetail, type Grade56Video } f
 import { stories } from './content/storyContent'
 import { COURSE_PACKAGES, getCourseForBand, type CoursePart } from './courseCatalog'
 import { buildStorySegments, useReadAloud } from './useReadAloud'
+import { MobilePageHeader } from '../../components/MobilePageHeader'
 import './course-content.css'
 
 // 3-4年级 markdown 文件通过 Vite ?raw 导入
@@ -281,17 +282,12 @@ export function CourseContentPage({ courseId, chapterNum, onBack, onStartTest }:
 
   return (
     <div className="course-content-page">
-      <header className="content-header">
-        <button type="button" className="content-back" onClick={onBack} aria-label="返回">
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <p className="content-course-name">{course.name}</p>
-          <h1 className="content-title">
-            {courseId === 'qmx' ? `第${chapterNum}天 · ${part?.title ?? ''}` : `第${chapterNum}章 · ${part?.title ?? ''}`}
-          </h1>
-        </div>
-      </header>
+      <MobilePageHeader
+        className="course-content-header"
+        eyebrow={course.name}
+        title={courseId === 'qmx' ? `第${chapterNum}天 · ${part?.title ?? ''}` : `第${chapterNum}章 · ${part?.title ?? ''}`}
+        onBack={onBack}
+      />
 
       {courseId === 'qmx' && (content as any) && (
         <QmxContent story={content as any} />
