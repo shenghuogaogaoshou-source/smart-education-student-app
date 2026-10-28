@@ -2,11 +2,14 @@ import { creationGuide, friendlyGenerationError } from './creationGuide.js';
 import { LONG_PRESS_MS, SLIDE_CANCEL_PX, moveCard, reorderSlot } from './slotDrag.js';
 import { CONCURRENCY, MAX_CLIP_SECONDS, estimateFilm, panelPrompt, pendingSegments, planSegments } from './filmPlan.js';
 import { saveFilmToZhiya } from './integration/saveToZhiya';
+import { createTask, pollTask } from '@zhiya/task-client';
+import { beginImageTask, finishImageTask, normalizeImageTask } from './imageTaskState.js';
 
 /** @param {HTMLElement} root */
 export function mountStudio(root, onNavigate = (stage) => {}) {
   const controller = new AbortController();
   const nativeDocument = window.document;
+  const nativeTaskMode = new URLSearchParams(window.location.search).has('apiOrigin');
   const document = new Proxy(nativeDocument, {
     get(target, key) {
       if (key === 'querySelector') return root.querySelector.bind(root);
@@ -583,6 +586,7 @@ function initPanels() {
   G.panels = list.map((cap, i) => ({
     cap, prm: '', seed: (i + 1) * 977, version: 0, wrong: null, note: '', fix: '',
     accepted: false, svg: '', img: '', thumb: '', aiMsg: '', aiDrawn: false,
+    imageTaskId: '', imageTaskStatus: '',
   }));
   G.panelsFrom = story;
   G.videoSegments = {};                 /* 分镜变了,之前拍好的镜头就作废,免得拼进旧内容 */
@@ -1084,6 +1088,7 @@ function tryRestoreDraft() {
     const d = store.get('bh_draft');
     if (!d || d.v !== 3 || !d.stage || d.stage === 'title') return false;
     Object.assign(G, d);
+    G.panels = Array.isArray(G.panels) ? G.panels.map(normalizeImageTask) : [];
     G.videoSegments = (G.videoSegments && typeof G.videoSegments === 'object' && !Array.isArray(G.videoSegments)) ? G.videoSegments : {};
     /* 本机录制的片子是内存 blob 地址,刷新后一定失效 —— 别让播放器挂个死链接 */
     if (G.videoUrl && /^blob:/i.test(G.videoUrl)) {
@@ -1097,6 +1102,7 @@ function tryRestoreDraft() {
     renderCreationGuide(G.stage);
     const r = { card: renderSlots, idea: renderIdea, story: renderStory, style: renderStyle, board: renderBoard, prem: renderPrem }[G.stage];
     if (r) r();
+    if (G.stage === 'board') setTimeout(resumeImageTasks, 50);
     refreshStepbar(); syncDownstreamNotes();
     toast('📽️ 上次没拍完的片子已恢复,继续创作吧!');
     return true;
@@ -1465,6 +1471,7 @@ const BK = {
   mod: {},
   usage: { imgLimit: 12, videoLeft: 30, videoUnlimited: false, videosToday: 0, maxSegments: 10 },
   busy: { story: false, img: {}, video: false },
+  resuming: false,
   lastErr: '',
 };
 
@@ -1802,6 +1809,10 @@ async function aiPaint(panelEl) {
   p.aiMsg = '⏳ ' + modelOf('image') + ' 正在画(大约 15~30 秒)…';
   drawAiMsg(panelEl, p);
   const prompt = [G.style, (p.prm || p.cap || '').trim(), '儿童绘本插画,明亮温暖,整张图不出现任何文字'].filter(Boolean).join('。');
+  if (nativeTaskMode) {
+    await startTaskImage(i, prompt, imgLimit);
+    return;
+  }
   try {
     const t0 = Date.now();
     const d = await bkPost('/api/image', { prompt }, 300000);
@@ -1822,6 +1833,81 @@ async function aiPaint(panelEl) {
   }
   BK.busy.img[i] = false;
   renderPanels(); saveDraft();
+}
+
+async function applyImageTaskResult(index, task) {
+  const p = G.panels[index];
+  if (!p) return;
+  if (task.status === 'succeeded' && task.result && task.result.src) {
+    const image = await shrinkImg(task.result.src, 1280);
+    Object.assign(p, finishImageTask(p, 'succeeded', image, '✅ AI 画好了，已保存到草稿'));
+    p.version++;
+    p.wrong = null; p.note = ''; p.fix = '';
+    G.aiShots = (G.aiShots || 0) + 1;
+    lg('ai-paint', '第 ' + (index + 1) + ' 格 AI 出图完成（后台任务）');
+    toast('🎨 第 ' + (index + 1) + ' 格画好了！');
+  } else {
+    const message = task.status === 'interrupted'
+      ? '⚠️ 上次的后台出图中断了，可以再次生成。'
+      : '❌ ' + friendlyGenerationError('image', task.error || 'provider_error').message + ' 可以点「🎨 重画这格」用免费画师。';
+    Object.assign(p, finishImageTask(p, task.status || 'failed', '', message));
+    lg('ai-paint', '第 ' + (index + 1) + ' 格后台出图失败');
+  }
+  BK.busy.img[index] = false;
+  renderPanels();
+  saveDraft();
+}
+
+async function startTaskImage(index, prompt, imgLimit) {
+  const p = G.panels[index];
+  if (!p) return;
+  const clientTaskId = crypto.randomUUID ? crypto.randomUUID() : 'image-' + Date.now();
+  Object.assign(p, beginImageTask(p, clientTaskId));
+  p.aiMsg = '⏳ 已提交后台画师，正在排队…';
+  saveDraft();
+  try {
+    const created = await createTask({
+      kind: 'film-image',
+      clientTaskId,
+      payload: { prompt },
+    });
+    p.imageTaskStatus = 'running';
+    p.aiMsg = '🎨 后台画师正在画这一格…';
+    renderPanels();
+    saveDraft();
+    const task = await pollTask(created.taskId);
+    await applyImageTaskResult(index, task);
+  } catch (error) {
+    Object.assign(p, finishImageTask(p, 'failed', '', '❌ 图片任务暂时连不上，作品和旧画面都还在。'));
+    BK.busy.img[index] = false;
+    renderPanels();
+    saveDraft();
+  }
+}
+
+async function resumeImageTasks() {
+  if (!nativeTaskMode || BK.resuming) return;
+  BK.resuming = true;
+  try {
+    const active = G.panels
+      .map((p, index) => ({ p, index }))
+      .filter(({ p }) => p.imageTaskId && ['queued', 'running'].includes(p.imageTaskStatus))
+      .slice(0, 3);
+    await Promise.all(active.map(({ p, index }) => {
+      BK.busy.img[index] = true;
+      p.aiMsg = '⏳ 正在恢复后台画面任务…';
+      return pollTask(p.imageTaskId)
+        .then(task => applyImageTaskResult(index, task))
+        .catch(() => {
+          Object.assign(p, finishImageTask(p, 'failed', '', '⚠️ 画面任务中断，可以再次生成。'));
+          BK.busy.img[index] = false;
+          renderPanels();
+          saveDraft();
+        });
+    }));
+  } finally {
+    BK.resuming = false;
+  }
 }
 
 function drawAiMsg(panelEl, p) {          // 立刻把状态写进格子(重绘前也能看到)
