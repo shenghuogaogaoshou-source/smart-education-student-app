@@ -11,6 +11,26 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 describe('AI companion proxy routes', () => {
+  it('transcribes a short microphone recording without exposing the provider key', async () => {
+    const transcribeAudioImpl = vi.fn(async () => ({ text: '云是怎么形成的？' }))
+
+    await expect(handleCompanionApiRequest({
+      method: 'POST',
+      path: '/api/companion/transcribe',
+      body: { audio: 'data:audio/webm;base64,YQ==' },
+    }, {
+      visionApiKey: 'dashscope-key',
+      transcribeAudioImpl,
+    })).resolves.toEqual({
+      status: 200,
+      body: { text: '云是怎么形成的？' },
+    })
+    expect(transcribeAudioImpl).toHaveBeenCalledWith(
+      { audio: 'data:audio/webm;base64,YQ==' },
+      expect.objectContaining({ apiKey: 'dashscope-key' }),
+    )
+  })
+
   it('uses the configured brain service for production TTS when available', async () => {
     const upstream = createServer((request, response) => {
       expect(request.url).toBe('/api/tts')
@@ -138,6 +158,7 @@ describe('AI companion proxy routes', () => {
         ok: true,
         companion: { configured: false, provider: 'deepseek' },
         vision: { configured: false, provider: 'dashscope', model: 'qwen3-vl-plus' },
+        transcription: { configured: false, provider: 'dashscope', model: 'qwen3-asr-flash' },
       },
     })
     expect(JSON.stringify(result)).not.toMatch(/sk-|api.?key/i)

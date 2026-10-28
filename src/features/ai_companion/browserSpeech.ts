@@ -49,6 +49,27 @@ export type SpeechPlayback = {
   cancel: () => void
 }
 
+type RecordedAudioStream = {
+  getTracks: () => Array<{ stop: () => void }>
+}
+
+type RecordedAudioRecorder = {
+  state: string
+  mimeType: string
+  ondataavailable: ((event: { data: Blob }) => void) | null
+  onstop: (() => void) | null
+  onerror: (() => void) | null
+  start: (timesliceMs?: number) => void
+  stop: () => void
+}
+
+type RecordedSpeechCaptureDependencies = {
+  getUserMedia: (constraints: MediaStreamConstraints) => Promise<RecordedAudioStream>
+  createRecorder: (stream: RecordedAudioStream, options?: MediaRecorderOptions) => RecordedAudioRecorder
+  requestTranscription: (audio: Blob, signal: AbortSignal) => Promise<string>
+  maxListeningMs?: number
+}
+
 export type NativeSpeechSession = {
   nativePreferred: boolean
 }
@@ -83,6 +104,183 @@ export async function requestSpeechAudio(text: string, signal?: AbortSignal): Pr
   const audio = await response.blob()
   if (!audio.type.startsWith('audio/') || audio.size === 0) throw new Error('tts_invalid_audio')
   return audio
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('audio_read_failed'))
+    }
+    reader.onerror = () => reject(reader.error || new Error('audio_read_failed'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+export async function requestSpeechTranscription(audio: Blob, signal?: AbortSignal): Promise<string> {
+  const dataUrl = await blobToDataUrl(audio)
+  const response = await requestWithRetry('/api/companion/transcribe', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ audio: dataUrl }),
+    signal,
+  }, {
+    attempts: 1,
+    timeoutMs: 35_000,
+  })
+  if (!response.ok) throw new Error('transcription_failed')
+  const data = await response.json()
+  const text = typeof data?.text === 'string' ? data.text.trim() : ''
+  if (!text) throw new Error('transcription_empty')
+  return text
+}
+
+function createRecordedSpeechCapture(
+  { onComplete, onError }: SpeechCaptureCallbacks,
+  {
+    getUserMedia,
+    createRecorder,
+    requestTranscription,
+    maxListeningMs = 12_000,
+  }: RecordedSpeechCaptureDependencies,
+): SpeechCapture {
+  let active = true
+  let stopRequested = false
+  let finalized = false
+  let stream: RecordedAudioStream | null = null
+  let recorder: RecordedAudioRecorder | null = null
+  let listeningTimer: ReturnType<typeof setTimeout> | null = null
+  let stopTimer: ReturnType<typeof setTimeout> | null = null
+  const chunks: Blob[] = []
+  const transcriptionController = new AbortController()
+
+  const cleanup = () => {
+    if (listeningTimer !== null) clearTimeout(listeningTimer)
+    if (stopTimer !== null) clearTimeout(stopTimer)
+    listeningTimer = null
+    stopTimer = null
+  }
+
+  const stopTracks = () => {
+    stream?.getTracks().forEach((track) => track.stop())
+    stream = null
+  }
+
+  const fail = (reason: SpeechCaptureErrorReason) => {
+    if (!active || finalized) return
+    active = false
+    finalized = true
+    cleanup()
+    stopTracks()
+    onError(reason)
+  }
+
+  const finalize = async () => {
+    if (!active || finalized) return
+    finalized = true
+    cleanup()
+    stopTracks()
+    const audio = new Blob(chunks, { type: recorder?.mimeType || chunks[0]?.type || 'audio/webm' })
+    if (audio.size === 0) {
+      active = false
+      onError('no-speech')
+      return
+    }
+    try {
+      const text = await requestTranscription(audio, transcriptionController.signal)
+      active = false
+      if (text.trim()) onComplete(text.trim())
+      else onError('no-speech')
+    } catch (error) {
+      active = false
+      if ((error as Error).name !== 'AbortError') onError('recognition-error')
+    }
+  }
+
+  void (async () => {
+    try {
+      stream = await getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+    } catch (error) {
+      const denied = error instanceof DOMException
+        && (error.name === 'NotAllowedError' || error.name === 'SecurityError')
+      fail(denied ? 'permission-denied' : 'start-failed')
+      return
+    }
+    if (!active) {
+      stopTracks()
+      return
+    }
+
+    try {
+      const typeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+      const mimeType = typeCandidates.find((candidate) => (
+        typeof MediaRecorder !== 'undefined'
+        && typeof MediaRecorder.isTypeSupported === 'function'
+        && MediaRecorder.isTypeSupported(candidate)
+      ))
+      recorder = createRecorder(stream, mimeType ? { mimeType } : undefined)
+      recorder.ondataavailable = ({ data }) => {
+        if (active && data.size > 0) chunks.push(data)
+      }
+      recorder.onstop = () => { void finalize() }
+      recorder.onerror = () => fail('recognition-error')
+      recorder.start(250)
+      listeningTimer = setTimeout(() => {
+        if (recorder && recorder.state !== 'inactive') recorder.stop()
+      }, maxListeningMs)
+      if (stopRequested && recorder.state !== 'inactive') recorder.stop()
+    } catch {
+      fail('start-failed')
+    }
+  })()
+
+  return {
+    stop: () => {
+      if (!active || stopRequested) return
+      stopRequested = true
+      if (recorder && recorder.state !== 'inactive') {
+        stopTimer = setTimeout(() => { void finalize() }, 1_500)
+        recorder.stop()
+      }
+    },
+    cancel: () => {
+      active = false
+      finalized = true
+      cleanup()
+      transcriptionController.abort()
+      try {
+        if (recorder && recorder.state !== 'inactive') recorder.stop()
+      } catch {
+        // Recorder already stopped.
+      }
+      stopTracks()
+    },
+  }
+}
+
+export function startRecordedSpeechCaptureForTest(
+  callbacks: SpeechCaptureCallbacks,
+  dependencies: RecordedSpeechCaptureDependencies,
+): SpeechCapture {
+  return createRecordedSpeechCapture(callbacks, dependencies)
+}
+
+function startRecordedSpeechCapture(callbacks: SpeechCaptureCallbacks): SpeechCapture {
+  return createRecordedSpeechCapture(callbacks, {
+    getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
+    createRecorder: (stream, options) => (
+      new MediaRecorder(stream as MediaStream, options) as unknown as RecordedAudioRecorder
+    ),
+    requestTranscription: requestSpeechTranscription,
+  })
 }
 
 function createNativeSpeechCapture(
@@ -214,7 +412,13 @@ function startNativeSpeechCapture(callbacks: SpeechCaptureCallbacks): SpeechCapt
 }
 
 export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCaptureCallbacks): SpeechCapture | null {
-  if (isNativeApp()) return startNativeSpeechCapture({ onInterim, onComplete, onError })
+  if (isNativeApp()) {
+    const mediaDevices = (navigator as Navigator & { mediaDevices?: MediaDevices }).mediaDevices
+    if (typeof MediaRecorder !== 'undefined' && mediaDevices) {
+      return startRecordedSpeechCapture({ onInterim, onComplete, onError })
+    }
+    return startNativeSpeechCapture({ onInterim, onComplete, onError })
+  }
   const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition
   if (!Recognition) return null
 

@@ -9,6 +9,7 @@ import { synthesizeSpeech } from './tts.mjs'
 import { buildSchedulePayload, normalizeScheduleRequest, validateScheduleResponse } from './schedulePolicy.mjs'
 import { createTaskService } from './taskService.mjs'
 import { createTaskExecutor } from './taskExecutors.mjs'
+import { transcribeAudio } from './transcription.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
@@ -131,7 +132,11 @@ export async function handleCompanionApiRequest(
     arkImageModel = process.env.ARK_IMAGE_MODEL || process.env.ARK_MODEL,
     visionApiKey = process.env.VISION_API_KEY,
     visionModel = process.env.VISION_MODEL || 'qwen3-vl-plus',
+    asrApiKey = process.env.ASR_API_KEY,
+    asrBaseUrl = process.env.ASR_BASE_URL || process.env.VISION_BASE_URL,
+    asrModel = process.env.ASR_MODEL || 'qwen3-asr-flash',
     fetchImpl = fetch,
+    transcribeAudioImpl = transcribeAudio,
     interpretIntent = interpretCompanionIntent,
     recognizeImage = recognize,
   } = {},
@@ -143,7 +148,28 @@ export async function handleCompanionApiRequest(
         ok: true,
         companion: { configured: Boolean(apiKey), provider: 'deepseek' },
         vision: { configured: Boolean(visionApiKey), provider: 'dashscope', model: visionModel },
+        transcription: { configured: Boolean(asrApiKey || visionApiKey), provider: 'dashscope', model: asrModel },
       },
+    }
+  }
+  if (path === '/api/companion/transcribe') {
+    try {
+      return {
+        status: 200,
+        body: await transcribeAudioImpl(body, {
+          apiKey: asrApiKey || visionApiKey,
+          baseUrl: asrBaseUrl,
+          model: asrModel,
+          fetchImpl,
+        }),
+      }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'provider_error'
+      const known = ['invalid_input', 'asr_not_configured', 'invalid_result', 'provider_error']
+      return {
+        status: code === 'invalid_input' ? 400 : code === 'asr_not_configured' ? 503 : 502,
+        body: { error: known.includes(code) ? code : 'provider_error' },
+      }
     }
   }
   if (method !== 'POST') return { status: 404, body: { error: 'not_found' } }
@@ -385,6 +411,8 @@ export function createCompanionRequestListener({
     }
     const limit = path === '/api/companion/schedule'
       ? 64 * 1024
+      : path === '/api/companion/transcribe'
+        ? 8 * 1024 * 1024
       : path === '/api/companion/recognize'
       ? 7 * 1024 * 1024
       : path === '/api/deepseek/chat/completions'

@@ -4,6 +4,7 @@ import {
   requestSpeechAudio,
   speakCompanionReply,
   speakCompanionReplyForTest,
+  startRecordedSpeechCaptureForTest,
   startNativeSpeechCaptureForTest,
   startSpeechCapture,
 } from './browserSpeech'
@@ -254,6 +255,57 @@ describe('browser speech capture', () => {
     await vi.waitFor(() => expect(plugin.start).toHaveBeenCalled())
     expect(order).toEqual(['request', 'available'])
     capture.cancel()
+  })
+
+  it('records native microphone audio and transcribes it without a system speech service', async () => {
+    const onComplete = vi.fn()
+    const stopTrack = vi.fn()
+    const stop = vi.fn()
+    let data: ((event: { data: Blob }) => void) | undefined
+    let stopped: (() => void) | undefined
+    const recorder = {
+      state: 'inactive',
+      mimeType: 'audio/webm',
+      ondataavailable: null as ((event: { data: Blob }) => void) | null,
+      onstop: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      start: vi.fn(() => { recorder.state = 'recording' }),
+      stop: vi.fn(() => { recorder.state = 'inactive'; stop() }),
+    }
+    data = (event) => recorder.ondataavailable?.(event)
+    stopped = () => recorder.onstop?.()
+    const requestTranscription = vi.fn(async () => '为什么天空是蓝色的？')
+    const capture = startRecordedSpeechCaptureForTest(
+      { onComplete, onError: vi.fn() },
+      {
+        getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })),
+        createRecorder: vi.fn(() => recorder),
+        requestTranscription,
+      },
+    )
+
+    await vi.waitFor(() => expect(recorder.start).toHaveBeenCalled())
+    capture.stop()
+    expect(recorder.stop).toHaveBeenCalledOnce()
+    data?.({ data: new Blob(['voice'], { type: 'audio/webm' }) })
+    stopped?.()
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith('为什么天空是蓝色的？'))
+    expect(requestTranscription).toHaveBeenCalledWith(expect.any(Blob), expect.any(AbortSignal))
+    expect(stopTrack).toHaveBeenCalledOnce()
+  })
+
+  it('reports microphone permission denial from getUserMedia', async () => {
+    const onError = vi.fn()
+    startRecordedSpeechCaptureForTest(
+      { onComplete: vi.fn(), onError },
+      {
+        getUserMedia: vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError')),
+        createRecorder: vi.fn(),
+        requestTranscription: vi.fn(),
+      },
+    )
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('permission-denied'))
   })
 
   it('starts Android local speech after 1.5 seconds while cloud TTS is pending', async () => {
