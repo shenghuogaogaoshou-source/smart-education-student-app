@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@zhiya/task-client": "*",
     "@zhiya/works-bridge": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
