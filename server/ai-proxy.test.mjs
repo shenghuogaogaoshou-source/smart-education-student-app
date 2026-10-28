@@ -343,4 +343,49 @@ describe('AI companion proxy routes', () => {
     expect(result).toEqual({ status: 502, body: { error: 'provider_error' } })
     expect(fetchImpl).toHaveBeenCalledOnce()
   })
+
+  it('creates and reads background tasks through the protected listener', async () => {
+    const taskService = {
+      create: vi.fn(async () => ({
+        taskId: '33333333-3333-4333-8333-333333333333',
+        kind: 'vision',
+        status: 'queued',
+        createdAt: '2026-10-28T15:30:00.000Z',
+        updatedAt: '2026-10-28T15:30:00.000Z',
+        elapsedMs: 0,
+      })),
+      get: vi.fn(() => ({
+        taskId: '33333333-3333-4333-8333-333333333333',
+        kind: 'vision',
+        status: 'succeeded',
+        result: { output: '白色机器人' },
+        createdAt: '2026-10-28T15:30:00.000Z',
+        updatedAt: '2026-10-28T15:30:18.000Z',
+        elapsedMs: 18_000,
+      })),
+    }
+    const listener = createCompanionRequestListener({
+      allowedOrigins: new Set(['https://localhost']),
+      taskService,
+    })
+    const server = createServer(listener).listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const origin = `http://127.0.0.1:${server.address().port}`
+    try {
+      const created = await fetch(`${origin}/api/tasks`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://localhost' },
+        body: JSON.stringify({ kind: 'vision', payload: { tool: 'object' }, clientTaskId: 'camera-1' }),
+      })
+      expect(created.status).toBe(202)
+      expect(await created.json()).toMatchObject({ status: 'queued' })
+      const result = await fetch(`${origin}/api/tasks/33333333-3333-4333-8333-333333333333`, {
+        headers: { origin: 'https://localhost' },
+      })
+      expect(result.status).toBe(200)
+      expect(await result.json()).toMatchObject({ status: 'succeeded', result: { output: '白色机器人' } })
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  })
 })

@@ -7,6 +7,8 @@ import { buildDeepSeekPayload, prepareStudentQuestion, prepareStudentReply } fro
 import { recognize } from './recognition.mjs'
 import { synthesizeSpeech } from './tts.mjs'
 import { buildSchedulePayload, normalizeScheduleRequest, validateScheduleResponse } from './schedulePolicy.mjs'
+import { createTaskService } from './taskService.mjs'
+import { createTaskExecutor } from './taskExecutors.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.COMPANION_PROXY_PORT ?? 8787)
@@ -278,7 +280,14 @@ export function createCompanionRequestListener({
   handleApi = handleCompanionApiRequest,
   synthesize = synthesizeSpeech,
   brainOrigin = process.env.BRAIN_INTERNAL_ORIGIN || '',
+  taskService,
 } = {}) {
+  const tasks = taskService || createTaskService({
+    dataDir: join(process.env.DATA_DIR || join(__dirname, '..', '.data'), 'tasks'),
+    execute: createTaskExecutor({ handleApi, brainOrigin: brainOrigin || 'http://127.0.0.1:8766' }),
+  })
+  const taskReady = typeof tasks.start === 'function' ? tasks.start() : Promise.resolve()
+
   return async function companionRequestListener(request, response) {
     const path = request.url?.split('?')[0] ?? ''
     const corsHeaders = corsHeadersForRequest(request, allowedOrigins)
@@ -287,6 +296,34 @@ export function createCompanionRequestListener({
       response.end()
       return
     }
+
+    if (request.method === 'POST' && path === '/api/tasks') {
+      try {
+        const body = await readJson(request, 8 * 1024 * 1024)
+        await taskReady
+        const task = await tasks.create(body)
+        sendJson(response, 202, task, corsHeaders)
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'invalid_input'
+        sendJson(response, code === 'body_too_large' ? 413 : code === 'invalid_input' ? 400 : 503, {
+          error: code === 'body_too_large' ? 'body_too_large' : code === 'invalid_input' ? 'invalid_input' : 'task_service_unavailable',
+        }, corsHeaders)
+      }
+      return
+    }
+
+    const taskMatch = path.match(/^\/api\/tasks\/([0-9a-f-]{36})$/)
+    if (request.method === 'GET' && taskMatch) {
+      await taskReady
+      const task = tasks.get(taskMatch[1])
+      if (!task) {
+        sendJson(response, 404, { error: 'task_not_found' }, corsHeaders)
+      } else {
+        sendJson(response, 200, task, corsHeaders)
+      }
+      return
+    }
+
     if (request.method === 'POST' && path === '/api/tts') {
       try {
         const body = await readJson(request)

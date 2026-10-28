@@ -37,6 +37,17 @@ describe('embedded game mobile API bridge', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://api.zhiya.test/api/health', undefined)
   })
 
+  it('sends brain-game background tasks to the shared task API', async () => {
+    window.history.replaceState({}, '', '/?apiOrigin=https%3A%2F%2Fapi.zhiya.test')
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 202 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    installGameApiShim('brain')
+    await fetch('/api/tasks', { method: 'POST' })
+
+    expect(fetchMock).toHaveBeenCalledWith('https://api.zhiya.test/api/tasks', { method: 'POST' })
+  })
+
   it('accepts one base origin explicitly from the parent WebView', async () => {
     window.history.replaceState({}, '', '/?apiOrigin=https%3A%2F%2Fapi.zhiya.test')
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))

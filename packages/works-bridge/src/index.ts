@@ -106,7 +106,8 @@ export function installGameApiShim(service: 'ai' | 'brain') {
     const originalFetch = window.fetch.bind(window)
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       if (typeof input === 'string' && input.startsWith('/api/')) {
-        return originalFetch(`${targetOrigin}${input}`, init)
+        const sharedTaskPath = input.startsWith('/api/tasks')
+        return originalFetch(`${sharedTaskPath ? origin : targetOrigin}${input}`, init)
       }
       return originalFetch(input, init)
     }

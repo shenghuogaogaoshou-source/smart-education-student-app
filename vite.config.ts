@@ -7,6 +7,7 @@ export default defineConfig({
     proxy: {
       '/api/companion': 'http://127.0.0.1:8787',
       '/api/tts': 'http://127.0.0.1:8787',
+      '/api/tasks': 'http://127.0.0.1:8787',
     },
   },
   test: {
