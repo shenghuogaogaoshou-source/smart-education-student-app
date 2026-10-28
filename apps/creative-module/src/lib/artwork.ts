@@ -15,6 +15,7 @@ import type { CircuitNodeData, DataType } from '../types/circuit'
 export const IMAGE_API_DEFAULTS = {
   endpoint: '/api/ark/images/generations',
   model: 'doubao-seedream-4-0-20260415',
+  size: '2048x2048',
   // 老模型兜底：主模型不可用时换这个重试
   fallbackModel: 'doubao-seedream-4-0-250828',
   apiKey: '',
@@ -423,13 +424,24 @@ function normalizeAiCheck(content: string): AiCheckResult {
 }
 
 // -------------------- 实物图生成（火山方舟） --------------------
+export function describeProductImageError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  if (/abort|timeout|超时/i.test(message)) {
+    return '实物图等得有点久，作品还在，请检查网络后再试一次。'
+  }
+  if (/没有返回图片|JSON|格式/i.test(message)) {
+    return '图片服务这次没有送回完整图片，作品还在，可以再次生成。'
+  }
+  return '图片服务正在休息，作品还在，请稍后再试一次。'
+}
+
 export async function generateProductImage(prompt: string, timeoutMs = 120000): Promise<string> {
   const { endpoint, model, apiKey } = loadImageSettings()
   const body = (m: string) =>
     JSON.stringify({
       model: m,
       prompt,
-      size: '1024x1024',
+      size: IMAGE_API_DEFAULTS.size,
       response_format: 'b64_json',
       watermark: false,
     })
@@ -470,10 +482,10 @@ export async function generateProductImage(prompt: string, timeoutMs = 120000): 
       try {
         return await attempt(IMAGE_API_DEFAULTS.fallbackModel)
       } catch {
-        throw err
+        throw new Error(describeProductImageError(err))
       }
     }
-    throw err
+    throw new Error(describeProductImageError(err))
   }
 }
 

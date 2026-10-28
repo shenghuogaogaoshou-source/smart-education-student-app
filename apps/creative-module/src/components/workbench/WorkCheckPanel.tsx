@@ -257,7 +257,7 @@ export function WorkCheckPanel({ onClose }: { onClose: () => void }) {
             style={{ border: '2px solid var(--ink)', background: 'var(--orange)', boxShadow: '2px 2px 0 0 var(--ink)' }}
           >
             {imaging ? <Loader2 size={13} className="spin-slow" /> : <Sparkles size={13} />}
-            {imaging ? '正在画…（约 10 秒）' : '生成实物图'}
+            {imaging ? '正在画…（约 10 秒）' : imageError ? '再次生成实物图' : '生成实物图'}
           </button>
           {imageError && (
             <p className="mt-2 rounded-md px-2 py-1.5 text-[11.5px] text-red-sig" style={{ border: '1.5px solid var(--red)', background: 'rgba(198,107,90,0.1)' }}>

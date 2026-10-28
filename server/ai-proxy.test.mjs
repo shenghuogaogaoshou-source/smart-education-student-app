@@ -311,4 +311,36 @@ describe('AI companion proxy routes', () => {
     expect(init.headers.authorization).toBe('Bearer ark-server-key')
     expect(JSON.parse(init.body)).toMatchObject({ prompt: '云朵小背包', model: 'ark-image-model' })
   })
+
+  it('retries one transient image provider failure without exposing the upstream error', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response('{"error":"busy"}', { status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ b64_json: 'image-data' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+
+    const result = await handleCompanionApiRequest({
+      method: 'POST',
+      path: '/api/ark/images/generations',
+      body: { prompt: '会发光的小夜灯', size: '1024x1024' },
+      requestId: 'req-image-1',
+    }, { arkApiKey: 'ark-server-key', fetchImpl })
+
+    expect(result).toEqual({ status: 200, body: { data: [{ b64_json: 'image-data' }] } })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry an image provider authentication failure', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response('{"error":"unauthorized"}', { status: 401 }))
+
+    const result = await handleCompanionApiRequest({
+      method: 'POST',
+      path: '/api/ark/images/generations',
+      body: { prompt: '会发光的小夜灯' },
+    }, { arkApiKey: 'invalid-key', fetchImpl })
+
+    expect(result).toEqual({ status: 502, body: { error: 'provider_error' } })
+    expect(fetchImpl).toHaveBeenCalledOnce()
+  })
 })

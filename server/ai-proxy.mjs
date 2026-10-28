@@ -122,7 +122,7 @@ async function proxyJsonRequest({ url, apiKey, body, fetchImpl, signal }) {
 }
 
 export async function handleCompanionApiRequest(
-  { method, path, body },
+  { method, path, body, requestId },
   {
     apiKey = process.env.DEEPSEEK_API_KEY,
     arkApiKey = process.env.ARK_API_KEY,
@@ -213,17 +213,49 @@ export async function handleCompanionApiRequest(
     }
   }
   if (path === '/api/ark/images/generations') {
+    const endpoint = process.env.ARK_IMAGE_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/images/generations'
+    const imageModel = arkImageModel || body?.model
+    const retryable = new Set([408, 429, 500, 502, 503, 504])
+    let lastStatus = 0
+    if (!arkApiKey) return { status: 503, body: { error: 'missing_api_key' } }
+
     try {
-      const result = await proxyJsonRequest({
-        url: process.env.ARK_IMAGE_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
-        apiKey: arkApiKey,
-        body: {
-          ...body,
-          model: arkImageModel || body?.model,
-        },
-        fetchImpl,
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        let upstream
+        try {
+          upstream = await fetchImpl(endpoint, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${arkApiKey}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ ...body, model: imageModel }),
+          })
+        } catch {
+          lastStatus = 0
+          if (attempt === 2) throw new Error('provider_error')
+          await new Promise((resolve) => setTimeout(resolve, 180))
+          continue
+        }
+
+        lastStatus = upstream.status
+        if (upstream.ok) return { status: 200, body: await upstream.json() }
+        if (!retryable.has(upstream.status) || attempt === 2) break
+        console.warn('[image-generation]', {
+          requestId: requestId || 'unknown',
+          attempt,
+          status: upstream.status,
+          error: 'provider_error_retry',
+        })
+        await new Promise((resolve) => setTimeout(resolve, 180))
+      }
+      console.warn('[image-generation]', {
+        requestId: requestId || 'unknown',
+        attempts: 2,
+        status: lastStatus,
+        error: 'provider_error',
       })
-      return { status: 200, body: result }
+      return { status: 502, body: { error: 'provider_error' } }
     } catch (error) {
       const code = error instanceof Error ? error.message : 'provider_error'
       return { status: code === 'missing_api_key' ? 503 : 502, body: { error: code } }
@@ -304,7 +336,12 @@ export function createCompanionRequestListener({
       sendJson(response, code === 'body_too_large' ? 413 : 400, { error: code }, corsHeaders)
       return
     }
-    const result = await handleApi({ method: request.method, path, body })
+    const result = await handleApi({
+      method: request.method,
+      path,
+      body,
+      requestId: String(request.headers['x-zhiya-request-id'] || ''),
+    })
     sendJson(response, result.status, result.body, corsHeaders)
   }
 }

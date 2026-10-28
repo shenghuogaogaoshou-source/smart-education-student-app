@@ -133,3 +133,15 @@ test('AI 审查和实物图能力存在，出图默认走智芽代理且不暴�
   assert.equal(art.IMAGE_API_DEFAULTS.endpoint, '/api/ark/images/generations');
   assert.equal(art.IMAGE_API_DEFAULTS.apiKey, '');
 });
+
+test('实物图错误会转成儿童可理解的提示，不显示上游技术文本', () => {
+  assert.equal(typeof art.describeProductImageError, 'function');
+  const message = art.describeProductImageError(new Error('出图接口返回 502：{"error":"provider_error"}'));
+  assert.match(message, /作品还在/);
+  assert.match(message, /稍后再试/);
+  assert.doesNotMatch(message, /provider_error|502/);
+});
+
+test('实物图请求使用当前图像服务支持的最小以上尺寸', () => {
+  assert.equal(art.IMAGE_API_DEFAULTS.size, '2048x2048');
+});
