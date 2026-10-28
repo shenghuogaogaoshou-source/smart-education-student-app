@@ -200,10 +200,10 @@
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .app-frame:not(:has(.embedded-game-page))::after {
+  body::after {
     content: '请将设备转回竖屏继续学习';
     position: fixed;
-    z-index: 2000;
+    z-index: 10000;
     inset: 0;
     display: grid;
     place-items: center;
@@ -213,6 +213,16 @@
     font-size: 1.05rem;
     font-weight: 800;
     text-align: center;
+  }
+
+  body:has(.embedded-game-page)::after {
+    display: none;
+  }
+
+  body:has(.embedded-game-page) .app-frame,
+  body:has(.embedded-game-page) .embedded-game-page {
+    width: 100%;
+    max-width: 100vw;
   }
 }
 
