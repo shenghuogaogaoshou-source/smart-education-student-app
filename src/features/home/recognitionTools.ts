@@ -11,7 +11,7 @@ export const toolDetails: { id: ToolId; hint: string }[] = [
 
 export async function readImage(file: File, preserveOriginal = false): Promise<string> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('请选择 JPG、PNG 或 WebP 图片。')
-  if (file.size > 5 * 1024 * 1024) throw new Error('图片太大，请选择 5 MB 以内的图片。')
+  if (file.size > 20 * 1024 * 1024) throw new Error('图片太大，请选择 20 MB 以内的原图。')
   if (preserveOriginal) return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
@@ -27,7 +27,7 @@ export async function readImage(file: File, preserveOriginal = false): Promise<s
     if (!ctx) throw new Error('当前浏览器无法处理图片。')
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    return canvas.toDataURL('image/jpeg', .9)
+    return canvas.toDataURL('image/jpeg', .88)
   } finally { bitmap.close() }
 }
 

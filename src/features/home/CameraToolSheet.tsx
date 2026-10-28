@@ -5,7 +5,8 @@ import { readImage, scanImage, toolDetails, type ToolResult } from './recognitio
 import './recognitionTools.css'
 import { RecognitionResultView, extensionTitle } from './RecognitionResultView'
 import { readResult } from './readResult'
-import { apiFetch } from '../../app/mobileApi'
+import { requestWithRetry } from '../../app/apiRequest'
+import { isNativeApp } from '../../app/mobileApi'
 
 export function CameraToolSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return open ? <ToolDialog onClose={onClose} /> : null
@@ -28,6 +29,7 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
   const dragDepth = useRef(0)
   const dialog = useRef<HTMLElement>(null)
   const video = useRef<HTMLVideoElement>(null)
+  const cameraInput = useRef<HTMLInputElement>(null)
   const stream = useRef<MediaStream | null>(null)
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
@@ -63,7 +65,25 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1600 } }, audio: false })
       if (token !== generation.current) { media.getTracks().forEach(t => t.stop()); return }
       stream.current = media; setCamera(true)
-    } catch { if (token === generation.current) setError('无法打开相机。请检查相机权限，或使用上传图片。') }
+    } catch (error) {
+      if (token !== generation.current) return
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setError('相机权限还没有开启，请到系统设置允许智芽使用相机，或先上传图片。')
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        setError('没有找到可用的相机，请改用上传图片。')
+      } else if (error instanceof DOMException && error.name === 'NotReadableError') {
+        setError('相机正被其他应用使用，请关闭其他相机后再试，或先上传图片。')
+      } else {
+        setError('无法打开相机。请检查相机权限，或使用上传图片。')
+      }
+    }
+  }
+  function openCamera() {
+    if (isNativeApp()) {
+      cameraInput.current?.click()
+      return
+    }
+    void startCamera()
   }
   function capture() {
     const el = video.current
@@ -83,7 +103,15 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
       let scanResult: ToolResult | null = null
       if (tool.id === 'scan') scanResult = await scanImage(image)
       if (controller.signal.aborted) return
-      const response = await apiFetch('/api/companion/recognize', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ tool: tool.id, image: scanResult ? '' : image, text: scanResult ? scanResult.output : text, target }) })
+      const response = await requestWithRetry('/api/companion/recognize', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({ tool: tool.id, image: scanResult ? '' : image, text: scanResult ? scanResult.output : text, target }),
+      }, {
+        attempts: 2,
+        timeoutMs: 210_000,
+      })
       const data = await response.json()
       if (!response.ok) {
         const messages: Record<string, string> = { vision_not_configured: '图片识别服务尚未配置，请联系管理员。', text_not_configured: '文字分析服务尚未配置，请联系管理员。', invalid_input: '请检查输入内容或重新选择图片。', invalid_result: '这次没有整理好结果，请重试；如果是整页试卷，可以分题拍摄。', result_too_long: '这一页内容较多，请分段或分题拍摄，让文字更清楚。' }
@@ -95,7 +123,11 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
         evidence: [...scanResult.evidence, ...data.result.evidence],
         steps: [scanResult.steps[0], ...data.result.steps],
       } : { ...data.result, sourceText: tool.id === 'translate' && !image ? text : data.result.sourceText })
-    } catch (e) { if (request.current === controller) setError(controller.signal.aborted ? '处理已取消或超时，可以重新尝试。' : e instanceof Error ? e.message : '处理失败，请重试。') }
+    } catch (e) {
+      if (request.current !== controller) return
+      const timedOut = controller.signal.aborted || (e instanceof DOMException && e.name === 'TimeoutError')
+      setError(timedOut ? '处理时间有点久，已经停下啦。请检查网络后再试一次。' : e instanceof Error ? e.message : '处理失败，请重试。')
+    }
     finally { clearTimeout(timeout); if (request.current === controller) { setBusy(false); request.current = null } }
   }
   const resultText = result ? `${result.title}${result.scanContent ? `\n\n码中原始内容\n${result.scanContent}` : ''}${result.sourceText ? `\n\n原文\n${result.sourceText}` : ''}\n\n${result.output}\n\n识别依据\n${result.evidence.join('\n')}\n\n方法说明\n${result.steps.map(s => `${s.title}：${s.detail}`).join('\n')}\n\n需要注意\n${result.uncertainty}${result.introduction ? `\n\n${tool?.id === 'object' ? '认识这个物品' : '拓展科普'}\n${result.introduction.overview}\n\n你知道吗？\n${result.introduction.funFact}\n\n观察一下，想一想\n${result.introduction.question}` : ''}` : ''
@@ -150,7 +182,17 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
         {!result && <>
           <div className={`recognition-drop-hint${dragging ? ' is-dragging' : ''}`} role="status">{dragging ? '松开鼠标，上传这张图片' : '也可以将一张图片拖到此面板上传'}</div>
           <div className="recognition-input-actions">
-            <button type="button" disabled={busy || camera || loadingImage} onClick={startCamera}><Camera size={18} />打开相机</button>
+            <button type="button" disabled={busy || camera || loadingImage} onClick={openCamera}><Camera size={18} />打开相机</button>
+            <input
+              ref={cameraInput}
+              className="recognition-camera-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              capture="environment"
+              aria-label="用相机拍摄"
+              disabled={busy || loadingImage}
+              onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }}
+            />
             <label className={busy || loadingImage ? 'is-disabled' : ''}><ImagePlus size={18} />上传图片<input type="file" aria-label="上传图片" accept="image/jpeg,image/png,image/webp" disabled={busy || loadingImage || camera} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
           </div>
           {camera && <div className="recognition-camera"><video ref={video} autoPlay playsInline muted /><button type="button" onClick={capture}>拍下这张</button><button type="button" onClick={stopCamera}>关闭相机</button></div>}
@@ -158,7 +200,7 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
           {image && <div className="recognition-image"><img src={image} alt="待识别图片" /><button type="button" disabled={busy} onClick={() => setImage('')}>移除图片</button></div>}
           {!requiresImage && <label className="recognition-field">{tool.id === 'solve' ? '题目内容' : '文字内容'}<textarea maxLength={4000} value={text} disabled={busy} placeholder="输入要处理的文字，也可以上传图片…" onChange={e => { setText(e.target.value) }} /><small>{text.length} / 4000</small></label>}
           {tool.id === 'translate' && <label className="recognition-field">翻译为<select value={target} disabled={busy} onChange={e => setTarget(e.target.value)}><option>中文</option><option>英语</option></select></label>}
-          <p className="recognition-privacy">{tool.id === 'scan' ? '图片在本机解码，点击开始后，码中的文字会发送给 AI 解读。请勿扫描包含私人信息的码。' : '点击开始后，材料会发送给识别服务。请勿上传人脸、姓名、住址等私人信息。'} 图片支持 JPG / PNG / WebP，最大 5 MB。</p>
+          <p className="recognition-privacy">{tool.id === 'scan' ? '图片在本机解码，点击开始后，码中的文字会发送给 AI 解读。请勿扫描包含私人信息的码。' : '点击开始后，材料会发送给识别服务。请勿上传人脸、姓名、住址等私人信息。'} 支持 JPG / PNG / WebP，大图会自动等比压缩。</p>
           {busy ? <div className="recognition-progress" role="status"><LoaderCircle size={20} /><span>正在仔细观察，整理发现和解释…</span><button type="button" onClick={() => request.current?.abort()}>取消</button></div> : <div className="recognition-start"><button className="recognition-primary" type="button" disabled={loadingImage || camera || (requiresImage ? !image : !image && !text.trim())} onClick={run}>开始{tool.id === 'scan' ? '扫码' : '分析'}</button></div>}
         </>}
         {error && <p className="recognition-error" role="alert">{error}</p>}

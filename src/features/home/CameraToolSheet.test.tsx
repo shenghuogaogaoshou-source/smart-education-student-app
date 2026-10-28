@@ -6,7 +6,12 @@ import { cameraTools } from './homeData'
 import { readResult } from './readResult'
 vi.mock('./readResult', () => ({ readResult: vi.fn() }))
 const translationResult = { title: '中文译文', output: '你好', evidence: ['Hello'], steps: [{ title: '翻译', detail: '转换问候语' }], uncertainty: '请结合上下文核对。', introduction: { overview: '英语问候语用于打招呼。', funFact: '不同场合使用不同的问候语。', question: '早上还可以怎么打招呼？' } }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks() })
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+  delete (window as Window & { Capacitor?: unknown }).Capacitor
+})
 describe('recognition tools', () => {
   it.each(cameraTools.map((t, i) => [t.title, i] as const))('opens %s without a sample entry', async (title, i) => {
     const user = userEvent.setup()
@@ -56,6 +61,55 @@ describe('recognition tools', () => {
     await user.click(screen.getByRole('button', { name: '开始分析' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('文字分析服务尚未配置')
     expect(screen.queryByText('识别成果')).not.toBeInTheDocument()
+  })
+
+  it('opens the native camera picker through an environment capture input on Android', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined)
+    const user = userEvent.setup()
+    render(<CameraToolSheet open onClose={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: '拍照识物' }))
+    await user.click(screen.getByRole('button', { name: '打开相机' }))
+
+    expect(screen.getByLabelText('用相机拍摄')).toHaveAttribute('capture', 'environment')
+    expect(click).toHaveBeenCalledOnce()
+  })
+
+  it('explains a refused camera permission and keeps upload available', async () => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError')),
+      },
+    })
+    const user = userEvent.setup()
+    render(<CameraToolSheet open onClose={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: '拍照识物' }))
+    await user.click(screen.getByRole('button', { name: '打开相机' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('相机权限')
+    expect(screen.getByLabelText('上传图片')).toBeEnabled()
+  })
+
+  it('retries one temporary recognition failure before showing an error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ error: 'provider_error' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ result: translationResult }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<CameraToolSheet open onClose={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: '翻译文字' }))
+    await user.type(screen.getByRole('textbox'), 'Hello')
+    await user.click(screen.getByRole('button', { name: '开始分析' }))
+
+    expect(await screen.findByText('AI 的发现 · 一起核对看看')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
 
