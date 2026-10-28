@@ -9,7 +9,22 @@ export const toolDetails: { id: ToolId; hint: string }[] = [
   { id: 'check', hint: '看看内容有没有说错、泄露个人信息，或让人不舒服的表达。' },
 ]
 
-export async function readImage(file: File, preserveOriginal = false): Promise<string> {
+export type ImageReadOptions = {
+  maxEdge?: number
+  preserveOriginal?: boolean
+}
+
+export function imageMaxEdgeForTool(tool: ToolId): number {
+  if (tool === 'object') return 960
+  if (tool === 'ocr') return 1280
+  if (tool === 'scan') return 1600
+  return 1024
+}
+
+export async function readImage(file: File, options: ImageReadOptions | boolean = {}): Promise<string> {
+  const settings = typeof options === 'boolean' ? { preserveOriginal: options } : options
+  const preserveOriginal = settings.preserveOriginal ?? false
+  const maxEdge = settings.maxEdge ?? 1600
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('请选择 JPG、PNG 或 WebP 图片。')
   if (file.size > 20 * 1024 * 1024) throw new Error('图片太大，请选择 20 MB 以内的原图。')
   if (preserveOriginal) return new Promise<string>((resolve, reject) => {
@@ -20,7 +35,7 @@ export async function readImage(file: File, preserveOriginal = false): Promise<s
   })
   const bitmap = await createImageBitmap(file)
   try {
-    const ratio = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
+    const ratio = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(bitmap.width * ratio); canvas.height = Math.round(bitmap.height * ratio)
     const ctx = canvas.getContext('2d')

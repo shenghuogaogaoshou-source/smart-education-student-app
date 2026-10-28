@@ -837,6 +837,81 @@
   text-align: center;
 }
 
+.background-recognition-task {
+  position: sticky;
+  bottom: calc(var(--bottom-nav-height, 76px) + 10px);
+  z-index: 18;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 4px 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(205 146 115 / 26%);
+  border-radius: 18px;
+  background: rgb(255 251 246 / 96%);
+  box-shadow: 0 12px 34px rgb(106 69 48 / 15%);
+  backdrop-filter: blur(16px);
+}
+
+.background-recognition-task__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 12px;
+  background: #fff0df;
+  color: #bd6747;
+}
+
+.background-recognition-task.is-complete .background-recognition-task__icon {
+  background: #e9f7e8;
+  color: #4e8652;
+}
+
+.background-recognition-task.is-failed .background-recognition-task__icon {
+  background: #fff0ed;
+  color: #a95a4f;
+}
+
+.background-recognition-task > div {
+  display: grid;
+  min-width: 0;
+}
+
+.background-recognition-task strong {
+  color: #5a4035;
+  font-size: .76rem;
+}
+
+.background-recognition-task small {
+  overflow: hidden;
+  color: #927363;
+  font-size: .64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.background-recognition-task > button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px 9px;
+  border: 1px solid rgb(204 144 112 / 24%);
+  border-radius: 11px;
+  background: #fff;
+  color: #8c5b47;
+  font-size: .66rem;
+  font-weight: 800;
+}
+
+.background-task-spin {
+  animation: background-task-spin .9s linear infinite;
+}
+
+@keyframes background-task-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ===== 小学小精灵剪影点缀 ===== */
 .games-grid button::before,
 .showcase-card::before,

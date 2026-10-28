@@ -5,7 +5,8 @@ import { getGradeBand, getResumeKnowledgePart } from '../../app/learning'
 import { getCourseForBand } from '../knowledge/courseCatalog'
 import { HomeSearch } from './HomeSearch'
 import { AchievementShowcase } from './AchievementShowcase'
-import { CameraToolSheet } from './CameraToolSheet'
+import { CameraToolSheet, type VisionTaskHandle } from './CameraToolSheet'
+import { BackgroundRecognitionTask } from './BackgroundRecognitionTask'
 import type { GameId } from '../games/gameRegistry'
 import { games, homeCopy } from './homeData'
 import './home.css'
@@ -18,9 +19,23 @@ const carouselDecorations = [
   { size: 50, icon: Sparkles },
 ]
 
+const VISION_TASK_KEY = 'zhiya:background-vision-task'
+
+function readStoredVisionTask(): VisionTaskHandle | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(VISION_TASK_KEY) ?? 'null') as Partial<VisionTaskHandle> | null
+    return value?.taskId && value.tool && value.title && value.createdAt
+      ? value as VisionTaskHandle
+      : null
+  } catch {
+    return null
+  }
+}
+
 export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavigateToKnowledge, onOpenContent, onOpenGame }: { onOpenContent?: (courseId: string, chapterNum: number) => void; onWorkClick?: (workId: string) => void; onMoreWorks?: () => void; onOpenNotifications?: () => void; onNavigateToKnowledge?: () => void; onOpenGame?: (gameId: GameId) => void }) {
   const { state } = useAppState()
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [visionTask, setVisionTask] = useState<VisionTaskHandle | null>(readStoredVisionTask)
   const [notice, setNotice] = useState('')
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0)
   const touchStartX = useRef(0)
@@ -34,6 +49,12 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
   const courseProgress = course.parts.length > 0
     ? Math.round((completedPartIds.length / course.parts.length) * 100)
     : 0
+
+  const saveVisionTask = (task: VisionTaskHandle | null) => {
+    setVisionTask(task)
+    if (task) localStorage.setItem(VISION_TASK_KEY, JSON.stringify(task))
+    else localStorage.removeItem(VISION_TASK_KEY)
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -152,7 +173,21 @@ export function HomePage({ onWorkClick, onMoreWorks, onOpenNotifications, onNavi
       </section>
 
       <AchievementShowcase onWorkClick={onWorkClick} onMoreWorks={onMoreWorks} />
-      <CameraToolSheet open={cameraOpen} onClose={() => setCameraOpen(false)} />
+      {visionTask && (
+        <BackgroundRecognitionTask
+          task={visionTask}
+          onDismiss={() => saveVisionTask(null)}
+          onRetry={() => {
+            saveVisionTask(null)
+            setCameraOpen(true)
+          }}
+        />
+      )}
+      <CameraToolSheet
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onTaskStarted={saveVisionTask}
+      />
     </div>
   )
 }

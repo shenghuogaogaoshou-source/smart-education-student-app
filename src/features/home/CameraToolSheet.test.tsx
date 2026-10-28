@@ -1,6 +1,7 @@
-import { render, screen, cleanup } from '@testing-library/react'
+import { act, render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { TaskView } from '@zhiya/task-client'
 import { CameraToolSheet } from './CameraToolSheet'
 import { cameraTools } from './homeData'
 import { readResult } from './readResult'
@@ -110,6 +111,43 @@ describe('recognition tools', () => {
 
     expect(await screen.findByText('AI 的发现 · 一起核对看看')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('moves a long native recognition task to the background after 12 seconds', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    const onClose = vi.fn()
+    const onTaskStarted = vi.fn()
+    const createTask = vi.fn().mockResolvedValue({
+      taskId: 'task-vision-1',
+      kind: 'vision',
+      status: 'queued',
+      createdAt: '2026-10-28T23:00:00.000Z',
+      updatedAt: '2026-10-28T23:00:00.000Z',
+      elapsedMs: 0,
+    })
+    const pollTask = vi.fn((_taskId: string, _options?: unknown) => new Promise<TaskView>(() => undefined))
+    render(
+      <CameraToolSheet
+        open
+        onClose={onClose}
+        onTaskStarted={onTaskStarted}
+        initialTool={0}
+        initialImage="data:image/jpeg;base64,YQ=="
+        createTaskImpl={createTask}
+        pollTaskImpl={pollTask}
+      />,
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '开始分析' }))
+      await Promise.resolve()
+    })
+    expect(onTaskStarted).toHaveBeenCalledWith(expect.objectContaining({ taskId: 'task-vision-1', tool: 'object' }))
+    await act(async () => vi.advanceTimersByTimeAsync(12_000))
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })
 

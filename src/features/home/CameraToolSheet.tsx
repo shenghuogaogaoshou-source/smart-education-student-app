@@ -1,19 +1,68 @@
 import { ArrowLeft, Camera, Check, Copy, Download, ImagePlus, LoaderCircle, Volume2, Square, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cameraTools } from './homeData'
-import { readImage, scanImage, toolDetails, type ToolResult } from './recognitionTools'
+import { imageMaxEdgeForTool, readImage, scanImage, toolDetails, type ToolId, type ToolResult } from './recognitionTools'
 import './recognitionTools.css'
 import { RecognitionResultView, extensionTitle } from './RecognitionResultView'
 import { readResult } from './readResult'
 import { requestWithRetry } from '../../app/apiRequest'
 import { isNativeApp } from '../../app/mobileApi'
+import { createTask, pollTask, type TaskView } from '@zhiya/task-client'
 
-export function CameraToolSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return open ? <ToolDialog onClose={onClose} /> : null
+export type VisionTaskHandle = {
+  taskId: string
+  tool: ToolId
+  title: string
+  createdAt: string
 }
-function ToolDialog({ onClose }: { onClose: () => void }) {
-  const [selected, setSelected] = useState<number | null>(null)
-  const [image, setImage] = useState('')
+
+type CameraToolSheetProps = {
+  open: boolean
+  onClose: () => void
+  onTaskStarted?: (task: VisionTaskHandle) => void
+  initialTool?: number | null
+  initialImage?: string
+  createTaskImpl?: typeof createTask
+  pollTaskImpl?: typeof pollTask
+}
+
+export function CameraToolSheet({
+  open,
+  onClose,
+  onTaskStarted,
+  initialTool = null,
+  initialImage = '',
+  createTaskImpl = createTask,
+  pollTaskImpl = pollTask,
+}: CameraToolSheetProps) {
+  return open
+    ? <ToolDialog
+        onClose={onClose}
+        onTaskStarted={onTaskStarted}
+        initialTool={initialTool}
+        initialImage={initialImage}
+        createTaskImpl={createTaskImpl}
+        pollTaskImpl={pollTaskImpl}
+      />
+    : null
+}
+function ToolDialog({
+  onClose,
+  onTaskStarted,
+  initialTool,
+  initialImage,
+  createTaskImpl,
+  pollTaskImpl,
+}: {
+  onClose: () => void
+  onTaskStarted?: (task: VisionTaskHandle) => void
+  initialTool: number | null
+  initialImage: string
+  createTaskImpl: typeof createTask
+  pollTaskImpl: typeof pollTask
+}) {
+  const [selected, setSelected] = useState<number | null>(initialTool)
+  const [image, setImage] = useState(initialImage)
   const [text, setText] = useState('')
   const [target, setTarget] = useState('中文')
   const [result, setResult] = useState<ToolResult | null>(null)
@@ -53,7 +102,12 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
     if (!file) return
     const token = ++generation.current
     setLoadingImage(true); setError(''); setResult(null)
-    try { const data = await (tool?.id === 'scan' ? readImage(file, true) : readImage(file)); if (token === generation.current) setImage(data) }
+    try {
+      const data = await readImage(file, tool
+        ? { maxEdge: imageMaxEdgeForTool(tool.id), preserveOriginal: tool.id === 'scan' }
+        : {})
+      if (token === generation.current) setImage(data)
+    }
     catch (e) { if (token === generation.current) setError(e instanceof Error ? e.message : '图片读取失败，请重新选择。') }
     finally { if (token === generation.current) setLoadingImage(false) }
   }
@@ -103,26 +157,69 @@ function ToolDialog({ onClose }: { onClose: () => void }) {
       let scanResult: ToolResult | null = null
       if (tool.id === 'scan') scanResult = await scanImage(image)
       if (controller.signal.aborted) return
-      const response = await requestWithRetry('/api/companion/recognize', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({ tool: tool.id, image: scanResult ? '' : image, text: scanResult ? scanResult.output : text, target }),
-      }, {
-        attempts: 2,
-        timeoutMs: 210_000,
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        const messages: Record<string, string> = { vision_not_configured: '图片识别服务尚未配置，请联系管理员。', text_not_configured: '文字分析服务尚未配置，请联系管理员。', invalid_input: '请检查输入内容或重新选择图片。', invalid_result: '这次没有整理好结果，请重试；如果是整页试卷，可以分题拍摄。', result_too_long: '这一页内容较多，请分段或分题拍摄，让文字更清楚。' }
-        throw new Error(messages[data.error] || '识别服务暂时不可用，请稍后重试。')
+      const payload = {
+        tool: tool.id,
+        image: scanResult ? '' : image,
+        text: scanResult ? scanResult.output : text,
+        target,
       }
-      if (!controller.signal.aborted) setResult(scanResult ? {
-        ...data.result,
-        scanContent: scanResult.output,
-        evidence: [...scanResult.evidence, ...data.result.evidence],
-        steps: [scanResult.steps[0], ...data.result.steps],
-      } : { ...data.result, sourceText: tool.id === 'translate' && !image ? text : data.result.sourceText })
+
+      if (isNativeApp()) {
+        const clientTaskId = globalThis.crypto?.randomUUID?.() ?? `camera-${Date.now()}`
+        const created = await createTaskImpl({
+          kind: 'vision',
+          payload,
+          clientTaskId,
+        }, { signal: controller.signal })
+        onTaskStarted?.({
+          taskId: created.taskId,
+          tool: tool.id,
+          title: cameraTools[selected!].title,
+          createdAt: created.createdAt,
+        })
+        const backgroundTimer = window.setTimeout(() => {
+          if (request.current === controller) onClose()
+        }, 12_000)
+        let completed: TaskView
+        try {
+          completed = await pollTaskImpl(created.taskId, { signal: controller.signal })
+        } finally {
+          window.clearTimeout(backgroundTimer)
+        }
+        if (completed.status !== 'succeeded' || !completed.result || typeof completed.result !== 'object') {
+          throw new Error(completed.error || '识别没有完成，请重新试一次。')
+        }
+        setResult(scanResult ? {
+          ...(completed.result as ToolResult),
+          scanContent: scanResult.output,
+          evidence: [...scanResult.evidence, ...(completed.result as ToolResult).evidence],
+          steps: [scanResult.steps[0], ...(completed.result as ToolResult).steps],
+        } : {
+          ...(completed.result as ToolResult),
+          sourceText: tool.id === 'translate' && !image ? text : (completed.result as ToolResult).sourceText,
+        })
+      } else {
+        const response = await requestWithRetry('/api/companion/recognize', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify(payload),
+        }, {
+          attempts: 2,
+          timeoutMs: 210_000,
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          const messages: Record<string, string> = { vision_not_configured: '图片识别服务尚未配置，请联系管理员。', text_not_configured: '文字分析服务尚未配置，请联系管理员。', invalid_input: '请检查输入内容或重新选择图片。', invalid_result: '这次没有整理好结果，请重试；如果是整页试卷，可以分题拍摄。', result_too_long: '这一页内容较多，请分段或分题拍摄，让文字更清楚。' }
+          throw new Error(messages[data.error] || '识别服务暂时不可用，请稍后重试。')
+        }
+        if (!controller.signal.aborted) setResult(scanResult ? {
+          ...data.result,
+          scanContent: scanResult.output,
+          evidence: [...scanResult.evidence, ...data.result.evidence],
+          steps: [scanResult.steps[0], ...data.result.steps],
+        } : { ...data.result, sourceText: tool.id === 'translate' && !image ? text : data.result.sourceText })
+      }
     } catch (e) {
       if (request.current !== controller) return
       const timedOut = controller.signal.aborted || (e instanceof DOMException && e.name === 'TimeoutError')

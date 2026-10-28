@@ -16,8 +16,8 @@ it.each(cameraTools.map(t => t.title))('%s accepts a dropped image', async title
  expect(screen.getByText('松开鼠标，上传这张图片')).toBeInTheDocument()
  fireEvent.drop(screen.getByRole('dialog'), { dataTransfer })
  expect(await screen.findByAltText('待识别图片')).toBeInTheDocument()
- if (title === '扫码识别') expect(readImage).toHaveBeenCalledWith(file, true)
- else expect(readImage).toHaveBeenCalledWith(file)
+  if (title === '扫码识别') expect(readImage).toHaveBeenCalledWith(file, { maxEdge: 1600, preserveOriginal: true })
+  else expect(readImage).toHaveBeenCalledWith(file, expect.objectContaining({ preserveOriginal: false }))
 })
 it('rejects multiple files and displays image validation errors', async () => {
  const user = userEvent.setup(); render(<CameraToolSheet open onClose={() => {}} />)
