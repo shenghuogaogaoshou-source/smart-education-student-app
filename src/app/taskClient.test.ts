@@ -29,6 +29,26 @@ describe('shared task client', () => {
     expect(fetcher).toHaveBeenNthCalledWith(2, '/api/tasks/task-1', expect.objectContaining({ method: 'GET' }))
   })
 
+  it('prefixes task requests with an explicit API origin', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({ taskId: 'task-1', status: 'queued' }, 202),
+    )
+
+    await createTask({
+      kind: 'vision',
+      payload: { tool: 'object' },
+      clientTaskId: 'camera-1',
+    }, {
+      fetcher,
+      baseUrl: 'https://api.zhiya.test',
+    })
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://api.zhiya.test/api/tasks',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
+
   it('polls with one-second cadence before ten seconds', async () => {
     vi.useFakeTimers()
     let clock = 0

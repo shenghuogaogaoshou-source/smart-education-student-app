@@ -2,6 +2,7 @@ import { MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useAppState } from '../../app/AppState'
 import type { CompanionLoadout } from '../../app/model'
+import { isNativeApp } from '../../app/mobileApi'
 import { startSpeechCapture, speakCompanionReply } from './browserSpeech'
 import { requestCompanionReply } from './companionChat'
 import { getCompanionItem } from './companionCatalog'
@@ -24,7 +25,11 @@ type LoginCompanionProps = {
 export const LOGIN_COMPANION_HANDOFF_KEY = 'student-app-login-companion-bounds'
 
 function loginConversationError(reason: ConversationSnapshot['errorReason']) {
-  if (reason === 'permission-denied') return '麦克风还没有获得允许，可以在地址栏里打开麦克风权限。'
+  if (reason === 'permission-denied') {
+    return isNativeApp()
+      ? '麦克风权限还没有开启，请到“设置 > 应用 > 智芽 > 权限”中允许使用麦克风。'
+      : '麦克风还没有获得允许，可以在浏览器的网站设置中打开麦克风权限。'
+  }
   if (reason === 'not-supported') return '当前浏览器暂不支持语音识别，可以登录后用文字和我聊天。'
   if (reason === 'request-error') return '知识问答暂时没有连上，可以稍后再问一次。'
   if (reason === 'start-failed' || reason === 'recognition-error') return '麦克风刚才没有启动成功，可以再试一次。'

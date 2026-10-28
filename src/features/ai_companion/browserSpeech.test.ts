@@ -229,6 +229,33 @@ describe('browser speech capture', () => {
     await vi.waitFor(() => expect(plugin.stop).toHaveBeenCalled())
   })
 
+  it('requests microphone permission before checking Android speech availability', async () => {
+    const order: string[] = []
+    const plugin = {
+      available: vi.fn(async () => {
+        order.push('available')
+        return { available: true }
+      }),
+      checkPermissions: vi.fn(async () => ({ speechRecognition: 'prompt' })),
+      requestPermissions: vi.fn(async () => {
+        order.push('request')
+        return { speechRecognition: 'granted' }
+      }),
+      addListener: vi.fn(async () => ({ remove: vi.fn(async () => undefined) })),
+      start: vi.fn(async () => ({ matches: [] })),
+      stop: vi.fn(async () => undefined),
+    }
+
+    const capture = startNativeSpeechCaptureForTest(
+      { onComplete: vi.fn(), onError: vi.fn() },
+      { plugin },
+    )
+
+    await vi.waitFor(() => expect(plugin.start).toHaveBeenCalled())
+    expect(order).toEqual(['request', 'available'])
+    capture.cancel()
+  })
+
   it('starts Android local speech after 1.5 seconds while cloud TTS is pending', async () => {
     vi.useFakeTimers()
     const speakNative = vi.fn(async () => undefined)

@@ -94,6 +94,7 @@ export function WorksManagePage({
         action={<button className="wm-header-upload" type="button" onClick={() => setUploadOpen(true)}><Plus size={15} />上传作品</button>}
       />
 
+      <div className="works-manage-content">
       <div className="rewards-summary">
         <button className={`rewards-stat clickable ${filter === '全部' ? 'active' : ''}`} type="button" onClick={() => setFilter('全部')}>
           <FolderKanban size={24} /><div><strong>{works.length}</strong><span>全部作品</span></div>
@@ -161,6 +162,7 @@ export function WorksManagePage({
           <div><button type="button" className="wm-action-primary" onClick={() => onContinueCreate?.()}>去创作</button><button type="button" className="wm-action-ghost" onClick={() => setUploadOpen(true)}>上传 AI 作品</button></div>
         </div>
       )}
+      </div>
 
       <ConfirmDialog
         open={Boolean(confirmDeleteWork)}

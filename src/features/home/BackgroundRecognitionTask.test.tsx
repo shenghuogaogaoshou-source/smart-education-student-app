@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BackgroundRecognitionTask } from './BackgroundRecognitionTask'
 
 const result = {
@@ -17,7 +17,17 @@ const result = {
 }
 
 describe('BackgroundRecognitionTask', () => {
+  afterEach(() => {
+    localStorage.clear()
+    delete (window as Window & { Capacitor?: unknown }).Capacitor
+  })
+
   it('restores a completed background recognition task and opens its result', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    localStorage.setItem('zhiya.mobileApiOrigin', 'https://api.zhiya.test')
     const user = userEvent.setup()
     const pollTaskImpl = vi.fn().mockResolvedValue({
       taskId: 'task-1',
@@ -37,6 +47,10 @@ describe('BackgroundRecognitionTask', () => {
     )
 
     expect(await screen.findByText('识别完成')).toBeInTheDocument()
+    expect(pollTaskImpl).toHaveBeenCalledWith(
+      'task-1',
+      expect.objectContaining({ baseUrl: 'https://api.zhiya.test' }),
+    )
     await user.click(screen.getByRole('button', { name: '查看拍照识物结果' }))
     expect(screen.getByRole('dialog', { name: '拍照识物结果' })).toBeVisible()
     expect(screen.getByText(result.output)).toBeVisible()

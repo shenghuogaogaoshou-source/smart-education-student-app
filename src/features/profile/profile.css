@@ -5239,6 +5239,19 @@
   grid-template-columns: auto 1fr auto;
 }
 
+.works-manage-page {
+  padding: 0 0 calc(88px + env(safe-area-inset-bottom));
+}
+
+.works-manage-content {
+  min-width: 0;
+  padding: 2px var(--mobile-page-gutter) 0;
+}
+
+.works-manage-content .wb-filter-row {
+  margin-top: 12px;
+}
+
 .works-manage-page .rewards-stat span {
   white-space: nowrap;
 }

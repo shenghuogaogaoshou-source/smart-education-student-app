@@ -17,6 +17,7 @@ export type TaskRequestOptions = {
   fetcher?: typeof fetch
   signal?: AbortSignal
   retryDelayMs?: number
+  baseUrl?: string
 }
 
 export type PollOptions = TaskRequestOptions & {
@@ -54,9 +55,12 @@ async function requestTask(
 ): Promise<TaskView> {
   if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
   const fetcher = options.fetcher ?? fetch
+  const requestUrl = options.baseUrl
+    ? new URL(input, options.baseUrl.endsWith('/') ? options.baseUrl : `${options.baseUrl}/`).toString()
+    : input
   let response: Response | undefined
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    response = await fetcher(input, { ...init, signal: options.signal })
+    response = await fetcher(requestUrl, { ...init, signal: options.signal })
     if (response.ok || !RETRYABLE_STATUS.has(response.status) || attempt === 1) break
     await new Promise((resolve) => setTimeout(resolve, options.retryDelayMs ?? 250))
   }

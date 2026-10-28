@@ -6,7 +6,7 @@ import './recognitionTools.css'
 import { RecognitionResultView, extensionTitle } from './RecognitionResultView'
 import { readResult } from './readResult'
 import { requestWithRetry } from '../../app/apiRequest'
-import { isNativeApp } from '../../app/mobileApi'
+import { isNativeApp, readNativeTaskApiOrigin } from '../../app/mobileApi'
 import { createTask, pollTask, type TaskView } from '@zhiya/task-client'
 
 export type VisionTaskHandle = {
@@ -78,7 +78,6 @@ function ToolDialog({
   const dragDepth = useRef(0)
   const dialog = useRef<HTMLElement>(null)
   const video = useRef<HTMLVideoElement>(null)
-  const cameraInput = useRef<HTMLInputElement>(null)
   const stream = useRef<MediaStream | null>(null)
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
@@ -115,28 +114,24 @@ function ToolDialog({
     const token = ++generation.current
     setError('')
     try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前环境无法打开相机，请使用上传图片。')
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前设备无法打开相机，请检查系统相机权限。')
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1600 } }, audio: false })
       if (token !== generation.current) { media.getTracks().forEach(t => t.stop()); return }
       stream.current = media; setCamera(true)
     } catch (error) {
       if (token !== generation.current) return
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        setError('相机权限还没有开启，请到系统设置允许智芽使用相机，或先上传图片。')
+        setError('相机权限还没有开启，请到“设置 > 应用 > 智芽 > 权限”中允许使用相机。')
       } else if (error instanceof DOMException && error.name === 'NotFoundError') {
-        setError('没有找到可用的相机，请改用上传图片。')
+        setError('没有找到可用的相机，请检查设备相机是否正常。')
       } else if (error instanceof DOMException && error.name === 'NotReadableError') {
-        setError('相机正被其他应用使用，请关闭其他相机后再试，或先上传图片。')
+        setError('相机正被其他应用使用，请关闭其他相机应用后再试。')
       } else {
-        setError('无法打开相机。请检查相机权限，或使用上传图片。')
+        setError('无法打开相机，请检查系统相机权限后再试。')
       }
     }
   }
   function openCamera() {
-    if (isNativeApp()) {
-      cameraInput.current?.click()
-      return
-    }
     void startCamera()
   }
   function capture() {
@@ -166,11 +161,13 @@ function ToolDialog({
 
       if (isNativeApp()) {
         const clientTaskId = globalThis.crypto?.randomUUID?.() ?? `camera-${Date.now()}`
+        const baseUrl = readNativeTaskApiOrigin()
+        const taskOptions = { signal: controller.signal, ...(baseUrl ? { baseUrl } : {}) }
         const created = await createTaskImpl({
           kind: 'vision',
           payload,
           clientTaskId,
-        }, { signal: controller.signal })
+        }, taskOptions)
         onTaskStarted?.({
           taskId: created.taskId,
           tool: tool.id,
@@ -182,7 +179,7 @@ function ToolDialog({
         }, 12_000)
         let completed: TaskView
         try {
-          completed = await pollTaskImpl(created.taskId, { signal: controller.signal })
+          completed = await pollTaskImpl(created.taskId, taskOptions)
         } finally {
           window.clearTimeout(backgroundTimer)
         }
@@ -280,16 +277,6 @@ function ToolDialog({
           <div className={`recognition-drop-hint${dragging ? ' is-dragging' : ''}`} role="status">{dragging ? '松开鼠标，上传这张图片' : '也可以将一张图片拖到此面板上传'}</div>
           <div className="recognition-input-actions">
             <button type="button" disabled={busy || camera || loadingImage} onClick={openCamera}><Camera size={18} />打开相机</button>
-            <input
-              ref={cameraInput}
-              className="recognition-camera-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              capture="environment"
-              aria-label="用相机拍摄"
-              disabled={busy || loadingImage}
-              onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }}
-            />
             <label className={busy || loadingImage ? 'is-disabled' : ''}><ImagePlus size={18} />上传图片<input type="file" aria-label="上传图片" accept="image/jpeg,image/png,image/webp" disabled={busy || loadingImage || camera} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
           </div>
           {camera && <div className="recognition-camera"><video ref={video} autoPlay playsInline muted /><button type="button" onClick={capture}>拍下这张</button><button type="button" onClick={stopCamera}>关闭相机</button></div>}

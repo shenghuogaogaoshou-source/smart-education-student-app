@@ -1,4 +1,4 @@
-import { act, render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { act, render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskView } from '@zhiya/task-client'
@@ -11,6 +11,7 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
+  localStorage.clear()
   delete (window as Window & { Capacitor?: unknown }).Capacitor
 })
 describe('recognition tools', () => {
@@ -64,23 +65,35 @@ describe('recognition tools', () => {
     expect(screen.queryByText('识别成果')).not.toBeInTheDocument()
   })
 
-  it('opens the native camera picker through an environment capture input on Android', async () => {
+  it('opens the in-app camera preview through getUserMedia on Android', async () => {
     Object.defineProperty(window, 'Capacitor', {
       configurable: true,
       value: { isNativePlatform: () => true },
     })
-    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined)
+    const stopTrack = vi.fn()
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: stopTrack }],
+    })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia },
+    })
+    const clickInput = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined)
     const user = userEvent.setup()
     render(<CameraToolSheet open onClose={() => {}} />)
 
     await user.click(screen.getByRole('button', { name: '拍照识物' }))
     await user.click(screen.getByRole('button', { name: '打开相机' }))
 
-    expect(screen.getByLabelText('用相机拍摄')).toHaveAttribute('capture', 'environment')
-    expect(click).toHaveBeenCalledOnce()
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
+      video: expect.objectContaining({ facingMode: 'environment' }),
+      audio: false,
+    })))
+    expect(await screen.findByRole('button', { name: '拍下这张' })).toBeInTheDocument()
+    expect(clickInput).not.toHaveBeenCalled()
   })
 
-  it('explains a refused camera permission and keeps upload available', async () => {
+  it('guides a refused camera permission to Android settings', async () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
@@ -93,8 +106,8 @@ describe('recognition tools', () => {
     await user.click(screen.getByRole('button', { name: '拍照识物' }))
     await user.click(screen.getByRole('button', { name: '打开相机' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('相机权限')
-    expect(screen.getByLabelText('上传图片')).toBeEnabled()
+    expect(await screen.findByRole('alert')).toHaveTextContent('设置 > 应用 > 智芽 > 权限')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('上传图片')
   })
 
   it('retries one temporary recognition failure before showing an error', async () => {
@@ -148,6 +161,50 @@ describe('recognition tools', () => {
     expect(onTaskStarted).toHaveBeenCalledWith(expect.objectContaining({ taskId: 'task-vision-1', tool: 'object' }))
     await act(async () => vi.advanceTimersByTimeAsync(12_000))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('uses the configured production API origin for native recognition tasks', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { isNativePlatform: () => true },
+    })
+    localStorage.setItem('zhiya.mobileApiOrigin', 'https://api.zhiya.test')
+    const createTask = vi.fn().mockResolvedValue({
+      taskId: 'task-vision-api',
+      kind: 'vision',
+      status: 'queued',
+      createdAt: '2026-10-29T00:00:00.000Z',
+      updatedAt: '2026-10-29T00:00:00.000Z',
+      elapsedMs: 0,
+    })
+    const pollTask = vi.fn((_taskId: string, _options?: unknown) => new Promise<TaskView>(() => undefined))
+    render(
+      <CameraToolSheet
+        open
+        onClose={vi.fn()}
+        initialTool={0}
+        initialImage="data:image/jpeg;base64,YQ=="
+        createTaskImpl={createTask}
+        pollTaskImpl={pollTask}
+      />,
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '开始分析' }))
+      await Promise.resolve()
+    })
+
+    expect(createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'vision' }),
+      expect.objectContaining({
+        baseUrl: 'https://api.zhiya.test',
+        signal: expect.any(AbortSignal),
+      }),
+    )
+    expect(pollTask).toHaveBeenCalledWith(
+      'task-vision-api',
+      expect.objectContaining({ baseUrl: 'https://api.zhiya.test' }),
+    )
   })
 })
 

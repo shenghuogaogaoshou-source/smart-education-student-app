@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type P
 import { createPortal } from 'react-dom'
 import { useAppState } from '../../app/AppState'
 import type { ConversationSummary, VoiceReplyMode } from '../../app/model'
+import { isNativeApp } from '../../app/mobileApi'
 import { AiLocalSheet } from './AiLocalSheet'
 import { getCompanionDisplayName } from './companionCatalog'
 import { requestCompanionReply } from './companionChat'
@@ -29,7 +30,11 @@ export function shouldSpeakReply(mode: VoiceReplyMode, source: 'voice' | 'text',
 }
 
 function errorMessage(conversation: ConversationSnapshot) {
-  if (conversation.errorReason === 'permission-denied') return '麦克风还没有获得允许，可以在设置里检查权限。'
+  if (conversation.errorReason === 'permission-denied') {
+    return isNativeApp()
+      ? '麦克风权限还没有开启，请到“设置 > 应用 > 智芽 > 权限”中允许使用麦克风。'
+      : '麦克风还没有获得允许，可以在浏览器的网站设置中打开麦克风权限。'
+  }
   if (conversation.errorReason === 'no-speech' || conversation.errorReason === 'not-supported') return '我没有听清楚，可以靠近一点再说一次吗？'
   if (conversation.errorReason === 'request-error') return '伙伴的知识问答服务还没连接好，先试试“打开知识”或“继续学习”吧。'
   return '刚才没有听清楚，可以再说一次吗？'

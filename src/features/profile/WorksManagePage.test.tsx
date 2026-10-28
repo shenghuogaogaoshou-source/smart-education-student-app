@@ -34,6 +34,8 @@ describe('WorksManagePage', () => {
       </WorksProvider>,
     )
 
+    expect(screen.getByRole('button', { name: '返回' })).toHaveClass('mobile-page-header__back')
+    expect(document.querySelector('.works-manage-content')).not.toBeNull()
     const card = (await screen.findByText('未来图书馆')).closest('.wm-card') as HTMLElement
     expect(within(card).getByText(/AI 创作/)).toBeInTheDocument()
   })

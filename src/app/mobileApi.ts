@@ -93,6 +93,11 @@ export function resolveApiUrl(path: string, service: ApiService = 'ai', native =
   return service === 'brain' ? `${apiOrigin}/brain${path}` : `${apiOrigin}${path}`
 }
 
+export function readNativeTaskApiOrigin(native = isNativeApp()) {
+  if (!native) return ''
+  return readMobileApiConfig().apiOrigin
+}
+
 export function apiFetch(input: string, init?: RequestInit, service: ApiService = 'ai') {
   return fetch(resolveApiUrl(input, service), init)
 }

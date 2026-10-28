@@ -130,21 +130,17 @@ function createNativeSpeechCapture(
   void (async () => {
     plugin = await loadPlugin()
     if (!active) return
+    let permission = await plugin.requestPermissions()
+    if (!active) return
+    if (permission.speechRecognition !== 'granted') {
+      finish('permission-denied')
+      return
+    }
+
     const availability = await plugin.available()
     if (!active) return
     if (!availability.available) {
       finish('start-failed')
-      return
-    }
-
-    let permission = await plugin.checkPermissions()
-    if (!active) return
-    if (permission.speechRecognition === 'prompt' || permission.speechRecognition === 'prompt-with-rationale') {
-      permission = await plugin.requestPermissions()
-    }
-    if (!active) return
-    if (permission.speechRecognition !== 'granted') {
-      finish('permission-denied')
       return
     }
 

@@ -1,6 +1,7 @@
 import { Check, LoaderCircle, RotateCcw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { pollTask, type TaskView } from '@zhiya/task-client'
+import { readNativeTaskApiOrigin } from '../../app/mobileApi'
 import { RecognitionResultView } from './RecognitionResultView'
 import type { ToolResult } from './recognitionTools'
 import type { VisionTaskHandle } from './CameraToolSheet'
@@ -21,7 +22,11 @@ export function BackgroundRecognitionTask({
 
   useEffect(() => {
     const controller = new AbortController()
-    void pollTaskImpl(task.taskId, { signal: controller.signal })
+    const baseUrl = readNativeTaskApiOrigin()
+    void pollTaskImpl(task.taskId, {
+      signal: controller.signal,
+      ...(baseUrl ? { baseUrl } : {}),
+    })
       .then(setState)
       .catch((error) => {
         if ((error as Error).name !== 'AbortError') {
