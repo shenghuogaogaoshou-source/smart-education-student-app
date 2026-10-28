@@ -11,11 +11,13 @@ const PRODUCTION_API_ORIGIN = import.meta.env.VITE_PRODUCTION_API_ORIGIN ?? ''
 
 type CapacitorLike = {
   isNativePlatform?: () => boolean
+  getPlatform?: () => string
 }
 
 export function isNativeApp() {
   const capacitor = (window as Window & { Capacitor?: CapacitorLike }).Capacitor
-  return capacitor?.isNativePlatform?.() === true
+  if (capacitor?.isNativePlatform?.() === true) return true
+  return capacitor?.getPlatform?.() === 'android' || capacitor?.getPlatform?.() === 'ios'
 }
 
 export function isProductionNativeRelease() {

@@ -49,4 +49,15 @@ describe('mobile API configuration', () => {
     const { resolveApiUrl } = await loadMobileApi()
     expect(resolveApiUrl('/api/companion/reply', 'ai', false)).toBe('/api/companion/reply')
   })
+
+  it('recognizes a Capacitor native platform when isNativePlatform is unavailable', async () => {
+    Object.defineProperty(window, 'Capacitor', {
+      configurable: true,
+      value: { getPlatform: () => 'android' },
+    })
+    const { isNativeApp } = await loadMobileApi()
+
+    expect(isNativeApp()).toBe(true)
+    delete (window as Window & { Capacitor?: unknown }).Capacitor
+  })
 })
