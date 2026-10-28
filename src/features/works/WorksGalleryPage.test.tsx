@@ -16,7 +16,7 @@ describe('WorksGalleryPage', () => {
     )
 
     const back = screen.getByRole('button', { name: '返回' })
-    expect(back).toHaveClass('gallery-back-button')
+    expect(back).toHaveClass('mobile-page-header__back')
     expect(back.querySelector('svg')).not.toBeNull()
 
     for (const label of ['每天', '每周', '每年']) {
@@ -59,12 +59,12 @@ describe('WorksGalleryPage', () => {
     expect(screen.queryByText('还没完成的小电影')).not.toBeInTheDocument()
     const publishedCard = (await screen.findAllByText('会分类的小车'))[0].closest('article')
     expect(publishedCard).not.toBeNull()
-    await user.click(within(publishedCard!).getByRole('button', { name: '点赞作品' }))
+    await user.click(within(publishedCard!).getByRole('button', { name: /^点赞作品/ }))
     expect((await repository.get('student-a', published.id))?.likes).toBe(1)
     expect((await repository.get('student-a', draft.id))?.likes).toBe(0)
   })
 
-  it('在精选列表和全部作品中复用演示作品媒体', async () => {
+  it('uses one media card instead of duplicating the same work', async () => {
     const repository = createMemoryWorkRepository()
     const work = await repository.saveDraft('student-a', {
       source: 'brain-film',
@@ -86,10 +86,11 @@ describe('WorksGalleryPage', () => {
     )
 
     const previews = await screen.findAllByRole('img', { name: '会呼吸的时钟' })
-    expect(previews).toHaveLength(2)
+    expect(previews).toHaveLength(1)
     expect(previews.every((preview) => (
       preview.getAttribute('src') === '/demo-works/posters/clockwork-morning.jpg'
     ))).toBe(true)
+    expect(screen.queryByText(/^全部作品/)).not.toBeInTheDocument()
   })
 
   it('展示多名同学的作品作者而不是统一显示当前账号', async () => {

@@ -411,6 +411,14 @@ button.stat-button:active { transform: scale(.96); }
   gap: 12px;
 }
 
+.works-gallery-header,
+.work-detail-page-header {
+  position: sticky;
+  top: 0;
+  background: rgb(255 250 244 / 94%);
+  backdrop-filter: blur(16px);
+}
+
 .gallery-back-button {
   display: grid;
   flex: 0 0 auto;
@@ -487,7 +495,7 @@ button.stat-button:active { transform: scale(.96); }
 
 .gallery-showcase-card {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 11px;
@@ -495,6 +503,20 @@ button.stat-button:active { transform: scale(.96); }
   border-radius: 20px;
   background: rgb(255 252 247 / 88%);
   box-shadow: 0 7px 20px rgb(112 72 51 / 8%);
+}
+
+.gallery-work-open {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
 .gallery-work-media {
@@ -538,6 +560,46 @@ button.stat-button:active { transform: scale(.96); }
   border-radius: 11px;
   background: #fff7ee;
   color: #c46e4c;
+}
+
+.gallery-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.gallery-showcase-card.is-compact {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 9px;
+}
+
+.gallery-showcase-card.is-compact .gallery-work-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.gallery-showcase-card.is-compact .gallery-work-media {
+  width: 100%;
+  height: 108px;
+}
+
+.gallery-showcase-card.is-compact .gallery-work-copy h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-showcase-card.is-compact .gallery-work-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 7px;
+  border-top: 1px dashed rgb(214 171 145 / 24%);
 }
 
 .gallery-all-works { margin-top: 20px; }

@@ -1,6 +1,7 @@
-import { ArrowLeft, Bookmark, Heart, MessageCircle, Send, Sparkles } from 'lucide-react'
+import { Bookmark, Heart, MessageCircle, Send, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
+import { MobilePageHeader } from '../../components/MobilePageHeader'
 import { WorkAssetPreview } from './WorkAssetPreview'
 import { useOptionalWorks } from './WorksProvider'
 import './works.css'
@@ -15,10 +16,7 @@ export function WorkDetailPage({ workId, onBack }: { workId: string; onBack: () 
   if (!work) {
     return (
       <div className="work-detail-page">
-        <header className="work-detail-header">
-          <button className="back-button" type="button" onClick={onBack} aria-label="返回"><ArrowLeft size={20} /></button>
-          <h1>作品详情</h1>
-        </header>
+        <MobilePageHeader className="work-detail-page-header" title="作品详情" onBack={onBack} />
         <div className="work-detail-content">
           <p>{worksState?.loading ? '正在读取作品…' : '作品不存在或已被删除'}</p>
           <button className="detail-btn subtle" type="button" onClick={onBack}>返回列表</button>
@@ -44,10 +42,7 @@ export function WorkDetailPage({ workId, onBack }: { workId: string; onBack: () 
 
   return (
     <div className="work-detail-page">
-      <header className="work-detail-header">
-        <button className="work-detail-back" type="button" onClick={onBack} aria-label="返回"><ArrowLeft size={20} /></button>
-        <div><small>同学作品</small><h1>{sourceName}</h1></div>
-      </header>
+      <MobilePageHeader className="work-detail-page-header" eyebrow="同学作品" title={sourceName} onBack={onBack} />
 
       <div className="work-detail-content">
         <section className="work-detail-intro">

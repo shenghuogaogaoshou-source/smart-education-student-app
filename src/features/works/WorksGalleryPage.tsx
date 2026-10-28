@@ -1,6 +1,7 @@
-import { Bookmark, CalendarDays, CalendarRange, ChevronLeft, Heart, Sparkles, Sun } from 'lucide-react'
+import { Bookmark, CalendarDays, CalendarRange, Heart, Sparkles, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { useAppState } from '../../app/AppState'
+import { MobilePageHeader } from '../../components/MobilePageHeader'
 import { rankPublishedWorks, type RankingPeriod } from './moderation'
 import { WorkMediaThumbnail } from './WorkMediaThumbnail'
 import { useOptionalWorks } from './WorksProvider'
@@ -20,15 +21,12 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
 
   return (
     <div className="works-gallery-page">
-      <header className="gallery-header">
-        <button className="gallery-back-button" type="button" onClick={onBack} aria-label="返回">
-          <ChevronLeft aria-hidden="true" size={21} />
-        </button>
-        <div className="gallery-header-title">
-          <h1>作品展示</h1>
-          <p>看看大家的新作品</p>
-        </div>
-      </header>
+      <MobilePageHeader
+        className="works-gallery-header"
+        eyebrow="看看大家的新作品"
+        title="作品展示"
+        onBack={onBack}
+      />
 
       <div className="gallery-period-tabs" aria-label="作品热度时间范围">
         {periodLabels.map(({ id, label, Icon }) => (
@@ -46,20 +44,22 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
       </div>
 
       <div className="gallery-work-list">
-        {allPublished.map((work, index) => {
+        {allPublished.slice(0, 3).map((work, index) => {
           const liked = work.likedBy.includes(state.accountId)
           const saved = work.favoritedBy.includes(state.accountId)
           return (
             <article className="gallery-showcase-card" key={work.id}>
-              <div className="gallery-work-media" onClick={() => onWorkClick?.(work.id)}>
-                <WorkMediaThumbnail work={work} />
-                <div className="gallery-work-index">{String(index + 1).padStart(2, '0')}</div>
-              </div>
-              <div className="gallery-work-copy" onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
-                <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
-                <h3>{work.title}</h3>
-                <p>{work.creatorName || state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
-              </div>
+              <button className="gallery-work-open" type="button" onClick={() => onWorkClick?.(work.id)} aria-label={`查看${work.title}`}>
+                <div className="gallery-work-media">
+                  <WorkMediaThumbnail work={work} />
+                  <div className="gallery-work-index">{String(index + 1).padStart(2, '0')}</div>
+                </div>
+                <div className="gallery-work-copy">
+                  <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
+                  <h3>{work.title}</h3>
+                  <p>{work.creatorName || state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
+                </div>
+              </button>
               <div className="gallery-work-actions">
                 <button type="button" aria-label="点赞作品" aria-pressed={liked} onClick={() => worksState?.toggleLike(work.id)}>
                   <Heart aria-hidden="true" size={18} fill={liked ? 'currentColor' : 'none'} />
@@ -73,6 +73,35 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
         })}
       </div>
 
+      {allPublished.length > 3 && (
+        <div className="gallery-compact-grid" aria-label="全部作品">
+          {allPublished.slice(3).map((work, offset) => {
+            const liked = work.likedBy.includes(state.accountId)
+            const saved = work.favoritedBy.includes(state.accountId)
+            return (
+              <article className="gallery-showcase-card is-compact" key={work.id}>
+                <button className="gallery-work-open" type="button" onClick={() => onWorkClick?.(work.id)} aria-label={`查看${work.title}`}>
+                  <div className="gallery-work-media"><WorkMediaThumbnail work={work} /></div>
+                  <div className="gallery-work-copy">
+                    <span>{work.source === 'brain-film' ? '脑洞放映厅' : work.source === 'creative-module' ? '创造模块' : 'AI 创作'}</span>
+                    <h3>{work.title}</h3>
+                    <p>{work.creatorName || state.nickname} · ❤️ {work.likes} · ⭐ {work.favorites}</p>
+                  </div>
+                </button>
+                <div className="gallery-work-actions">
+                  <button type="button" aria-label={`点赞作品${offset + 4}`} aria-pressed={liked} onClick={() => worksState?.toggleLike(work.id)}>
+                    <Heart aria-hidden="true" size={17} fill={liked ? 'currentColor' : 'none'} />
+                  </button>
+                  <button type="button" aria-label={`收藏作品${offset + 4}`} aria-pressed={saved} onClick={() => worksState?.toggleFavorite(work.id)}>
+                    <Bookmark aria-hidden="true" size={17} fill={saved ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+
       {!worksState?.loading && allPublished.length === 0 && (
         <div className="gallery-empty" role="status">
           <Sparkles aria-hidden="true" />
@@ -81,19 +110,6 @@ export function WorksGalleryPage({ onBack, onWorkClick }: { onBack: () => void; 
         </div>
       )}
 
-      {allPublished.length > 0 && (
-        <div className="gallery-all-works">
-          <p className="gallery-section-title">全部作品 ({allPublished.length})</p>
-          <div className="gallery-all-list">
-            {allPublished.map((work) => (
-              <article className="gallery-all-card" key={`all-${work.id}`} onClick={() => onWorkClick?.(work.id)} style={{ cursor: onWorkClick ? 'pointer' : 'default' }}>
-                <WorkMediaThumbnail work={work} className="gallery-all-media" />
-                <div className="gallery-all-info"><h3>{work.title}</h3><p>{work.aiTools.join(' · ')}</p></div>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
