@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  createNativeSpeechSession,
   requestSpeechAudio,
   speakCompanionReply,
+  speakCompanionReplyForTest,
   startNativeSpeechCaptureForTest,
   startSpeechCapture,
 } from './browserSpeech'
@@ -225,5 +227,20 @@ describe('browser speech capture', () => {
     capture.stop()
     finishStart?.({ matches: [] })
     await vi.waitFor(() => expect(plugin.stop).toHaveBeenCalled())
+  })
+
+  it('starts Android local speech after 1.5 seconds while cloud TTS is pending', async () => {
+    vi.useFakeTimers()
+    const speakNative = vi.fn(async () => undefined)
+    const session = createNativeSpeechSession()
+    const playback = speakCompanionReplyForTest('你好', true, undefined, {
+      isNative: true,
+      session,
+      requestAudio: vi.fn((_text: string, _signal: AbortSignal) => new Promise<Blob>(() => undefined)),
+      speakNative,
+    })
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(speakNative).toHaveBeenCalledOnce()
+    playback?.cancel()
   })
 })

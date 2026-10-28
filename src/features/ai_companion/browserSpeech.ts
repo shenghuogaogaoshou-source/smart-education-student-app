@@ -49,6 +49,14 @@ export type SpeechPlayback = {
   cancel: () => void
 }
 
+export type NativeSpeechSession = {
+  nativePreferred: boolean
+}
+
+export function createNativeSpeechSession(): NativeSpeechSession {
+  return { nativePreferred: false }
+}
+
 type NativeSpeechPlugin = {
   available: () => Promise<{ available: boolean }>
   checkPermissions: () => Promise<{ speechRecognition: string }>
@@ -273,9 +281,14 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
   }
 }
 
-export function speakCompanionReply(text: string, enabled: boolean, onEnd?: () => void): SpeechPlayback | null {
+export function speakCompanionReply(
+  text: string,
+  enabled: boolean,
+  onEnd?: () => void,
+  session: NativeSpeechSession = createNativeSpeechSession(),
+): SpeechPlayback | null {
   if (enabled && isNativeApp()) {
-    return startNativeSpeechWithFallback(text, onEnd)
+    return startNativeSpeechWithFallback(text, onEnd, session)
   }
   if (!enabled || typeof window.speechSynthesis === 'undefined' || typeof window.SpeechSynthesisUtterance === 'undefined') return null
 
@@ -295,13 +308,76 @@ export function speakCompanionReply(text: string, enabled: boolean, onEnd?: () =
   return { cancel: () => synthesis.cancel() }
 }
 
-function startNativeSpeechWithFallback(text: string, onEnd?: () => void): SpeechPlayback {
+type NativeSpeechDependencies = {
+  session: NativeSpeechSession
+  isNative: boolean
+  requestAudio: (text: string, signal: AbortSignal) => Promise<Blob>
+  speakNative: (text: string) => Promise<void>
+  stopNative: () => Promise<void>
+  createAudio: (url: string) => HTMLAudioElement
+}
+
+function defaultNativeSpeechDependencies(session: NativeSpeechSession): NativeSpeechDependencies {
+  return {
+    session,
+    isNative: true,
+    requestAudio: requestSpeechAudio,
+    speakNative: async (text) => {
+      const { TextToSpeech, QueueStrategy } = await import('@capacitor-community/text-to-speech')
+      await TextToSpeech.speak({
+        text,
+        lang: 'zh-CN',
+        rate: .96,
+        pitch: 1,
+        queueStrategy: QueueStrategy.Flush,
+      })
+    },
+    stopNative: async () => {
+      const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
+      await TextToSpeech.stop()
+    },
+    createAudio: (url) => new Audio(url),
+  }
+}
+
+export function speakCompanionReplyForTest(
+  text: string,
+  enabled: boolean,
+  onEnd: (() => void) | undefined,
+  dependencies: {
+    isNative: boolean
+    session: NativeSpeechSession
+    requestAudio: (text: string, signal: AbortSignal) => Promise<Blob>
+    speakNative: (text: string) => Promise<void>
+    stopNative?: () => Promise<void>
+    createAudio?: (url: string) => HTMLAudioElement
+  },
+): SpeechPlayback | null {
+  if (!enabled || !dependencies.isNative) return null
+  return startNativeSpeechWithFallback(text, onEnd, dependencies.session, {
+    ...dependencies,
+    stopNative: dependencies.stopNative ?? (async () => undefined),
+    createAudio: dependencies.createAudio ?? ((url) => new Audio(url)),
+  })
+}
+
+function startNativeSpeechWithFallback(
+  text: string,
+  onEnd?: () => void,
+  session: NativeSpeechSession = createNativeSpeechSession(),
+  overrides?: Partial<NativeSpeechDependencies>,
+): SpeechPlayback {
   let stopped = false
   let finished = false
   let nativeStarted = false
   let audio: HTMLAudioElement | null = null
   let objectUrl = ''
   const controller = new AbortController()
+  const dependencies = {
+    ...defaultNativeSpeechDependencies(session),
+    ...overrides,
+  }
+  let cloudTimer: ReturnType<typeof setTimeout> | null = null
 
   const revokeAudio = () => {
     if (!objectUrl) return
@@ -317,36 +393,40 @@ function startNativeSpeechWithFallback(text: string, onEnd?: () => void): Speech
   }
 
   const playNativeFallback = async () => {
-    if (stopped) return
+    if (stopped || nativeStarted) return
+    nativeStarted = true
+    session.nativePreferred = true
     try {
-      const { TextToSpeech, QueueStrategy } = await import('@capacitor-community/text-to-speech')
-      if (stopped) return
-      nativeStarted = true
-      await TextToSpeech.stop()
-      if (stopped) return
-      await TextToSpeech.speak({
-        text,
-        lang: 'zh-CN',
-        rate: .96,
-        pitch: 1,
-        queueStrategy: QueueStrategy.Flush,
-      })
+      await dependencies.stopNative?.()
+      await dependencies.speakNative(text)
       if (!stopped) finish()
     } catch {
       if (!stopped) finish()
     }
   }
 
+  if (session.nativePreferred) {
+    void playNativeFallback()
+    return {
+      cancel: () => {
+        stopped = true
+        controller.abort()
+        void dependencies.stopNative?.()
+      },
+    }
+  }
+
   void (async () => {
     try {
-      const blob = await requestSpeechAudio(text, controller.signal)
+      const blob = await dependencies.requestAudio(text, controller.signal)
       if (stopped) return
+      if (cloudTimer !== null) clearTimeout(cloudTimer)
       if (typeof Audio === 'undefined' || typeof URL.createObjectURL !== 'function') {
         await playNativeFallback()
         return
       }
       objectUrl = URL.createObjectURL(blob)
-      audio = new Audio(objectUrl)
+      audio = dependencies.createAudio(objectUrl)
       audio.onended = finish
       audio.onerror = () => {
         revokeAudio()
@@ -358,15 +438,20 @@ function startNativeSpeechWithFallback(text: string, onEnd?: () => void): Speech
     }
   })()
 
+  cloudTimer = setTimeout(() => {
+    if (stopped || nativeStarted) return
+    controller.abort()
+    void playNativeFallback()
+  }, 1500)
+
   return {
     cancel: () => {
       stopped = true
+      if (cloudTimer !== null) clearTimeout(cloudTimer)
       controller.abort()
       audio?.pause()
       revokeAudio()
-      if (nativeStarted) {
-        void import('@capacitor-community/text-to-speech').then(({ TextToSpeech }) => TextToSpeech.stop())
-      }
+      if (nativeStarted) void dependencies.stopNative?.()
     },
   }
 }

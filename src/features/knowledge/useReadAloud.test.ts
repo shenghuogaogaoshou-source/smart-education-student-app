@@ -252,6 +252,7 @@ describe('useReadAloud', () => {
         '今天的目标：认识 AI 是会看、会听、会帮忙的聪明工具。',
         true,
         expect.any(Function),
+        expect.objectContaining({ nativePreferred: false }),
       )
       act(() => finishCurrent?.())
       expect(result.current.index).toBe(1)
@@ -276,5 +277,23 @@ describe('useReadAloud', () => {
 
     expect(result.current.status).toBe('idle')
     expect(result.current.index).toBe(-1)
+  })
+
+  it('prefetches the next native segment while the current segment plays', async () => {
+    const finish = vi.fn()
+    const playText = vi.fn((_text: string, _enabled: boolean, onEnd?: () => void) => {
+      onEnd
+      return { cancel: finish }
+    })
+    const prefetchText = vi.fn()
+    const { result } = renderHook(() => useReadAloud(sampleSegments, {
+      isNative: true,
+      playText,
+      prefetchText,
+    }))
+
+    act(() => result.current.play(0))
+
+    expect(prefetchText).toHaveBeenCalledWith(sampleSegments[1].text)
   })
 })

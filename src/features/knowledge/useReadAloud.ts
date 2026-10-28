@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, isNativeApp } from '../../app/mobileApi'
-import { speakCompanionReply, type SpeechPlayback } from '../ai_companion/browserSpeech'
+import {
+  createNativeSpeechSession,
+  requestSpeechAudio,
+  speakCompanionReply,
+  type NativeSpeechSession,
+  type SpeechPlayback,
+} from '../ai_companion/browserSpeech'
 import type { DayStory } from './content/storyContent'
 
 // 播读最小单元：一段旁白、一句对话、或一个板块的文本
@@ -48,7 +54,8 @@ export type ReadAloudEngine = 'server' | 'local'
 
 export type UseReadAloudOptions = {
   isNative?: boolean
-  playText?: (text: string, enabled: boolean, onEnd?: () => void) => SpeechPlayback | null
+  playText?: (text: string, enabled: boolean, onEnd?: () => void, session?: NativeSpeechSession) => SpeechPlayback | null
+  prefetchText?: (text: string) => void | Promise<void>
 }
 
 export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptions = {}) {
@@ -58,6 +65,9 @@ export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptio
     && typeof window.SpeechSynthesisUtterance === 'function'
   const supported = native || localSpeechSupported
   const playText = options.playText ?? speakCompanionReply
+  const prefetchText = options.prefetchText ?? (options.playText
+    ? (() => undefined)
+    : (text: string) => requestSpeechAudio(text).then(() => undefined))
   const [status, setStatus] = useState<ReadAloudStatus>('idle')
   const [index, setIndex] = useState(-1)
   const [engine, setEngine] = useState<ReadAloudEngine>('local')
@@ -74,6 +84,7 @@ export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptio
   const engineRef = useRef<ReadAloudEngine>('local')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const nativePlaybackRef = useRef<SpeechPlayback | null>(null)
+  const nativeSessionRef = useRef<NativeSpeechSession>(createNativeSpeechSession())
   const urlCacheRef = useRef(new Map<string, string>())
 
   const finish = useCallback(() => {
@@ -200,9 +211,13 @@ export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptio
         const playback = playText(segmentsRef.current[nextIndex].text, true, () => {
           nativePlaybackRef.current = null
           if (activeRef.current) speakAtRef.current(indexRef.current + 1)
-        })
+        }, nativeSessionRef.current)
         if (playback) nativePlaybackRef.current = playback
         else finish()
+        const nextSegment = segmentsRef.current[nextIndex + 1]
+        if (nextSegment && !nativeSessionRef.current.nativePreferred) {
+          void prefetchText(nextSegment.text)
+        }
         return
       }
 
@@ -219,7 +234,7 @@ export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptio
         speakLocalAt(nextIndex)
       }
     },
-    [native, playText, finish, speakServerAt, speakLocalAt],
+    [native, playText, prefetchText, finish, speakServerAt, speakLocalAt],
   )
 
   speakAtRef.current = speakAt
@@ -270,6 +285,7 @@ export function useReadAloud(segments: ReadSegment[], options: UseReadAloudOptio
   // 切换故事（segments 变化）或卸载时停止播读
   useEffect(() => {
     if (!supported) return
+    nativeSessionRef.current = createNativeSpeechSession()
     // 触发一次语音列表加载，避免首次本地播报拿不到中文语音
     if (localSpeechSupported) {
       window.speechSynthesis.getVoices()
