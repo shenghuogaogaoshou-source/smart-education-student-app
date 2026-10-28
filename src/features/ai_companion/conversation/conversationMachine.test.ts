@@ -130,4 +130,30 @@ describe('companion conversation controller', () => {
 
     expect(controller.getSnapshot()).toMatchObject({ status: 'error', errorReason: 'start-failed' })
   })
+
+  it('keeps the written reply when speech playback throws', async () => {
+    const harness = createHarness()
+    const speakReply = vi.fn(() => {
+      throw new Error('tts unavailable')
+    })
+    const controller = createConversationController({
+      startCapture: (callbacks) => {
+        callbacks.onComplete('你是谁')
+        return { stop: vi.fn(), cancel: vi.fn() }
+      },
+      requestReply: async () => '我是绒桃 Momo。',
+      speakReply,
+      getCompanionId: () => 'momo',
+      getVoiceEnabled: () => true,
+    })
+
+    controller.start()
+
+    await vi.waitFor(() => expect(controller.getSnapshot().status).toBe('idle'))
+    expect(controller.getSnapshot()).toMatchObject({
+      reply: '我是绒桃 Momo。',
+      errorReason: null,
+    })
+    expect(harness.capture.cancel).not.toHaveBeenCalled()
+  })
 })

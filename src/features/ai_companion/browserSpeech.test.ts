@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { startSpeechCapture } from './browserSpeech'
+import { requestSpeechAudio, speakCompanionReply, startSpeechCapture } from './browserSpeech'
 
 type Result = { 0: { transcript: string }; isFinal: boolean }
 type RecognitionTestEvent = { resultIndex?: number; results?: ArrayLike<Result> }
@@ -143,5 +143,35 @@ describe('browser speech capture', () => {
     FakeRecognition.latest?.onerror?.({ error: 'no-speech' })
 
     expect(onError).toHaveBeenCalledWith('no-speech')
+  })
+
+  it('uses the protected TTS proxy and returns playable audio', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      new Uint8Array([82, 73, 70, 70]),
+      { status: 200, headers: { 'content-type': 'audio/wav' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const audio = await requestSpeechAudio('你好呀', new AbortController().signal)
+
+    expect(audio.type).toContain('audio/wav')
+    expect(fetchMock).toHaveBeenCalledWith('/api/tts', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ text: '你好呀' }),
+    }))
+  })
+
+  it('finishes playback cleanly when the local speech engine throws', () => {
+    const onEnd = vi.fn()
+    vi.stubGlobal('SpeechSynthesisUtterance', function () {})
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      speak: vi.fn(() => {
+        throw new Error('native speech unavailable')
+      }),
+    })
+
+    expect(() => speakCompanionReply('你好', true, onEnd)).not.toThrow()
+    expect(onEnd).toHaveBeenCalledOnce()
   })
 })

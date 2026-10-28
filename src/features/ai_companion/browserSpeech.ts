@@ -1,3 +1,4 @@
+import { requestWithRetry } from '../../app/apiRequest'
 import { isNativeApp } from '../../app/mobileApi'
 
 type RecognitionResultItem = {
@@ -46,6 +47,22 @@ export type SpeechCapture = {
 
 export type SpeechPlayback = {
   cancel: () => void
+}
+
+export async function requestSpeechAudio(text: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await requestWithRetry('/api/tts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal,
+  }, {
+    attempts: 1,
+    timeoutMs: 25_000,
+  })
+  if (!response.ok) throw new Error('tts_failed')
+  const audio = await response.blob()
+  if (!audio.type.startsWith('audio/') || audio.size === 0) throw new Error('tts_invalid_audio')
+  return audio
 }
 
 function startNativeSpeechCapture({
@@ -185,8 +202,53 @@ export function startSpeechCapture({ onInterim, onComplete, onError }: SpeechCap
 
 export function speakCompanionReply(text: string, enabled: boolean, onEnd?: () => void): SpeechPlayback | null {
   if (enabled && isNativeApp()) {
-    let stopped = false
-    void import('@capacitor-community/text-to-speech').then(async ({ TextToSpeech, QueueStrategy }) => {
+    return startNativeSpeechWithFallback(text, onEnd)
+  }
+  if (!enabled || typeof window.speechSynthesis === 'undefined' || typeof window.SpeechSynthesisUtterance === 'undefined') return null
+
+  const synthesis = window.speechSynthesis
+  try {
+    synthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'zh-CN'
+    utterance.rate = .96
+    utterance.pitch = 1
+    utterance.onend = () => onEnd?.()
+    utterance.onerror = () => onEnd?.()
+    synthesis.speak(utterance)
+  } catch {
+    onEnd?.()
+  }
+  return { cancel: () => synthesis.cancel() }
+}
+
+function startNativeSpeechWithFallback(text: string, onEnd?: () => void): SpeechPlayback {
+  let stopped = false
+  let finished = false
+  let nativeStarted = false
+  let audio: HTMLAudioElement | null = null
+  let objectUrl = ''
+  const controller = new AbortController()
+
+  const revokeAudio = () => {
+    if (!objectUrl) return
+    URL.revokeObjectURL(objectUrl)
+    objectUrl = ''
+  }
+
+  const finish = () => {
+    if (finished) return
+    finished = true
+    revokeAudio()
+    onEnd?.()
+  }
+
+  const playNativeFallback = async () => {
+    if (stopped) return
+    try {
+      const { TextToSpeech, QueueStrategy } = await import('@capacitor-community/text-to-speech')
+      if (stopped) return
+      nativeStarted = true
       await TextToSpeech.stop()
       if (stopped) return
       await TextToSpeech.speak({
@@ -196,25 +258,42 @@ export function speakCompanionReply(text: string, enabled: boolean, onEnd?: () =
         pitch: 1,
         queueStrategy: QueueStrategy.Flush,
       })
-      if (!stopped) onEnd?.()
-    }).catch(() => onEnd?.())
-    return {
-      cancel: () => {
-        stopped = true
-        void import('@capacitor-community/text-to-speech').then(({ TextToSpeech }) => TextToSpeech.stop())
-      },
+      if (!stopped) finish()
+    } catch {
+      if (!stopped) finish()
     }
   }
-  if (!enabled || typeof window.speechSynthesis === 'undefined' || typeof window.SpeechSynthesisUtterance === 'undefined') return null
 
-  const synthesis = window.speechSynthesis
-  synthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'zh-CN'
-  utterance.rate = .96
-  utterance.pitch = 1
-  utterance.onend = () => onEnd?.()
-  utterance.onerror = () => onEnd?.()
-  synthesis.speak(utterance)
-  return { cancel: () => synthesis.cancel() }
+  void (async () => {
+    try {
+      const blob = await requestSpeechAudio(text, controller.signal)
+      if (stopped) return
+      if (typeof Audio === 'undefined' || typeof URL.createObjectURL !== 'function') {
+        await playNativeFallback()
+        return
+      }
+      objectUrl = URL.createObjectURL(blob)
+      audio = new Audio(objectUrl)
+      audio.onended = finish
+      audio.onerror = () => {
+        revokeAudio()
+        void playNativeFallback()
+      }
+      await audio.play()
+    } catch {
+      if (!stopped) await playNativeFallback()
+    }
+  })()
+
+  return {
+    cancel: () => {
+      stopped = true
+      controller.abort()
+      audio?.pause()
+      revokeAudio()
+      if (nativeStarted) {
+        void import('@capacitor-community/text-to-speech').then(({ TextToSpeech }) => TextToSpeech.stop())
+      }
+    },
+  }
 }

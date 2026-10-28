@@ -1,4 +1,4 @@
-import { apiFetch } from '../../app/mobileApi'
+import { requestWithRetry } from '../../app/apiRequest'
 
 type CompanionReplyRequest = {
   companionId: string
@@ -13,11 +13,14 @@ export async function requestCompanionReply({ companionId, question, signal }: C
   const normalizedQuestion = question.trim().replace(/\s+/g, ' ').slice(0, MAX_QUESTION_LENGTH)
   if (!normalizedQuestion) throw new Error(STUDENT_FACING_ERROR)
   const normalizedCompanionId = COMPANION_IDS.has(companionId) ? companionId : 'momo'
-  const response = await apiFetch('/api/companion/reply', {
+  const response = await requestWithRetry('/api/companion/reply', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ companionId: normalizedCompanionId, question: normalizedQuestion }),
     signal,
+  }, {
+    attempts: 2,
+    timeoutMs: 45_000,
   })
 
   if (!response.ok) throw new Error(STUDENT_FACING_ERROR)

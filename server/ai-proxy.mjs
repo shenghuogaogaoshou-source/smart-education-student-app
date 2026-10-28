@@ -14,7 +14,7 @@ const HOST = process.env.COMPANION_PROXY_HOST || '127.0.0.1'
 const MAX_BODY_BYTES = 16 * 1024
 const CORS_BASE_HEADERS = {
   'access-control-allow-methods': 'GET,POST,OPTIONS',
-  'access-control-allow-headers': 'content-type',
+  'access-control-allow-headers': 'content-type,x-zhiya-request-id',
   'access-control-max-age': '86400',
 }
 

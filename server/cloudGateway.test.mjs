@@ -63,6 +63,26 @@ describe('cloud API gateway', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer')
   })
 
+  it('allows browser and APK clients to send the diagnostic request id header', async () => {
+    const gateway = await listen(createCloudGatewayListener({
+      companionListener: (_request, response) => response.writeHead(204).end(),
+      allowedOrigins: new Set(['https://localhost']),
+    }))
+
+    const response = await rawRequest(gateway.origin, {
+      path: '/api/companion/reply',
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://localhost',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,x-zhiya-request-id',
+      },
+    })
+
+    expect(response.status).toBe(204)
+    expect(response.headers['access-control-allow-headers']).toContain('x-zhiya-request-id')
+  })
+
   it('proxies brain health and preserves ranged film responses byte-for-byte', async () => {
     let receivedRange = null
     const upstream = await listen((request, response) => {

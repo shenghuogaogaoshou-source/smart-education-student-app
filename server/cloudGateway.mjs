@@ -161,7 +161,7 @@ export function createCloudGatewayListener({
     if (request.method === 'OPTIONS') {
       response.writeHead(204, {
         'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-        'access-control-allow-headers': 'content-type,authorization,range',
+        'access-control-allow-headers': 'content-type,authorization,range,x-zhiya-request-id',
         'access-control-max-age': '86400',
         ...requestCorsHeaders,
       })

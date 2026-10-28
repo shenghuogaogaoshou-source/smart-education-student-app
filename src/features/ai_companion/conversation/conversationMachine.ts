@@ -104,7 +104,13 @@ export function createConversationController(deps: ConversationDependencies) {
         playback = null
         update({ status: 'idle' })
       }
-      playback = deps.speakReply(reply, deps.getVoiceEnabled(), finish)
+      try {
+        playback = deps.speakReply(reply, deps.getVoiceEnabled(), finish)
+      } catch {
+        // A device without a working speech engine should still keep the written answer.
+        update({ status: 'idle', errorReason: null })
+        return
+      }
       if (!playback && snapshot.status === 'speaking') finish()
     } catch (error) {
       if (controller.signal.aborted || currentVersion !== requestVersion) return

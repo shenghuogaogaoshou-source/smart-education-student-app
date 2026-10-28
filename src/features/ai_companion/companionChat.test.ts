@@ -15,9 +15,10 @@ describe('requestCompanionReply', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply', expect.objectContaining({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ companionId: 'yunduo', question: '彩虹为什么有颜色？' }),
     }))
+    const requestInit = fetchMock.mock.calls[0][1] as RequestInit
+    expect(new Headers(requestInit.headers).get('content-type')).toBe('application/json')
   })
 
   it('keeps a failed request from exposing service details to the student', async () => {
@@ -39,8 +40,20 @@ describe('requestCompanionReply', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith('/api/companion/reply', expect.objectContaining({
-      signal: controller.signal,
       body: JSON.stringify({ companionId: 'momo', question: '问'.repeat(160) }),
     }))
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('retries one temporary provider failure before giving up', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'provider_error' }), { status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ reply: '我们再一起想想。' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(requestCompanionReply({ companionId: 'momo', question: '为什么天是蓝色的？' }))
+      .resolves.toBe('我们再一起想想。')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
