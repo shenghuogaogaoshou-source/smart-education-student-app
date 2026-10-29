@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import {
   existsSync,
@@ -102,6 +102,18 @@ async function requestWithTimeout(
   }
 }
 
+async function liveRequest(fetchImpl, step, url, options, timeoutMs) {
+  try {
+    return await requestWithTimeout(fetchImpl, url, options, timeoutMs)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'request_failed'
+    const causeCode = error?.cause?.code
+    throw new Error(
+      `live API smoke failed at ${step}: ${detail}${causeCode ? ` (${causeCode})` : ''}`,
+    )
+  }
+}
+
 async function waitForEndpoint(fetchImpl, url, timeoutMs) {
   const deadline = Date.now() + timeoutMs
   let lastStatus = 'unreachable'
@@ -114,7 +126,10 @@ async function waitForEndpoint(fetchImpl, url, timeoutMs) {
         Math.min(3_000, Math.max(500, deadline - Date.now())),
       )
       lastStatus = response.status
-      if (response.ok) return response
+      if (response.ok) {
+        await response.arrayBuffer()
+        return response
+      }
     } catch {
       lastStatus = 'unreachable'
     }
@@ -144,16 +159,10 @@ async function defaultLaunchPackage({ packageRoot, environment }) {
     {
       cwd: packageRoot,
       env: { ...process.env, ...environment },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: 'inherit',
       windowsHide: true,
     },
   )
-  let stderr = ''
-  child.stdout.resume()
-  child.stderr.setEncoding('utf8')
-  child.stderr.on('data', (chunk) => {
-    if (stderr.length < 8_000) stderr += chunk
-  })
 
   return {
     process: child,
@@ -168,7 +177,7 @@ async function defaultLaunchPackage({ packageRoot, environment }) {
       }
       if (child.exitCode === null) child.kill()
       if (child.exitCode !== 0 && child.exitCode !== null) {
-        throw new Error(`Portable launcher exited with ${child.exitCode}: ${stderr}`)
+        throw new Error(`Portable launcher exited with ${child.exitCode}`)
       }
     },
   }
@@ -190,13 +199,14 @@ async function assertPortsReleased(fetchImpl) {
   }
 }
 
-async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
+async function runLiveApiSmoke({ packageRoot, fetchImpl }) {
   const results = {}
   const companionBase = 'http://127.0.0.1:8787'
   const brainBase = 'http://127.0.0.1:8766'
 
-  const chatResponse = await requestWithTimeout(
+  const chatResponse = await liveRequest(
     fetchImpl,
+    'DeepSeek chat request',
     `${companionBase}/api/deepseek/chat/completions`,
     {
       method: 'POST',
@@ -218,8 +228,9 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
   }
   results.chat = { status: chatResponse.status }
 
-  const ttsResponse = await requestWithTimeout(
+  const ttsResponse = await liveRequest(
     fetchImpl,
+    'TTS request',
     `${companionBase}/api/tts`,
     {
       method: 'POST',
@@ -236,8 +247,9 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
     throw new Error('live API smoke failed: empty TTS audio')
   }
   const contentType = ttsResponse.headers.get('content-type') || 'audio/wav'
-  const transcribeResponse = await requestWithTimeout(
+  const transcribeResponse = await liveRequest(
     fetchImpl,
+    'transcription request',
     `${companionBase}/api/companion/transcribe`,
     {
       method: 'POST',
@@ -265,8 +277,9 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
   if (!existsSync(imagePath)) {
     throw new Error('live API smoke failed: safe verification image is missing')
   }
-  const recognizeResponse = await requestWithTimeout(
+  const recognizeResponse = await liveRequest(
     fetchImpl,
+    'image recognition request',
     `${companionBase}/api/companion/recognize`,
     {
       method: 'POST',
@@ -284,8 +297,9 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
   }
   results.recognize = { status: recognizeResponse.status }
 
-  const configResponse = await requestWithTimeout(
+  const configResponse = await liveRequest(
     fetchImpl,
+    'brain config request',
     `${brainBase}/api/config`,
     { method: 'GET' },
     15_000,
@@ -297,48 +311,32 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
     backendReady: config?.backend === true,
   }
 
-  const createResponse = await requestWithTimeout(
+  const storyResponse = await liveRequest(
     fetchImpl,
-    `${companionBase}/api/tasks`,
+    'creative story generation',
+    `${brainBase}/api/story`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        kind: 'film-image',
-        clientTaskId: randomUUID(),
-        payload: {
-          prompt: '儿童绘本插画，一株刚发芽的小绿苗，明亮温暖，不出现文字',
-        },
+        cards: [
+          { slot: '角色', card: '一株刚发芽的小绿苗' },
+          { slot: '场景', card: '清晨的教室窗台' },
+        ],
+        idea: '小绿苗想和同学们一起完成一次观察实验。',
       }),
     },
-    15_000,
+    45_000,
   )
-  const created = await readJson(createResponse, 'create creative task')
-  if (!created?.taskId) {
-    throw new Error('live API smoke failed: creative task ID is missing')
+  const story = await readJson(storyResponse, 'creative story')
+  if (!Array.isArray(story?.lines) || story.lines.length === 0) {
+    throw new Error('live API smoke failed: creative story is empty')
   }
-  results.creativeTask = { status: createResponse.status }
-  const deadline = Date.now() + Math.min(timeoutMs, 120_000)
-  while (Date.now() < deadline) {
-    const pollResponse = await requestWithTimeout(
-      fetchImpl,
-      `${companionBase}/api/tasks/${created.taskId}`,
-      { method: 'GET' },
-      15_000,
-    )
-    const task = await readJson(pollResponse, 'poll creative task')
-    if (task.status === 'succeeded') {
-      results.creativeTask.finalStatus = 'succeeded'
-      return results
-    }
-    if (['failed', 'interrupted'].includes(task.status)) {
-      throw new Error(
-        `live API smoke failed: creative task ended as ${task.status}`,
-      )
-    }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 2_000))
+  results.creativeStory = {
+    status: storyResponse.status,
+    lineCount: story.lines.length,
   }
-  throw new Error('live API smoke failed: creative task timed out')
+  return results
 }
 
 export async function verifyPortablePackage({
@@ -348,7 +346,6 @@ export async function verifyPortablePackage({
   fetchImpl = fetch,
   launchPackage = defaultLaunchPackage,
   healthTimeoutMs = 75_000,
-  liveApiTimeoutMs = 120_000,
   checkPortsReleased = true,
 }) {
   const startedAt = Date.now()
@@ -366,6 +363,7 @@ export async function verifyPortablePackage({
   let report
 
   try {
+    rmSync(shutdownFile, { force: true })
     extractZip(zip, extractionPath)
     const packageRoot = findPackageRoot(extractionPath)
     assertPackageFiles(packageRoot)
@@ -426,13 +424,14 @@ export async function verifyPortablePackage({
       HEALTH_ENDPOINTS[4],
     )
 
-    const liveApiResults = liveApi
-      ? await runLiveApiSmoke({
-          packageRoot,
-          fetchImpl,
-          timeoutMs: liveApiTimeoutMs,
-        })
-      : undefined
+    let liveApiResults
+    if (liveApi) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 3_000))
+      liveApiResults = await runLiveApiSmoke({
+        packageRoot,
+        fetchImpl,
+      })
+    }
 
     await launched.stop()
     launched = undefined
