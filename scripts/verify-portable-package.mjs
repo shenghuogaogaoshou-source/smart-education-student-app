@@ -207,7 +207,7 @@ async function runLiveApiSmoke({ packageRoot, fetchImpl, timeoutMs }) {
           content: '请用一句适合小学生的短句，提醒我学习 AI 时要保护个人隐私。',
         }],
         temperature: 0.1,
-        max_tokens: 80,
+        max_tokens: 512,
       }),
     },
     30_000,
