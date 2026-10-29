@@ -22,6 +22,8 @@
     "test:server": "vitest run --config vitest.server.config.ts && node --test server/devProcesses.test.mjs server/devSupervisor.test.mjs server/recognition.test.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:repository-policy": "node --test scripts/repository-policy.test.mjs",
+    "cleanup:check": "node scripts/cleanup-project.mjs --dry-run",
+    "cleanup:apply": "node scripts/cleanup-project.mjs --apply",
     "import:brain-film": "node scripts/import-brain-film-work.mjs",
     "test:games": "npm test --workspace @zhiya/brain-film && npm run test:py --workspace @zhiya/brain-film && npm test --workspace @zhiya/creative-module",
     "test:all": "npm test -- --run && npm run test:server && npm run test:scripts && npm run test:games",
