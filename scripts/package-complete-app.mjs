@@ -320,6 +320,7 @@ export async function buildCompletePackage({
         sha256: result.sha256,
         size: lstatSync(candidateZip).size,
         runtimeVersions: result.runtimeVersions,
+        verificationScript: 'node scripts/verify-portable-package.mjs --zip <candidate.zip>',
       },
       null,
       2,

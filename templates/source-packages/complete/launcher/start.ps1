@@ -39,7 +39,7 @@ try {
     }
 
     foreach ($port in $ports) {
-        if (-not (Stop-ZhiyaPortConflict -Port $port -PackageRoot $packageRoot)) {
+        if (-not (Stop-ZhiyaPortConflict -Port $port -PackageRoot $packageRoot -NonInteractive:($env:ZHIYA_NONINTERACTIVE -eq '1'))) {
             throw "Port $port is unavailable. Resolve the conflict and try again."
         }
     }
@@ -64,7 +64,14 @@ try {
 
     Write-Host ''
     Write-Host 'Zhiya is running. Close this window to stop this session.'
-    Wait-Process -Id $serverProcess.Id
+    if ($env:ZHIYA_VERIFY_SHUTDOWN_FILE) {
+        while (-not (Test-Path -LiteralPath $env:ZHIYA_VERIFY_SHUTDOWN_FILE) -and -not $serverProcess.HasExited) {
+            Start-Sleep -Milliseconds 500
+            $serverProcess.Refresh()
+        }
+    } else {
+        Wait-Process -Id $serverProcess.Id
+    }
 } catch {
     Write-Host "[Error] $($_.Exception.Message)"
     exit 1
