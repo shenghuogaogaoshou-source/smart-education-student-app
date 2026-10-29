@@ -22,7 +22,7 @@
 - ZIP 使用本地真实 `.env` 和 API Key，以保持与当前电脑演示相同的本地代理链路。
 - 真实密钥不得进入 Git 提交、GitHub、日志、README、校验文件或命令输出。
 - ZIP 仅用于可信设备和可信人员；拥有 ZIP 的人理论上可以提取其中的 Key。
-- ZIP 为 Windows 10/11 完整免环境版，内置便携 Node.js、Python 和项目依赖。
+- ZIP 为 Windows 10/11 完整免环境版，内置便携 Node.js、Python、FFmpeg/FFprobe 和项目依赖。
 - 统一演示账号继续使用 `123 / 123`，启动后加载稳定的比赛演示数据，不复制当前浏览器个人缓存。
 - 不重写 Git 历史，不强制推送，不破坏旧克隆和旧分支。
 - `main` 禁止强制推送和删除；仓库所有者可直接推送，其他协作者必须通过 Pull Request 和自动测试。
@@ -43,7 +43,8 @@ ZIP 解压后形成单一根目录：
 │  └─ process-manager.ps1
 ├─ runtime/
 │  ├─ node/
-│  └─ python/
+│  ├─ python/
+│  └─ ffmpeg/
 ├─ project/
 │  ├─ src/
 │  ├─ public/
@@ -67,7 +68,7 @@ ZIP 解压后形成单一根目录：
 
 ## 4. 启动与进程管理
 
-`启动.cmd` 调用随包分发的 PowerShell 启动器。启动器不得依赖系统 PATH 中的 Node.js 或 Python，而是显式使用 `runtime/node` 和 `runtime/python`。
+`启动.cmd` 调用随包分发的 PowerShell 启动器。启动器不得依赖系统 PATH 中的 Node.js、Python 或 FFmpeg，而是显式使用 `runtime/node`、`runtime/python` 和 `runtime/ffmpeg`。FFmpeg/FFprobe 用于脑洞放映厅的影片拼接、配音合成和字幕烧录；启动器只为本次进程扩展 PATH，不修改目标电脑的系统环境。
 
 启动顺序：
 
@@ -187,7 +188,7 @@ README 下半部分服务开发维护：技术架构、目录结构、安装启�
 
 - ZIP 可正常解压；
 - 在含中文和空格的新路径中运行；
-- 不依赖目标电脑预装 Node.js 或 Python；
+- 不依赖目标电脑预装 Node.js、Python 或 FFmpeg；
 - 五个服务全部通过健康检查；
 - 启动器能处理本包残留进程和外部端口占用确认；
 - 关闭控制台后无本包残留进程；
