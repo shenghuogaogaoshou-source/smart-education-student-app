@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLearningEvent } from './learningEvents'
+import { getResumeKnowledgePart } from './learning'
 import { createDefaultState } from './model'
 import { getPointsBalance } from './points'
 import { loadState, normalizePersistedState, saveState } from './storage'
+import { COURSE_PACKAGES } from '../features/knowledge/courseCatalog'
+import { deriveCourseAchievementGroups, getAchievementSummary } from '../features/profile/courseAchievements'
 
 describe('primary-only state migration', () => {
   beforeEach(() => localStorage.clear())
@@ -30,6 +33,38 @@ describe('primary-only state migration', () => {
     expect(state.companion.equipped).toEqual({ appearance: 'momo', outfit: null, decoration: null })
     expect(state.transactions.map(({ amount }) => amount)).toEqual([90, 100, 40, 1770])
     expect(getPointsBalance(state.transactions)).toBe(2000)
+  })
+
+  it('keeps the competition account data aligned with all three course bands', () => {
+    const state = normalizePersistedState(createDefaultState())
+    const resumePartId = getResumeKnowledgePart(state)
+
+    for (const band of ['grade1-2', 'grade3-4', 'grade5-6'] as const) {
+      expect(COURSE_PACKAGES[band].parts.length).toBeGreaterThan(0)
+      expect(COURSE_PACKAGES[band].quizzes.length).toBeGreaterThan(0)
+      expect(COURSE_PACKAGES[band].medals.length).toBeGreaterThan(0)
+    }
+
+    expect(
+      COURSE_PACKAGES['grade5-6'].parts.some(({ id }) => id === resumePartId),
+    ).toBe(true)
+    expect(state.learningEvents.map(({ contentId }) => contentId)).toEqual([
+      'ael-1',
+      'ael-2',
+      'ael-3',
+      'ael-1',
+      'ael-2',
+    ])
+    expect(state.wrongAnswers).toEqual([])
+    const achievements = deriveCourseAchievementGroups(
+      state.learningEvents,
+      state.accountId,
+      state.wrongAnswers,
+    )
+    expect(getAchievementSummary(achievements)).toEqual({
+      earnedCount: 5,
+      totalCount: 49,
+    })
   })
 
   it('replaces an old prototype state once without clearing unrelated keys', () => {

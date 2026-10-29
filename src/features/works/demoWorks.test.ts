@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryWorkRepository } from './repository'
-import { DEMO_WORK_SPECS, seedDemoWorks } from './demoWorks'
+import {
+  DEMO_WORK_SPECS,
+  isContinuableGameDraft,
+  seedDemoWorks,
+} from './demoWorks'
 import type { WorkRecord } from './types'
 
 type WorkWithCreator = WorkRecord & {
@@ -15,6 +19,24 @@ describe('demo work catalogue', () => {
     expect(DEMO_WORK_SPECS.filter((work) => work.previewKind === 'image')).toHaveLength(17)
     expect(DEMO_WORK_SPECS.filter((work) => work.previewKind === 'video')).toHaveLength(8)
     expect(DEMO_WORK_SPECS.some((work) => work.assetPath.endsWith('/wonder-map.webp'))).toBe(false)
+  })
+
+  it('keeps drafts limited to the two creative games', async () => {
+    const repository = createMemoryWorkRepository()
+    const works = await seedDemoWorks(repository, '123')
+
+    expect(
+      works
+        .filter((work) => work.status === 'draft')
+        .every((work) => (
+          work.source === 'brain-film' || work.source === 'creative-module'
+        )),
+    ).toBe(true)
+    expect(
+      works
+        .filter((work) => work.source === 'external-upload')
+        .every((work) => isContinuableGameDraft(work) === false),
+    ).toBe(true)
   })
 
   it('labels supplied and imported demo works as AI creations', () => {
@@ -159,6 +181,21 @@ describe('demo work catalogue', () => {
       .toEqual([...firstTimes.entries()])
     expect(second.map((work) => [work.id, work.publishedAt]))
       .toEqual(first.map((work) => [work.id, work.publishedAt]))
+  })
+
+  it('is idempotent for the fixed demo work ID set', async () => {
+    const repository = createMemoryWorkRepository()
+    const loadAsset = async (path: string) => new Blob([path], {
+      type: path.endsWith('.mp4') ? 'video/mp4' : 'image/png',
+    })
+
+    const first = await seedDemoWorks(repository, '123', loadAsset)
+    const second = await seedDemoWorks(repository, '123', loadAsset)
+
+    expect(second.map((work) => work.id).sort()).toEqual(
+      first.map((work) => work.id).sort(),
+    )
+    expect(new Set(second.map((work) => work.id)).size).toBe(25)
   })
 
   it('does not download the full demo media library while seeding metadata', async () => {
