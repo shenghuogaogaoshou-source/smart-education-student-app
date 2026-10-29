@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -240,6 +241,31 @@ function verifyStagedWorkspace(stagedProjectRoot) {
   }
 }
 
+function materializeWorkspacePackages(stagedProjectRoot) {
+  const scopeRoot = join(
+    stagedProjectRoot,
+    'node_modules',
+    '@zhiya',
+  )
+  if (!existsSync(scopeRoot)) return
+
+  const materializedPackages = new Set(['task-client', 'works-bridge'])
+  for (const entry of readdirSync(scopeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+    const linkedPath = join(scopeRoot, entry.name)
+    if (!lstatSync(linkedPath).isSymbolicLink()) continue
+
+    unlinkSync(linkedPath)
+    if (!materializedPackages.has(entry.name)) continue
+
+    const source = join(stagedProjectRoot, 'packages', entry.name)
+    if (!existsSync(source)) {
+      throw new Error(`Workspace package source is missing: ${source}`)
+    }
+    cpSync(source, linkedPath, { recursive: true, dereference: true })
+  }
+}
+
 function sha256File(filePath) {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex')
 }
@@ -289,6 +315,7 @@ export async function buildCompletePackage({
   const runtimeVerification = verifyRuntime(runtimeRoot)
 
   await installDependenciesHook(stagedProjectRoot)
+  materializeWorkspacePackages(stagedProjectRoot)
   verifyStagedWorkspace(stagedProjectRoot)
   injectDeliveryConfig(stagedProjectRoot, deliveryConfig)
 

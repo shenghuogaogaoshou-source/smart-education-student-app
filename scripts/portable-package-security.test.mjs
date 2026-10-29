@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -83,6 +85,13 @@ test('delivery secrets exist only in the extracted project configuration', async
     },
     keepStage: true,
     installDependencies: async (stagedProjectRoot) => {
+      const scopedRoot = join(stagedProjectRoot, 'node_modules', '@zhiya')
+      mkdirSync(scopedRoot, { recursive: true })
+      symlinkSync(
+        join(stagedProjectRoot, 'apps', 'brain-film'),
+        join(scopedRoot, 'brain-film'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      )
       for (const packageName of ['task-client', 'works-bridge']) {
         const directory = join(
           stagedProjectRoot,
@@ -125,6 +134,10 @@ test('delivery secrets exist only in the extracted project configuration', async
   )
   assert.equal(JSON.stringify(result).includes('SECRET_SERVER_FIXTURE'), false)
   assert.equal(JSON.stringify(result).includes('SECRET_FILM_FIXTURE'), false)
+  assert.equal(
+    existsSync(join(result.packageRoot, 'project', 'node_modules', '@zhiya', 'brain-film')),
+    false,
+  )
   assert.equal(
     readFileSync(result.reportPath, 'utf8').includes('SECRET_SERVER_FIXTURE'),
     false,
