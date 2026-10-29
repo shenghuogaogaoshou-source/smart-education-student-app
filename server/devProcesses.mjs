@@ -35,6 +35,7 @@ export function buildDevProcessSpecs(root, forwardedArgs) {
   return [
     processSpec('ai-proxy', root, [join(root, 'server', 'ai-proxy.mjs')], process.execPath, {
       COMPANION_PROXY_HOST: backendHost,
+      BRAIN_INTERNAL_ORIGIN: 'http://127.0.0.1:8766',
     }, true),
     processSpec(
       'brain-api',
