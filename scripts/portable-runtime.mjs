@@ -207,7 +207,7 @@ function runAndRequire(command, args, errorMessage) {
 
 export function verifyPortableRuntime(
   runtimeRoot,
-  commandRunner = spawnSync,
+  commandRunner,
 ) {
   const root = resolve(runtimeRoot)
   const nodePath = join(root, 'node', 'node.exe')
@@ -229,12 +229,18 @@ export function verifyPortableRuntime(
     if (!existsSync(spec.path)) {
       throw new Error(`Portable runtime file is missing: ${spec.path}`)
     }
-    const result = commandRunner({
+    const result = (commandRunner ?? ((spec) => spawnSync(
+      spec.command,
+      spec.args,
+      spec.options,
+    )))({
       command: spec.command,
       args: spec.args,
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 15_000,
+      options: {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 15_000,
+      },
     })
     if (result.status !== 0) {
       throw new Error(
